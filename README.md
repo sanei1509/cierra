@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cierra · prototipo
 
-## Getting Started
-
-First, run the development server:
+Prototipo funcional de liquidación de sueldos multiempresa y recibos web para estudios contables de Uruguay.
+Spec y modelo de negocio en `../docs/`. Arquitectura del MVP: [`docs/arquitectura-mvp.md`](docs/arquitectura-mvp.md).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+pnpm dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Los datos son ficticios y se guardan en el navegador (localStorage). Botón "Reiniciar datos de ejemplo" en la barra lateral.
+- Cambiá de usuario (arriba a la derecha) para probar roles: Administradora, Liquidador, Solo lectura.
+- "Cliente y empleado" en la barra lateral abre los portales.
+- La fecha de la demo está fija en septiembre 2026.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Estructura
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Archivo | Qué es |
+|---|---|
+| `src/lib/engine.ts` | Motor de cálculo determinista (sin dependencias de UI) |
+| `src/lib/params.ts` | Parámetros normativos y laudos con vigencia (**valores de ejemplo**) |
+| `src/lib/validations.ts` | Alertas bloqueantes, advertencias e informativas |
+| `src/lib/store.ts` | Workflow del período y auditoría (reemplazar por API + DB en producción) |
+| `src/lib/seed.ts` | 12 empresas y ~45 personas de ejemplo |
+| `src/app/(estudio)/` | Área del contador |
+| `src/app/cliente/[id]` | Portal del cliente |
+| `src/app/portal/[id]` | Portal del empleado (mobile) |
+| `src/app/recibo/[id]/[mes]` | Recibo imprimible |
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Deploy: `vercel` (es una app Next.js estática en su mayoría, entra en el plan gratuito).
