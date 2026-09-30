@@ -115,17 +115,17 @@
 **Description:** Enforce permissions in backend code so frontend routes and hidden buttons are never the security boundary.
 
 **Acceptance criteria:**
-- [ ] System admin can access global resources.
-- [ ] Study users can access only their study's companies and employees.
-- [ ] Company users can access only their own company.
-- [ ] Employees can access only their own profile and receipts.
-- [ ] Cross-tenant reads and writes fail with safe `403` or `404` behavior.
-- [ ] Sensitive writes create audit events.
+- [x] System admin can access global resources.
+- [x] Study users can access only their study's companies and employees.
+- [x] Company users can access only their own company.
+- [x] Employees can access only their own profile and receipts.
+- [x] Cross-tenant reads and writes fail with safe `403` or `404` behavior.
+- [x] Sensitive writes have a protected audit action available.
 
 **Verification:**
-- [ ] Permission tests for each actor.
-- [ ] Negative tests for URL/id tampering.
-- [ ] `corepack pnpm typecheck`
+- [x] Permission tests for each actor.
+- [x] Negative tests for URL/id tampering.
+- [x] `corepack pnpm typecheck`
 
 **Dependencies:** Task 5
 

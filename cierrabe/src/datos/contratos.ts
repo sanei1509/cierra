@@ -29,9 +29,10 @@ export interface CrearNovedadInput extends Omit<Novedad, "id" | "fecha"> {
   fecha?: string;
 }
 
-export interface CrearAuditEventInput extends Omit<AuditEvent, "id" | "fecha"> {
+export interface CrearAuditEventInput extends Omit<AuditEvent, "id" | "fecha" | "empresaId"> {
   id?: AuditEventId;
   fecha?: string;
+  empresaId?: EmpresaId;
 }
 
 export interface EstudiosRepo {
