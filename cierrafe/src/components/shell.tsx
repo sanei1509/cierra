@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, FileText, Home, Search, Settings, ShieldCheck, Users, Eye, RotateCcw, Menu, X, CalendarDays, ListChecks } from "lucide-react";
+import { Building2, FileText, Home, Search, Settings, ShieldCheck, Users, Eye, RotateCcw, Menu, X, CalendarDays, ListChecks, KeyRound, UserCog, BriefcaseBusiness, UserRound } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { useHidratado, useStore, useUsuario } from "@/lib/store";
 import { USUARIOS, ESTUDIO } from "@/lib/seed";
@@ -166,6 +166,43 @@ function Usuario() {
   );
 }
 
+function DevAccessBar() {
+  const router = useRouter();
+  const setUsuario = useStore((s) => s.setUsuario);
+  if (process.env.NODE_ENV === "production") return null;
+
+  const entrarEstudio = (id: string) => {
+    setUsuario(id);
+    router.push("/");
+  };
+
+  return (
+    <section className="flex flex-wrap items-center gap-2 rounded-[var(--radius-panel)] border border-dashed border-petroleo/35 bg-sol-suave/55 px-3 py-2" aria-label="Accesos rápidos de desarrollo">
+      <span className="flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-[0.08em] text-crema-t">
+        <KeyRound size={14} /> Dev roles
+      </span>
+      <Link href="/admin" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-tinta px-3 text-xs font-semibold text-white hover:bg-tinta-2">
+        <UserCog size={13} /> Admin sistema
+      </Link>
+      <button onClick={() => entrarEstudio("u1")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-tinta shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido">
+        <ShieldCheck size={13} /> Estudio admin
+      </button>
+      <button onClick={() => entrarEstudio("u2")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-tinta shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido">
+        <BriefcaseBusiness size={13} /> Liquidador
+      </button>
+      <button onClick={() => entrarEstudio("u3")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-tinta shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido">
+        <Eye size={13} /> Solo lectura
+      </button>
+      <Link href="/cliente/colon" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-tinta shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido">
+        <Building2 size={13} /> Empresa
+      </Link>
+      <Link href="/portal/espiga-3" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-tinta shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido">
+        <UserRound size={13} /> Empleado
+      </Link>
+    </section>
+  );
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const ok = useHidratado();
   const [menu, setMenu] = useState(false);
@@ -196,6 +233,7 @@ export function Shell({ children }: { children: ReactNode }) {
             {ok && <Usuario />}
           </div>
         </header>
+        {ok && <DevAccessBar />}
         <main className="min-w-0 flex-1">{ok ? children : <div className="h-[70vh] animate-pulse rounded-[var(--radius-panel)] bg-superficie/60" />}</main>
       </div>
     </div>
