@@ -272,19 +272,22 @@
 **Description:** Create the admin-facing screens needed to manage modules, plans and contracted services per study.
 
 **Acceptance criteria:**
-- [ ] Admin can view all studies and their current plan.
-- [ ] Admin can see active modules and add-ons for each study.
-- [ ] Admin can assign a package to a study.
-- [ ] Admin can define package/modules and fixed monthly price when giving access to a new study.
-- [ ] Admin can activate/deactivate add-ons and overrides.
-- [ ] Admin can enter internal commercial notes.
-- [ ] All changes create audit events.
+- [x] Admin can view all studies and their current plan.
+- [x] Admin can see active modules and add-ons for each study.
+- [x] Admin can assign a package to a study.
+- [x] Admin can define package/modules and fixed monthly price when giving access to a new study.
+- [x] Admin can activate/deactivate add-ons and overrides.
+- [x] Admin can enter internal commercial notes.
+- [x] All changes create audit events.
 
 **Verification:**
-- [ ] UI smoke test for admin commercial console.
-- [ ] Permission test proving study users cannot access admin commercial actions.
-- [ ] `corepack pnpm lint`
-- [ ] `corepack pnpm build`
+- [x] UI smoke test for admin commercial console.
+- [x] Permission test proving study users cannot access admin commercial actions.
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Notes:**
+- [ ] Pending later: persist admin console changes through real backend repositories/routes.
 
 **Dependencies:** Task 11
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Building2, Layers3, ReceiptText, ShieldCheck, Users } from "lucide-react";
+import { AdminCommercialConsole } from "@/components/admin-commercial-console";
 import { Boton, Panel } from "@/components/ui";
 import { Logo } from "@/components/shell";
 
@@ -30,25 +31,9 @@ export default function AdminSistema() {
         </p>
       </Panel>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <Panel className="p-5">
-          <h2 className="text-lg font-bold tracking-tight">Futuro panel admin</h2>
-          <ul className="mt-4 space-y-3 text-sm">
-            {[
-              "Crear y suspender estudios contables.",
-              "Dar acceso al usuario dueño del estudio.",
-              "Activar modulos, paquetes y add-ons.",
-              "Definir precio fijo mensual por estudio.",
-              "Ver actividad global y auditoria comercial.",
-            ].map((x) => (
-              <li key={x} className="flex gap-2">
-                <span className="mt-1 size-2 rounded-full bg-petroleo" />
-                <span>{x}</span>
-              </li>
-            ))}
-          </ul>
-        </Panel>
+      <AdminCommercialConsole />
 
+      <div className="grid gap-3 md:grid-cols-2">
         <Panel className="p-5">
           <h2 className="text-lg font-bold tracking-tight">Atajos de desarrollo</h2>
           <div className="mt-4 grid gap-2">
