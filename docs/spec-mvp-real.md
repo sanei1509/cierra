@@ -4,15 +4,21 @@
 Construir el sistema productivo de liquidacion de sueldos para estudios contables de Uruguay, partiendo del prototipo actual pero reemplazando los datos en `localStorage` por backend real, autenticacion, base PostgreSQL multi-tenant, auditoria y pruebas.
 
 Usuarios principales:
+- Administrador del sistema: administra Cierra, ve todo, habilita estudios y audita actividad global.
 - Estudio contable: administradores, liquidadores y perfiles de lectura.
 - Cliente empresa: carga novedades y aprueba liquidaciones.
 - Empleado: consulta recibos y datos propios.
 
 El primer hito es un MVP operable para 1 o 2 estudios piloto, con empresas, empleados, periodos mensuales, novedades, liquidacion versionada, recibos publicados y auditoria basica.
 
+La arquitectura de accesos, marca y aislamiento queda definida en `docs/accesos-marca-y-tenancy.md`.
+
 ## Supuestos
 - La app sigue siendo Next.js + TypeScript con App Router.
 - La base productiva sera PostgreSQL con `estudio_id` en tablas de negocio.
+- Cada usuario autenticado tendra rol y alcance: sistema, estudio, empresa o empleado.
+- Estudios y empresas podran editar su nombre visible, datos basicos y logo.
+- Cada usuario podra elegir modo claro, oscuro o seguir sistema.
 - El prototipo visual actual se reutiliza; cambia la fuente de datos.
 - Los montos productivos se migran a centesimos enteros antes de usar casos reales.
 - La fecha de demo septiembre 2026 se mantiene solo para datos de prueba.
@@ -45,6 +51,7 @@ El primer hito es un MVP operable para 1 o 2 estudios piloto, con empresas, empl
 - `cierrabe/drizzle/`: migraciones SQL.
 - `cierrabe/src/acciones/`: futuras acciones/casos de uso del backend.
 - `cierrabe/src/auth/`: futura configuracion de autenticacion y permisos.
+- `cierrabe/src/permisos/`: futuras politicas de autorizacion y alcance por actor.
 - `cierrabe/src/motor/`: futuro motor productivo, separado de UI y DB.
 - `cierrabe/src/pdf/`: futuras plantillas de recibos.
 - `tests/e2e/`: futuros recorridos Playwright.
@@ -72,11 +79,14 @@ Convenciones:
 - Las pantallas no hablan directo con SQL.
 - Validacion en bordes: formularios, Server Actions, APIs, imports y variables de entorno.
 - Auditoria en toda escritura de negocio.
+- Toda lectura/escritura protegida recibe un contexto de acceso y valida pertenencia.
 
 ## Testing Strategy
 - Motor: casos unitarios y casos dorados anonimizados.
 - Repositorios: pruebas de integracion contra Postgres de test.
 - Aislamiento multi-tenant: pruebas obligatorias por tabla/ruta.
+- Autorizacion por rol: pruebas para admin sistema, estudio, empresa y empleado.
+- Preferencias visuales: pruebas de persistencia de tema por usuario cuando se implemente auth real.
 - Server Actions: validacion, permisos, errores y auditoria.
 - UI: Playwright para recorridos principales del estudio, cliente y empleado.
 - Build/lint/typecheck obligatorios antes de publicar.
@@ -88,6 +98,7 @@ Convenciones:
   - Registrar auditoria para escrituras.
   - Reutilizar componentes y reglas existentes si aplican.
   - Separar contratos de implementacion.
+  - Comprobar permisos en backend aunque el frontend oculte botones.
 - Ask first:
   - Cambiar proveedor de auth/base/deploy.
   - Exponer datos reales o secretos.
@@ -101,10 +112,14 @@ Convenciones:
 
 ## Success Criteria
 - Un usuario del estudio puede iniciar sesion y operar solo su estudio.
+- Un administrador del sistema puede ver y gestionar todos los estudios.
 - Un estudio puede crear empresa y empleado con vigencias.
+- Un estudio puede editar su perfil y logo.
+- Una empresa puede entrar, ver su pantalla con nombre/logo propio y editar datos permitidos.
 - Un cliente puede cargar novedades del mes.
 - El estudio puede calcular una version, revisarla, aprobar/cerrar y publicar recibos.
 - El empleado solo puede ver sus recibos.
+- Cada usuario puede elegir modo claro, oscuro o sistema.
 - La auditoria permite reconstruir cambios importantes.
 - Pruebas de aislamiento fallan si se intenta leer datos de otro estudio.
 - `corepack pnpm lint` y `corepack pnpm build` pasan.
@@ -115,3 +130,5 @@ Convenciones:
 - Politica final de redondeo por concepto.
 - Formato real de exportacion BPS.
 - Decision legal sobre ubicacion de datos y contratos Ley 18.331.
+- Definir si el login inicial usa email/password, magic links, Google/Microsoft o combinacion.
+- Definir si una misma persona puede tener varios roles y elegir espacio al entrar.
