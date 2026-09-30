@@ -82,10 +82,13 @@
 **Estimated scope:** Medium
 
 ## Task 5: Authentication Foundation
-**Description:** Add real login foundation and resolve the authenticated user on every protected request.
+**Description:** Add mixed login foundation and resolve the authenticated user on every protected request.
 
 **Acceptance criteria:**
 - [ ] Users can be represented independently from their roles.
+- [ ] Login supports email/password.
+- [ ] Login supports magic link.
+- [ ] The model leaves room for Google/Microsoft login later.
 - [ ] A user can belong to a study, company and/or employee profile if needed.
 - [ ] Session context includes user id, actor type, role and selected workspace.
 - [ ] Suspended users cannot access protected areas.
@@ -188,6 +191,7 @@
 
 **Acceptance criteria:**
 - [ ] Module codes are stable and documented.
+- [ ] Initial module catalog covers the Excel replacement scope: RRHH core, payroll core, receipts, BPS, IRPF, licenses, salary history and accounting entries.
 - [ ] Modules have name, description, status, scope and dependencies.
 - [ ] Backend can list active modules.
 - [ ] Optional features reference module codes instead of hardcoded booleans.
@@ -212,6 +216,8 @@
 
 **Acceptance criteria:**
 - [ ] Plans can include multiple modules.
+- [ ] Pricing model supports fixed monthly price by plan.
+- [ ] Pricing model supports fixed monthly price by module/add-on.
 - [ ] Study subscription stores plan, status, dates, currency and internal notes.
 - [ ] Add-ons can enable modules outside the plan.
 - [ ] Admin overrides can enable or disable a module manually.
@@ -264,6 +270,7 @@
 - [ ] Admin can view all studies and their current plan.
 - [ ] Admin can see active modules and add-ons for each study.
 - [ ] Admin can assign a package to a study.
+- [ ] Admin can define package/modules and fixed monthly price when giving access to a new study.
 - [ ] Admin can activate/deactivate add-ons and overrides.
 - [ ] Admin can enter internal commercial notes.
 - [ ] All changes create audit events.
@@ -285,11 +292,11 @@
 **Estimated scope:** Medium
 
 ## Task 13: Internal Billing Summary
-**Description:** Track usage and produce a monthly internal summary of what each study should be charged.
+**Description:** Track commercial setup and produce a monthly internal summary of what each study should be charged.
 
 **Acceptance criteria:**
-- [ ] Usage events can be recorded for billable actions.
-- [ ] Billing summary includes plan price, add-ons, usage and manual adjustments.
+- [ ] Usage events can be recorded for internal reference.
+- [ ] Billing summary includes fixed plan price, fixed module/add-on prices and manual adjustments.
 - [ ] Summary can be filtered by month and study.
 - [ ] Prices are versioned or snapshotted so historical totals do not change silently.
 - [ ] Admin can see notes explaining manual adjustments.

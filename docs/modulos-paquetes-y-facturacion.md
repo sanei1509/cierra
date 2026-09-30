@@ -29,6 +29,13 @@ Estudio Don Pedrito
 - Mantener historial de cambios comerciales.
 - Evitar que un estudio use una funcion no contratada aunque conozca la URL.
 
+## Decisiones iniciales
+- El login sera mixto: email/contrasena y magic link desde el inicio; Google/Microsoft queda como opcion futura o configurable si un estudio lo necesita.
+- La estrategia comercial inicial sera cobro fijo mensual por modulo o por paquete de modulos.
+- Los paquetes no necesitan cerrarse todos antes de seguir desarrollando. Se pueden definir al dar ingreso a cada estudio.
+- El primer foco funcional sera reemplazar las planillas Excel actuales del estudio con modulos equivalentes dentro del sistema.
+- La medicion de uso se guardara para control interno, soporte y futuras reglas comerciales, pero no sera la base principal del cobro inicial.
+
 ## Conceptos principales
 
 ### Modulo
@@ -48,6 +55,26 @@ Ejemplos:
 - Multiusuario dentro del estudio.
 - Firma o aceptacion digital de recibos.
 - Almacenamiento de documentos laborales.
+
+### Modulos iniciales para reemplazar Excel
+Estos modulos salen del archivo Excel de RRHH usado como referencia inicial:
+
+| Codigo | Nombre | Reemplaza o cubre |
+|---|---|---|
+| `rrhh_core` | Datos RRHH base | Datos Madre, empleados, empresas, parametros generales |
+| `payroll_core` | Liquidacion de sueldos | Simuladores, nomina y calculos mensuales |
+| `payroll_receipts` | Recibos de sueldo | Recibo y publicacion/descarga de recibos |
+| `bps_exports` | BPS y CESS | CESS-BPS, CESS-BPS Socios y archivo de nomina |
+| `irpf_calculation` | IRPF | IRPF e IRPF anticipo |
+| `leave_management` | Licencias | Licencias, licencia gozada y saldos futuros |
+| `salary_history` | Historia laboral/salarial | Historia y vigencias de sueldo/categoria |
+| `accounting_entries` | Asiento de sueldos | Asiento sueldos y cuentas contables |
+| `company_portal` | Portal empresa | Carga de novedades y aprobacion de liquidaciones |
+| `employee_portal` | Portal empleado | Consulta personal de recibos y datos |
+| `bulk_import_excel` | Importacion Excel | Alta/carga masiva desde planillas |
+| `audit_basic` | Auditoria basica | Registro de actividad y cambios |
+
+Estos codigos deben mantenerse estables. El nombre visible puede cambiar, pero el codigo interno no deberia cambiar una vez usado en contratos.
 
 Cada modulo debe tener:
 - Codigo interno estable.
@@ -156,14 +183,22 @@ El permiso final se calcula combinando paquete + add-ons + overrides + estado de
 ## Precios
 Los precios pueden ser simples al principio y crecer despues.
 
-### Tipos de precio posibles
-- Precio fijo mensual.
+### Estrategia inicial de precio
+El precio inicial sera fijo mensual.
+
+Puede ser:
+- Precio fijo mensual por paquete.
+- Precio fijo mensual por modulo individual.
+- Precio especial acordado manualmente para un estudio.
+
+Por ahora no se cobrara principalmente por empresa, empleado, recibo o envio, aunque esos datos pueden guardarse para control interno y futuras decisiones.
+
+### Tipos de precio futuros posibles
 - Precio por empresa activa.
 - Precio por empleado activo.
 - Precio por recibo generado.
 - Precio por envio realizado.
 - Precio por almacenamiento usado.
-- Precio especial acordado manualmente.
 
 ### Ejemplos
 
@@ -174,13 +209,13 @@ Precio: incluido en paquete Profesional
 
 ```text
 Modulo: Envio automatico de recibos por email
-Precio: $ X mensual + $ Y por recibo enviado
+Precio: $ X mensual fijo
 ```
 
 ```text
 Paquete Basico
-Precio: $ X mensual
-Incluye hasta 5 empresas y 50 empleados
+Precio: $ X mensual fijo
+Incluye los modulos acordados al dar de alta el estudio
 ```
 
 ## Facturacion interna
@@ -194,7 +229,7 @@ El sistema deberia poder mostrar:
 - Cantidad de empleados activos.
 - Cantidad de recibos generados.
 - Cantidad de envios realizados.
-- Precio mensual estimado.
+- Precio mensual fijo acordado.
 - Ajustes manuales.
 - Observaciones internas.
 
@@ -233,6 +268,7 @@ El admin del sistema necesita una pantalla para:
 - Crear y editar paquetes.
 - Definir precios.
 - Asignar paquete a un estudio.
+- Definir el paquete inicial al dar ingreso a un estudio.
 - Activar add-ons.
 - Hacer overrides manuales.
 - Ver resumen de cobro por estudio.
@@ -319,6 +355,22 @@ Ejemplos:
 - recibo enviado.
 - empleado activo del mes.
 - empresa activa del mes.
+
+Aunque el cobro inicial sea fijo, estos eventos ayudan a entender uso, soporte, rentabilidad y cambios futuros de plan.
+
+## Alta de un estudio
+Cuando se da ingreso a un estudio, el administrador debe poder definir:
+- Datos del estudio.
+- Usuario dueño o administrador inicial.
+- Paquete inicial.
+- Modulos activos.
+- Precio fijo mensual acordado.
+- Moneda.
+- Fecha de inicio.
+- Estado inicial: prueba o activo.
+- Notas comerciales internas.
+
+Esta accion debe dejar auditoria comercial y auditoria de acceso.
 
 ## Casos de abuso que deben fallar
 - Un estudio intenta usar un modulo no contratado cambiando la URL.

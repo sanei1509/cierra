@@ -13,7 +13,10 @@ Convertir el prototipo local en una aplicacion productiva por slices verticales.
 - Implementar multi-tenancy desde el primer schema, no como parche posterior.
 - Implementar permisos en backend; el frontend solo refleja lo que el backend permite.
 - Implementar chequeo de modulo contratado en backend para toda funcion opcional.
+- Usar login mixto: email/contrasena y magic link como base, con opcion futura de Google/Microsoft.
 - Guardar preferencias visuales por usuario: claro, oscuro o sistema.
+- Cobrar inicialmente fijo mensual por modulo o paquete de modulos.
+- Priorizar modulos que sustituyen las planillas Excel actuales del estudio.
 - Mantener el seed/demo hasta que cada slice tenga backend real equivalente.
 
 ## Phase 1: Foundation
@@ -31,7 +34,7 @@ Convertir el prototipo local en una aplicacion productiva por slices verticales.
 
 ## Phase 2: Auth and Permissions
 - Task 6: Modelar usuarios, roles, membresias y alcance para admin sistema, estudio, empresa y empleado.
-- Task 7: Integrar autenticacion real y resolver contexto de acceso por request.
+- Task 7: Integrar login mixto y resolver contexto de acceso por request.
 - Task 8: Implementar politicas de autorizacion backend para cada actor.
 - Task 9: Proteger rutas de estudio, empresa, empleado y admin con sesion real.
 - Task 10: Reemplazar selector de usuario demo por sesion y selector de espacio cuando aplique.
@@ -52,11 +55,11 @@ Convertir el prototipo local en una aplicacion productiva por slices verticales.
 - Task 14: Aplicar marca contextual en estudio, empresa, empleado, recibos y portales.
 
 ## Phase 4: Modules, Packages and Billing Foundation
-- Task 15: Catalogo de modulos funcionales con codigos estables.
+- Task 15: Catalogo de modulos funcionales con codigos estables, empezando por los modulos que sustituyen Excel.
 - Task 16: Paquetes comerciales y modulos incluidos.
 - Task 17: Contrato/suscripcion por estudio con add-ons y overrides.
 - Task 18: Guard de modulo contratado en backend y UI.
-- Task 19: Resumen interno de cobro por estudio.
+- Task 19: Resumen interno de cobro fijo por estudio, modulo y paquete.
 
 ## Phase 5: Core Payroll Flow
 - Task 20: Migrar empresas/empleados a backend real.
@@ -98,9 +101,8 @@ Convertir el prototipo local en una aplicacion productiva por slices verticales.
 
 ## Open Questions
 - Confirmar proveedor final de auth si Better Auth sigue firme.
-- Confirmar metodo de login: email/password, magic link, Google/Microsoft o mixto.
 - Confirmar si un usuario puede pertenecer a mas de un estudio/empresa.
-- Confirmar paquetes iniciales y que modulos incluye cada uno.
-- Confirmar estrategia inicial de precios: fijo, por uso o mixto.
+- Confirmar nombres comerciales iniciales de paquetes.
+- Confirmar moneda inicial, IVA y formato de precios.
 - Confirmar si desarrollo local usara Docker Compose para Postgres.
 - Confirmar prioridad: estudio interno primero o portal cliente primero.

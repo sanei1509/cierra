@@ -14,14 +14,18 @@ El primer hito es un MVP operable para 1 o 2 estudios piloto, con empresas, empl
 La arquitectura de accesos, marca y aislamiento queda definida en `docs/accesos-marca-y-tenancy.md`.
 La arquitectura de modulos contratados, paquetes, precios y facturacion interna queda definida en `docs/modulos-paquetes-y-facturacion.md`.
 
+El alcance funcional inicial sera reemplazar, de forma ordenada y segura, las planillas Excel usadas por el estudio para RRHH, nomina, recibos, IRPF, BPS, licencias, historia y asiento de sueldos.
+
 ## Supuestos
 - La app sigue siendo Next.js + TypeScript con App Router.
 - La base productiva sera PostgreSQL con `estudio_id` en tablas de negocio.
+- El login sera mixto: email/contrasena y magic link como base, con posibilidad de sumar Google/Microsoft para estudios que lo pidan.
 - Cada usuario autenticado tendra rol y alcance: sistema, estudio, empresa o empleado.
 - Estudios y empresas podran editar su nombre visible, datos basicos y logo.
 - Cada usuario podra elegir modo claro, oscuro o seguir sistema.
 - Las funciones del sistema podran habilitarse o deshabilitarse por estudio mediante modulos, paquetes y add-ons.
-- Los administradores podran ver que servicios tiene contratado cada estudio y cuanto cobrarle segun plan, modulos y uso.
+- Los administradores podran ver que servicios tiene contratado cada estudio y cuanto cobrarle segun plan y modulos.
+- El cobro inicial sera fijo mensual por modulo o por paquete de modulos. El uso se medira para referencia interna, no como regla principal de cobro inicial.
 - El prototipo visual actual se reutiliza; cambia la fuente de datos.
 - Los montos productivos se migran a centesimos enteros antes de usar casos reales.
 - La fecha de demo septiembre 2026 se mantiene solo para datos de prueba.
@@ -123,6 +127,7 @@ Convenciones:
 - Un administrador del sistema puede ver y gestionar todos los estudios.
 - Un administrador del sistema puede activar/desactivar modulos por estudio.
 - Un administrador del sistema puede asignar paquete, add-ons y precios a un estudio.
+- Un administrador del sistema puede dar ingreso a un estudio y, en ese momento, definir su paquete inicial, modulos activos y precio fijo mensual.
 - Un estudio puede crear empresa y empleado con vigencias.
 - Un estudio puede editar su perfil y logo.
 - Una empresa puede entrar, ver su pantalla con nombre/logo propio y editar datos permitidos.
@@ -142,7 +147,6 @@ Convenciones:
 - Politica final de redondeo por concepto.
 - Formato real de exportacion BPS.
 - Decision legal sobre ubicacion de datos y contratos Ley 18.331.
-- Definir si el login inicial usa email/password, magic links, Google/Microsoft o combinacion.
 - Definir si una misma persona puede tener varios roles y elegir espacio al entrar.
 - Definir moneda inicial, impuestos y si los precios se guardan con IVA incluido o sin IVA.
-- Definir si el cobro sera fijo mensual, por empresa, por empleado, por recibo, por envio o mixto.
+- Definir nombres comerciales definitivos de los paquetes iniciales.
