@@ -182,3 +182,128 @@
 - `cierrafe/src/lib/*`
 
 **Estimated scope:** Medium
+
+## Task 9: Module Catalog Contracts
+**Description:** Define the functional module catalog used to enable or disable system capabilities by study.
+
+**Acceptance criteria:**
+- [ ] Module codes are stable and documented.
+- [ ] Modules have name, description, status, scope and dependencies.
+- [ ] Backend can list active modules.
+- [ ] Optional features reference module codes instead of hardcoded booleans.
+- [ ] The implementation follows `docs/modulos-paquetes-y-facturacion.md`.
+
+**Verification:**
+- [ ] `corepack pnpm typecheck`
+- [ ] Unit tests for module dependency and active/inactive status.
+
+**Dependencies:** Task 6
+
+**Files likely touched:**
+- `cierrabe/src/modulos/*`
+- `cierrabe/src/datos/schema.ts`
+- `cierrabe/src/datos/contratos.ts`
+- `docs/modulos-paquetes-y-facturacion.md`
+
+**Estimated scope:** Medium
+
+## Task 10: Plans, Add-ons and Study Subscriptions
+**Description:** Model commercial packages and what each study has contracted.
+
+**Acceptance criteria:**
+- [ ] Plans can include multiple modules.
+- [ ] Study subscription stores plan, status, dates, currency and internal notes.
+- [ ] Add-ons can enable modules outside the plan.
+- [ ] Admin overrides can enable or disable a module manually.
+- [ ] Commercial changes are audited.
+
+**Verification:**
+- [ ] Repository/schema tests for plan and subscription relationships.
+- [ ] Permission tests proving only system admins can change commercial setup.
+- [ ] `corepack pnpm typecheck`
+
+**Dependencies:** Task 9
+
+**Files likely touched:**
+- `cierrabe/src/modulos/*`
+- `cierrabe/src/facturacion/*`
+- `cierrabe/src/datos/schema.ts`
+- `cierrabe/drizzle/*`
+
+**Estimated scope:** Medium
+
+## Task 11: Contracted Module Guard
+**Description:** Enforce module availability in backend code before executing optional system functions.
+
+**Acceptance criteria:**
+- [ ] Backend exposes a single guard to check if a study has a module enabled.
+- [ ] Guard combines plan modules, add-ons, overrides and subscription status.
+- [ ] Disabled modules cannot be executed through direct requests.
+- [ ] Frontend receives a clear non-technical reason when a module is not included.
+- [ ] Permission checks and module checks remain separate.
+
+**Verification:**
+- [ ] Tests for included module, disabled module, add-on, override and paused subscription.
+- [ ] Negative test for URL/request bypass.
+- [ ] `corepack pnpm typecheck`
+
+**Dependencies:** Task 10
+
+**Files likely touched:**
+- `cierrabe/src/modulos/*`
+- `cierrabe/src/permisos/*`
+- `cierrabe/src/datos/errores.ts`
+- `cierrafe/src/components/*`
+
+**Estimated scope:** Medium
+
+## Task 12: Admin Commercial Console
+**Description:** Create the admin-facing screens needed to manage modules, plans and contracted services per study.
+
+**Acceptance criteria:**
+- [ ] Admin can view all studies and their current plan.
+- [ ] Admin can see active modules and add-ons for each study.
+- [ ] Admin can assign a package to a study.
+- [ ] Admin can activate/deactivate add-ons and overrides.
+- [ ] Admin can enter internal commercial notes.
+- [ ] All changes create audit events.
+
+**Verification:**
+- [ ] UI smoke test for admin commercial console.
+- [ ] Permission test proving study users cannot access admin commercial actions.
+- [ ] `corepack pnpm lint`
+- [ ] `corepack pnpm build`
+
+**Dependencies:** Task 11
+
+**Files likely touched:**
+- `cierrafe/src/app/admin/*`
+- `cierrafe/src/components/*`
+- `cierrabe/src/modulos/*`
+- `cierrabe/src/facturacion/*`
+
+**Estimated scope:** Medium
+
+## Task 13: Internal Billing Summary
+**Description:** Track usage and produce a monthly internal summary of what each study should be charged.
+
+**Acceptance criteria:**
+- [ ] Usage events can be recorded for billable actions.
+- [ ] Billing summary includes plan price, add-ons, usage and manual adjustments.
+- [ ] Summary can be filtered by month and study.
+- [ ] Prices are versioned or snapshotted so historical totals do not change silently.
+- [ ] Admin can see notes explaining manual adjustments.
+
+**Verification:**
+- [ ] Unit tests for billing summary calculation.
+- [ ] Tests for historical price snapshot behavior.
+- [ ] `corepack pnpm typecheck`
+
+**Dependencies:** Task 12
+
+**Files likely touched:**
+- `cierrabe/src/facturacion/*`
+- `cierrabe/src/datos/schema.ts`
+- `cierrafe/src/app/admin/*`
+
+**Estimated scope:** Medium

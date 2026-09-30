@@ -8,9 +8,11 @@ Convertir el prototipo local en una aplicacion productiva por slices verticales.
 - Separar el repo en `cierrafe/` para frontend y `cierrabe/` para backend/base.
 - Introducir `cierrabe/src/datos/` como frontera unica de persistencia.
 - Tratar `docs/accesos-marca-y-tenancy.md` como contrato base de roles, permisos y marca.
+- Tratar `docs/modulos-paquetes-y-facturacion.md` como contrato base de modulos, paquetes y cobro interno.
 - Usar contratos TypeScript antes de SQL para evitar acoplar pantallas a la DB.
 - Implementar multi-tenancy desde el primer schema, no como parche posterior.
 - Implementar permisos en backend; el frontend solo refleja lo que el backend permite.
+- Implementar chequeo de modulo contratado en backend para toda funcion opcional.
 - Guardar preferencias visuales por usuario: claro, oscuro o sistema.
 - Mantener el seed/demo hasta que cada slice tenga backend real equivalente.
 
@@ -49,29 +51,36 @@ Convertir el prototipo local en una aplicacion productiva por slices verticales.
 - Task 13: Preferencia visual por usuario: modo claro, modo oscuro o sistema.
 - Task 14: Aplicar marca contextual en estudio, empresa, empleado, recibos y portales.
 
-## Phase 4: Core Payroll Flow
-- Task 15: Migrar empresas/empleados a backend real.
-- Task 16: Implementar periodos y solicitudes de novedades.
-- Task 17: Implementar novedades con auditoria.
-- Task 18: Calcular liquidacion versionada desde datos persistidos.
-- Task 19: Cerrar periodo y publicar recibos.
+## Phase 4: Modules, Packages and Billing Foundation
+- Task 15: Catalogo de modulos funcionales con codigos estables.
+- Task 16: Paquetes comerciales y modulos incluidos.
+- Task 17: Contrato/suscripcion por estudio con add-ons y overrides.
+- Task 18: Guard de modulo contratado en backend y UI.
+- Task 19: Resumen interno de cobro por estudio.
+
+## Phase 5: Core Payroll Flow
+- Task 20: Migrar empresas/empleados a backend real.
+- Task 21: Implementar periodos y solicitudes de novedades.
+- Task 22: Implementar novedades con auditoria.
+- Task 23: Calcular liquidacion versionada desde datos persistidos.
+- Task 24: Cerrar periodo y publicar recibos.
 
 ## Checkpoint: Core Flow
 - Crear/cargar/calcular/cerrar un mes end-to-end.
 - Recibo publicado reproduce version cerrada.
 - Auditoria registra cada escritura.
 
-## Phase 5: Portals and Imports
-- Task 20: Portal cliente con acceso restringido a una empresa.
-- Task 21: Portal empleado restringido a un empleado.
-- Task 22: Importador Excel persistente con validacion y resumen.
-- Task 23: Exportacion BPS basada en liquidacion cerrada.
+## Phase 6: Portals and Imports
+- Task 25: Portal cliente con acceso restringido a una empresa.
+- Task 26: Portal empleado restringido a un empleado.
+- Task 27: Importador Excel persistente con validacion y resumen.
+- Task 28: Exportacion BPS basada en liquidacion cerrada.
 
-## Phase 6: Production Readiness
-- Task 24: Docker/standalone para Coolify.
-- Task 25: Variables de entorno, headers de seguridad y logs sin PII.
-- Task 26: Backups y restore documentados.
-- Task 27: Playwright para recorridos criticos.
+## Phase 7: Production Readiness
+- Task 29: Docker/standalone para Coolify.
+- Task 30: Variables de entorno, headers de seguridad y logs sin PII.
+- Task 31: Backups y restore documentados.
+- Task 32: Playwright para recorridos criticos.
 
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
@@ -79,6 +88,8 @@ Convertir el prototipo local en una aplicacion productiva por slices verticales.
 | Mezcla de datos entre estudios | High | RLS, `estudio_id` obligatorio y pruebas de aislamiento desde Phase 1 |
 | Empresa o empleado accede por URL a datos ajenos | High | Politicas backend por actor, pruebas negativas y respuestas 403/404 |
 | Admin soporte modifica datos sin trazabilidad | High | Auditoria obligatoria y modo soporte con motivo |
+| Estudio usa funciones no contratadas | High | Guard backend de modulo contratado y pruebas negativas |
+| Cobro calculado con reglas ambiguas | Medium | Catalogo de precios versionado, snapshots mensuales y ajustes manuales auditados |
 | Reglas laborales incompletas | High | Bloquear fuera de alcance, casos dorados y validacion con contador |
 | Migracion demasiado grande desde Zustand | Medium | Slices por flujo, mantener demo hasta reemplazo completo |
 | Auth mal integrada con Server Actions | Medium | Contexto unico de sesion/tenant y pruebas por rol |
@@ -89,5 +100,7 @@ Convertir el prototipo local en una aplicacion productiva por slices verticales.
 - Confirmar proveedor final de auth si Better Auth sigue firme.
 - Confirmar metodo de login: email/password, magic link, Google/Microsoft o mixto.
 - Confirmar si un usuario puede pertenecer a mas de un estudio/empresa.
+- Confirmar paquetes iniciales y que modulos incluye cada uno.
+- Confirmar estrategia inicial de precios: fijo, por uso o mixto.
 - Confirmar si desarrollo local usara Docker Compose para Postgres.
 - Confirmar prioridad: estudio interno primero o portal cliente primero.

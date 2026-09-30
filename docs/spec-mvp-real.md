@@ -12,6 +12,7 @@ Usuarios principales:
 El primer hito es un MVP operable para 1 o 2 estudios piloto, con empresas, empleados, periodos mensuales, novedades, liquidacion versionada, recibos publicados y auditoria basica.
 
 La arquitectura de accesos, marca y aislamiento queda definida en `docs/accesos-marca-y-tenancy.md`.
+La arquitectura de modulos contratados, paquetes, precios y facturacion interna queda definida en `docs/modulos-paquetes-y-facturacion.md`.
 
 ## Supuestos
 - La app sigue siendo Next.js + TypeScript con App Router.
@@ -19,6 +20,8 @@ La arquitectura de accesos, marca y aislamiento queda definida en `docs/accesos-
 - Cada usuario autenticado tendra rol y alcance: sistema, estudio, empresa o empleado.
 - Estudios y empresas podran editar su nombre visible, datos basicos y logo.
 - Cada usuario podra elegir modo claro, oscuro o seguir sistema.
+- Las funciones del sistema podran habilitarse o deshabilitarse por estudio mediante modulos, paquetes y add-ons.
+- Los administradores podran ver que servicios tiene contratado cada estudio y cuanto cobrarle segun plan, modulos y uso.
 - El prototipo visual actual se reutiliza; cambia la fuente de datos.
 - Los montos productivos se migran a centesimos enteros antes de usar casos reales.
 - La fecha de demo septiembre 2026 se mantiene solo para datos de prueba.
@@ -52,6 +55,8 @@ La arquitectura de accesos, marca y aislamiento queda definida en `docs/accesos-
 - `cierrabe/src/acciones/`: futuras acciones/casos de uso del backend.
 - `cierrabe/src/auth/`: futura configuracion de autenticacion y permisos.
 - `cierrabe/src/permisos/`: futuras politicas de autorizacion y alcance por actor.
+- `cierrabe/src/modulos/`: futuro catalogo de modulos, planes, contratos y chequeos de habilitacion.
+- `cierrabe/src/facturacion/`: futura medicion de uso y resumen interno de cobro.
 - `cierrabe/src/motor/`: futuro motor productivo, separado de UI y DB.
 - `cierrabe/src/pdf/`: futuras plantillas de recibos.
 - `tests/e2e/`: futuros recorridos Playwright.
@@ -80,12 +85,14 @@ Convenciones:
 - Validacion en bordes: formularios, Server Actions, APIs, imports y variables de entorno.
 - Auditoria en toda escritura de negocio.
 - Toda lectura/escritura protegida recibe un contexto de acceso y valida pertenencia.
+- Toda accion asociada a una funcion opcional valida que el modulo este contratado o habilitado.
 
 ## Testing Strategy
 - Motor: casos unitarios y casos dorados anonimizados.
 - Repositorios: pruebas de integracion contra Postgres de test.
 - Aislamiento multi-tenant: pruebas obligatorias por tabla/ruta.
 - Autorizacion por rol: pruebas para admin sistema, estudio, empresa y empleado.
+- Modulos contratados: pruebas para funcion activa, funcion apagada, add-on y override administrativo.
 - Preferencias visuales: pruebas de persistencia de tema por usuario cuando se implemente auth real.
 - Server Actions: validacion, permisos, errores y auditoria.
 - UI: Playwright para recorridos principales del estudio, cliente y empleado.
@@ -99,6 +106,7 @@ Convenciones:
   - Reutilizar componentes y reglas existentes si aplican.
   - Separar contratos de implementacion.
   - Comprobar permisos en backend aunque el frontend oculte botones.
+  - Comprobar modulo contratado en backend antes de ejecutar funciones opcionales.
 - Ask first:
   - Cambiar proveedor de auth/base/deploy.
   - Exponer datos reales o secretos.
@@ -113,6 +121,8 @@ Convenciones:
 ## Success Criteria
 - Un usuario del estudio puede iniciar sesion y operar solo su estudio.
 - Un administrador del sistema puede ver y gestionar todos los estudios.
+- Un administrador del sistema puede activar/desactivar modulos por estudio.
+- Un administrador del sistema puede asignar paquete, add-ons y precios a un estudio.
 - Un estudio puede crear empresa y empleado con vigencias.
 - Un estudio puede editar su perfil y logo.
 - Una empresa puede entrar, ver su pantalla con nombre/logo propio y editar datos permitidos.
@@ -120,6 +130,8 @@ Convenciones:
 - El estudio puede calcular una version, revisarla, aprobar/cerrar y publicar recibos.
 - El empleado solo puede ver sus recibos.
 - Cada usuario puede elegir modo claro, oscuro o sistema.
+- Un estudio no puede usar funciones no contratadas aunque intente acceder por URL o request directa.
+- El sistema puede mostrar un resumen interno de cobro por estudio.
 - La auditoria permite reconstruir cambios importantes.
 - Pruebas de aislamiento fallan si se intenta leer datos de otro estudio.
 - `corepack pnpm lint` y `corepack pnpm build` pasan.
@@ -132,3 +144,5 @@ Convenciones:
 - Decision legal sobre ubicacion de datos y contratos Ley 18.331.
 - Definir si el login inicial usa email/password, magic links, Google/Microsoft o combinacion.
 - Definir si una misma persona puede tener varios roles y elegir espacio al entrar.
+- Definir moneda inicial, impuestos y si los precios se guardan con IVA incluido o sin IVA.
+- Definir si el cobro sera fijo mensual, por empresa, por empleado, por recibo, por envio o mixto.
