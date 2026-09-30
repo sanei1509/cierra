@@ -20,6 +20,8 @@ export const temaPreferidoEnum = pgEnum("tema_preferido", ["system", "light", "d
 export const proveedorAuthEnum = pgEnum("proveedor_auth", ["password", "magic_link", "google", "microsoft"]);
 export const duenoArchivoMarcaEnum = pgEnum("dueno_archivo_marca", ["estudio", "empresa", "empleado"]);
 export const tipoArchivoMarcaEnum = pgEnum("tipo_archivo_marca", ["logo", "foto"]);
+export const estadoModuloEnum = pgEnum("estado_modulo", ["activo", "oculto", "beta", "discontinuado"]);
+export const alcanceModuloEnum = pgEnum("alcance_modulo", ["sistema", "estudio", "empresa", "empleado"]);
 export const etapaPeriodoEnum = pgEnum("etapa_periodo", ["novedades", "recibidas", "borrador", "enviada", "devuelta", "aprobada", "cerrada"]);
 export const bpsEstadoEnum = pgEnum("bps_estado", ["pendiente", "generado", "presentado"]);
 export const modalidadEnum = pgEnum("modalidad", ["mensual", "jornalero"]);
@@ -50,6 +52,21 @@ export const estudios = pgTable("estudios", {
   plan: text("plan").default("piloto").notNull(),
   creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const modulos = pgTable(
+  "modulos",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    codigo: varchar("codigo", { length: 80 }).notNull(),
+    nombre: text("nombre").notNull(),
+    descripcion: text("descripcion").notNull(),
+    estado: estadoModuloEnum("estado").default("activo").notNull(),
+    alcance: alcanceModuloEnum("alcance").notNull(),
+    dependeDe: jsonb("depende_de").$type<string[]>().default([]).notNull(),
+    creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("modulos_codigo_unique").on(t.codigo)],
+);
 
 export const usuarios = pgTable(
   "usuarios",

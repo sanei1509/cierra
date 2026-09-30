@@ -22,6 +22,13 @@
       "when": 1790807783085,
       "tag": "0002_freezing_krista_starr",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790808559363,
+      "tag": "0003_breezy_daimon_hellstrom",
+      "breakpoints": true
     }
   ]
 }

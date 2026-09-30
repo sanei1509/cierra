@@ -195,16 +195,16 @@
 **Description:** Define the functional module catalog used to enable or disable system capabilities by study.
 
 **Acceptance criteria:**
-- [ ] Module codes are stable and documented.
-- [ ] Initial module catalog covers the Excel replacement scope: RRHH core, payroll core, receipts, BPS, IRPF, licenses, salary history and accounting entries.
-- [ ] Modules have name, description, status, scope and dependencies.
-- [ ] Backend can list active modules.
-- [ ] Optional features reference module codes instead of hardcoded booleans.
-- [ ] The implementation follows `docs/modulos-paquetes-y-facturacion.md`.
+- [x] Module codes are stable and documented.
+- [x] Initial module catalog covers the Excel replacement scope: RRHH core, payroll core, receipts, BPS, IRPF, licenses, salary history and accounting entries.
+- [x] Modules have name, description, status, scope and dependencies.
+- [x] Backend can list active modules.
+- [x] Optional features reference module codes instead of hardcoded booleans.
+- [x] The implementation follows `docs/modulos-paquetes-y-facturacion.md`.
 
 **Verification:**
-- [ ] `corepack pnpm typecheck`
-- [ ] Unit tests for module dependency and active/inactive status.
+- [x] `corepack pnpm typecheck`
+- [x] Unit tests for module dependency and active/inactive status.
 
 **Dependencies:** Task 6
 
