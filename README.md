@@ -17,14 +17,13 @@ pnpm dev          # http://localhost:3000
 
 | Archivo | Qué es |
 |---|---|
-| `src/lib/engine.ts` | Motor de cálculo determinista (sin dependencias de UI) |
-| `src/lib/params.ts` | Parámetros normativos y laudos con vigencia (**valores de ejemplo**) |
-| `src/lib/validations.ts` | Alertas bloqueantes, advertencias e informativas |
-| `src/lib/store.ts` | Workflow del período y auditoría (reemplazar por API + DB en producción) |
-| `src/lib/seed.ts` | 12 empresas y ~45 personas de ejemplo |
-| `src/app/(estudio)/` | Área del contador |
-| `src/app/cliente/[id]` | Portal del cliente |
-| `src/app/portal/[id]` | Portal del empleado (mobile) |
-| `src/app/recibo/[id]/[mes]` | Recibo imprimible |
+| `cierrafe/` | Frontend Next.js: pantallas del estudio, cliente y empleado |
+| `cierrafe/src/lib/engine.ts` | Motor de cálculo determinista usado por el front actual |
+| `cierrafe/src/lib/params.ts` | Parámetros normativos y laudos con vigencia (**valores de ejemplo**) |
+| `cierrafe/src/lib/store.ts` | Workflow demo en navegador, a reemplazar por backend |
+| `cierrabe/` | Backend: schema PostgreSQL, Drizzle, contratos y acceso a datos |
+| `cierrabe/src/datos/schema.ts` | Primer esquema real de base de datos |
+| `cierrabe/drizzle/` | Migraciones SQL generadas |
+| `docs/` | Arquitectura y notas de desarrollo |
 
 Deploy: `vercel` (es una app Next.js estática en su mayoría, entra en el plan gratuito).

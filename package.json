@@ -1,31 +1,22 @@
 {
-  "name": "app",
+  "name": "cierra",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "clsx": "^2.1.1",
-    "lucide-react": "^1.48.0",
-    "next": "16.3.6",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zustand": "^5.0.15"
+    "dev": "pnpm --filter cierrafe dev",
+    "dev:fe": "pnpm --filter cierrafe dev",
+    "build": "pnpm --filter cierrafe build",
+    "build:fe": "pnpm --filter cierrafe build",
+    "lint": "pnpm --filter cierrafe lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter cierrafe test",
+    "db:generate": "pnpm --filter cierrabe db:generate",
+    "db:migrate": "pnpm --filter cierrabe db:migrate",
+    "db:studio": "pnpm --filter cierrabe db:studio"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.3.6",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "drizzle-orm": "^0.45.3",
+    "next": "16.3.6"
   },
   "packageManager": "pnpm@11.22.0"
 }
