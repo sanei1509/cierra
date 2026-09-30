@@ -15,6 +15,9 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const rolEnum = pgEnum("rol", ["admin", "liquidador", "lectura"]);
+export const estadoUsuarioEnum = pgEnum("estado_usuario", ["invitado", "activo", "suspendido"]);
+export const temaPreferidoEnum = pgEnum("tema_preferido", ["system", "light", "dark"]);
+export const proveedorAuthEnum = pgEnum("proveedor_auth", ["password", "magic_link", "google", "microsoft"]);
 export const etapaPeriodoEnum = pgEnum("etapa_periodo", ["novedades", "recibidas", "borrador", "enviada", "devuelta", "aprobada", "cerrada"]);
 export const bpsEstadoEnum = pgEnum("bps_estado", ["pendiente", "generado", "presentado"]);
 export const modalidadEnum = pgEnum("modalidad", ["mensual", "jornalero"]);
@@ -45,10 +48,73 @@ export const usuarios = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     email: text("email").notNull(),
     nombre: text("nombre").notNull(),
+    estado: estadoUsuarioEnum("estado").default("invitado").notNull(),
+    temaPreferido: temaPreferidoEnum("tema_preferido").default("system").notNull(),
     mfaActivo: boolean("mfa_activo").default(false).notNull(),
+    ultimoAcceso: timestamp("ultimo_acceso", { withTimezone: true }),
     creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [uniqueIndex("usuarios_email_unique").on(t.email)],
+);
+
+export const credencialesPassword = pgTable(
+  "credenciales_password",
+  {
+    usuarioId: uuid("usuario_id").primaryKey().references(() => usuarios.id),
+    passwordHash: text("password_hash").notNull(),
+    actualizada: timestamp("actualizada", { withTimezone: true }).defaultNow().notNull(),
+  },
+);
+
+export const magicLinks = pgTable(
+  "magic_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+    tokenHash: text("token_hash").notNull(),
+    email: text("email").notNull(),
+    expira: timestamp("expira", { withTimezone: true }).notNull(),
+    usado: timestamp("usado", { withTimezone: true }),
+    creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("magic_links_token_hash_unique").on(t.tokenHash),
+    index("magic_links_usuario_idx").on(t.usuarioId),
+  ],
+);
+
+export const sesiones = pgTable(
+  "sesiones",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+    tokenHash: text("token_hash").notNull(),
+    expira: timestamp("expira", { withTimezone: true }).notNull(),
+    revocada: timestamp("revocada", { withTimezone: true }),
+    ipHash: text("ip_hash"),
+    userAgent: text("user_agent"),
+    creada: timestamp("creada", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("sesiones_token_hash_unique").on(t.tokenHash),
+    index("sesiones_usuario_idx").on(t.usuarioId),
+  ],
+);
+
+export const cuentasOauth = pgTable(
+  "cuentas_oauth",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+    proveedor: proveedorAuthEnum("proveedor").notNull(),
+    proveedorCuentaId: text("proveedor_cuenta_id").notNull(),
+    email: text("email").notNull(),
+    creada: timestamp("creada", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("cuentas_oauth_proveedor_cuenta_unique").on(t.proveedor, t.proveedorCuentaId),
+    index("cuentas_oauth_usuario_idx").on(t.usuarioId),
+  ],
 );
 
 export const membresias = pgTable(
@@ -247,4 +313,3 @@ export const periodosRelations = relations(periodos, ({ many, one }) => ({
   empresa: one(empresas, { fields: [periodos.empresaId], references: [empresas.id] }),
   novedades: many(novedades),
 }));
-

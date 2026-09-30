@@ -86,18 +86,21 @@
 **Description:** Add mixed login foundation and resolve the authenticated user on every protected request.
 
 **Acceptance criteria:**
-- [ ] Users can be represented independently from their roles.
-- [ ] Login supports email/password.
-- [ ] Login supports magic link.
-- [ ] The model leaves room for Google/Microsoft login later.
-- [ ] A user can belong to a study, company and/or employee profile if needed.
-- [ ] Session context includes user id, actor type, role and selected workspace.
-- [ ] Suspended users cannot access protected areas.
-- [ ] Auth errors do not leak internal details.
+- [x] Users can be represented independently from their roles.
+- [x] Login foundation supports email/password credentials.
+- [x] Login foundation supports magic link tokens.
+- [x] The model leaves room for Google/Microsoft login later.
+- [x] A user can belong to a study, company and/or employee profile if needed.
+- [x] Session context includes user id, actor type, role and selected workspace.
+- [x] Suspended users cannot access protected areas.
+- [x] Auth errors do not leak internal details.
 
 **Verification:**
-- [ ] `corepack pnpm typecheck`
-- [ ] Auth boundary tests for missing session, suspended user and valid session.
+- [x] `corepack pnpm typecheck`
+- [x] Auth boundary tests for missing session, suspended user and valid session.
+
+**Notes:**
+- [ ] Pending later: real route handlers, email delivery, cookies and login UI.
 
 **Dependencies:** Task 4
 
