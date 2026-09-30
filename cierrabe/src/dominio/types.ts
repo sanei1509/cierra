@@ -169,6 +169,7 @@ export interface AuditEvent {
   actor: string;
   empresaId?: string;
   entidad: string;
+  entidadId?: string;
   accion: string;
   detalle?: string;
   antes?: string;

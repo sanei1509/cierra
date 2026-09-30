@@ -141,16 +141,17 @@
 **Description:** Let studies and companies manage their visible identity safely.
 
 **Acceptance criteria:**
-- [ ] Study profile supports visible name, legal name, RUT, contact data and logo/photo.
-- [ ] Company profile supports visible name, legal name, RUT, contact data and logo.
-- [ ] Only authorized actors can edit each profile.
-- [ ] Logo upload validates file type and size.
+- [x] Study profile supports visible name, legal name, RUT, contact data and logo/photo.
+- [x] Company profile supports visible name, legal name, RUT, contact data and logo.
+- [x] Only authorized actors can edit each profile.
+- [x] Logo upload validates file type and size.
 - [ ] UI falls back to initials when no logo exists.
-- [ ] Profile and logo changes are audited.
+- [x] Profile and logo changes are audited.
+- [ ] Payroll receipt templates can consume company visible name and logo when available.
 
 **Verification:**
-- [ ] Backend validation tests for profile updates.
-- [ ] Permission tests for forbidden profile edits.
+- [x] Backend validation tests for profile updates.
+- [x] Permission tests for forbidden profile edits.
 - [ ] Manual UI check in light and dark mode.
 
 **Dependencies:** Task 6

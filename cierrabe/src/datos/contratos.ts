@@ -4,8 +4,63 @@ import type { AuditEventId, EmpleadoId, EmpresaId, EstudioId, NovedadId, Periodo
 export interface Estudio {
   id: EstudioId;
   nombre: string;
+  nombreVisible?: string;
+  razonSocial?: string;
+  rut?: string;
   ciudad?: string;
+  telefono?: string;
+  emailContacto?: string;
+  logoArchivoId?: string;
+  fotoArchivoId?: string;
   creado: string;
+}
+
+export type DuenoArchivoMarca = "estudio" | "empresa" | "empleado";
+export type TipoArchivoMarca = "logo" | "foto";
+
+export interface ArchivoMarca {
+  id: string;
+  estudioId: EstudioId;
+  empresaId?: EmpresaId;
+  empleadoId?: EmpleadoId;
+  duenoTipo: DuenoArchivoMarca;
+  tipo: TipoArchivoMarca;
+  nombreOriginal: string;
+  mimeType: string;
+  tamanoBytes: number;
+  storageKey: string;
+  checksumSha256?: string;
+  creadoPorUsuarioId?: UsuarioId;
+  creado: string;
+}
+
+export interface CrearArchivoMarcaInput extends Omit<ArchivoMarca, "id" | "creado" | "creadoPorUsuarioId"> {
+  id?: string;
+  creado?: string;
+  creadoPorUsuarioId?: UsuarioId;
+}
+
+export interface ActualizarPerfilEstudioInput {
+  nombreVisible?: string;
+  razonSocial?: string;
+  rut?: string;
+  ciudad?: string;
+  telefono?: string;
+  emailContacto?: string;
+  logoArchivoId?: string;
+  fotoArchivoId?: string;
+  resumen: string;
+}
+
+export interface ActualizarPerfilEmpresaInput extends Pick<ActualizarEmpresaInput, "resumen"> {
+  nombreVisible?: string;
+  razonSocial?: string;
+  rut?: string;
+  contactoNombre?: string;
+  contactoEmail?: string;
+  contactoTelefono?: string;
+  direccion?: string;
+  logoArchivoId?: string;
 }
 
 export interface CrearEmpresaInput extends Omit<Empresa, "id"> {
@@ -37,6 +92,7 @@ export interface CrearAuditEventInput extends Omit<AuditEvent, "id" | "fecha" | 
 
 export interface EstudiosRepo {
   obtener(ctx: Pick<TenantContext, "estudioId">): Promise<Estudio | null>;
+  actualizarPerfil(ctx: TenantContext, input: ActualizarPerfilEstudioInput): Promise<Estudio>;
 }
 
 export interface UsuariosRepo {
@@ -74,6 +130,11 @@ export interface AuditoriaRepo {
   registrar(ctx: TenantContext, input: CrearAuditEventInput): Promise<AuditEvent>;
 }
 
+export interface ArchivosMarcaRepo {
+  crear(ctx: TenantContext, input: CrearArchivoMarcaInput): Promise<ArchivoMarca>;
+  obtener(ctx: TenantContext, archivoId: string): Promise<ArchivoMarca | null>;
+}
+
 export interface DatosRepos {
   estudios: EstudiosRepo;
   usuarios: UsuariosRepo;
@@ -82,4 +143,5 @@ export interface DatosRepos {
   periodos: PeriodosRepo;
   novedades: NovedadesRepo;
   auditoria: AuditoriaRepo;
+  archivosMarca: ArchivosMarcaRepo;
 }

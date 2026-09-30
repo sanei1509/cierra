@@ -18,6 +18,8 @@ export const rolEnum = pgEnum("rol", ["admin", "liquidador", "lectura"]);
 export const estadoUsuarioEnum = pgEnum("estado_usuario", ["invitado", "activo", "suspendido"]);
 export const temaPreferidoEnum = pgEnum("tema_preferido", ["system", "light", "dark"]);
 export const proveedorAuthEnum = pgEnum("proveedor_auth", ["password", "magic_link", "google", "microsoft"]);
+export const duenoArchivoMarcaEnum = pgEnum("dueno_archivo_marca", ["estudio", "empresa", "empleado"]);
+export const tipoArchivoMarcaEnum = pgEnum("tipo_archivo_marca", ["logo", "foto"]);
 export const etapaPeriodoEnum = pgEnum("etapa_periodo", ["novedades", "recibidas", "borrador", "enviada", "devuelta", "aprobada", "cerrada"]);
 export const bpsEstadoEnum = pgEnum("bps_estado", ["pendiente", "generado", "presentado"]);
 export const modalidadEnum = pgEnum("modalidad", ["mensual", "jornalero"]);
@@ -37,7 +39,14 @@ export const origenNovedadEnum = pgEnum("origen_novedad", ["cliente", "estudio"]
 export const estudios = pgTable("estudios", {
   id: uuid("id").defaultRandom().primaryKey(),
   nombre: text("nombre").notNull(),
+  nombreVisible: text("nombre_visible"),
+  razonSocial: text("razon_social"),
+  rut: varchar("rut", { length: 20 }),
   ciudad: text("ciudad"),
+  telefono: text("telefono"),
+  emailContacto: text("email_contacto"),
+  logoArchivoId: uuid("logo_archivo_id"),
+  fotoArchivoId: uuid("foto_archivo_id"),
   plan: text("plan").default("piloto").notNull(),
   creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -138,6 +147,8 @@ export const empresas = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     estudioId: uuid("estudio_id").notNull().references(() => estudios.id),
     nombre: text("nombre").notNull(),
+    nombreVisible: text("nombre_visible"),
+    razonSocial: text("razon_social"),
     rut: varchar("rut", { length: 20 }).notNull(),
     nroBps: text("nro_bps").notNull(),
     actividad: text("actividad").notNull(),
@@ -147,6 +158,8 @@ export const empresas = pgTable(
     requiereAprobacion: boolean("requiere_aprobacion").default(true).notNull(),
     contactoNombre: text("contacto_nombre").notNull(),
     contactoEmail: text("contacto_email").notNull(),
+    contactoTelefono: text("contacto_telefono"),
+    direccion: text("direccion"),
     logoArchivoId: uuid("logo_archivo_id"),
     activa: boolean("activa").default(true).notNull(),
     creada: timestamp("creada", { withTimezone: true }).defaultNow().notNull(),
@@ -154,6 +167,29 @@ export const empresas = pgTable(
   (t) => [
     uniqueIndex("empresas_estudio_rut_unique").on(t.estudioId, t.rut),
     index("empresas_estudio_idx").on(t.estudioId),
+  ],
+);
+
+export const archivosMarca = pgTable(
+  "archivos_marca",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    estudioId: uuid("estudio_id").notNull().references(() => estudios.id),
+    empresaId: uuid("empresa_id").references(() => empresas.id),
+    empleadoId: uuid("empleado_id"),
+    duenoTipo: duenoArchivoMarcaEnum("dueno_tipo").notNull(),
+    tipo: tipoArchivoMarcaEnum("tipo").notNull(),
+    nombreOriginal: text("nombre_original").notNull(),
+    mimeType: text("mime_type").notNull(),
+    tamanoBytes: integer("tamano_bytes").notNull(),
+    storageKey: text("storage_key").notNull(),
+    checksumSha256: text("checksum_sha256"),
+    creadoPorUsuarioId: uuid("creado_por_usuario_id").references(() => usuarios.id),
+    creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("archivos_marca_estudio_idx").on(t.estudioId),
+    index("archivos_marca_empresa_idx").on(t.estudioId, t.empresaId),
   ],
 );
 

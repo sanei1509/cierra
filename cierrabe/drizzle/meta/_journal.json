@@ -15,6 +15,13 @@
       "when": 1790805389024,
       "tag": "0001_third_devos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790807783085,
+      "tag": "0002_freezing_krista_starr",
+      "breakpoints": true
     }
   ]
 }

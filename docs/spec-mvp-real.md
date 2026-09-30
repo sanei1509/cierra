@@ -136,6 +136,7 @@ Convenciones:
 - Una empresa puede entrar, ver su pantalla con nombre/logo propio y editar datos permitidos.
 - Un cliente puede cargar novedades del mes.
 - El estudio puede calcular una version, revisarla, aprobar/cerrar y publicar recibos.
+- Los recibos de sueldo deben mostrar el nombre de la empresa y, si existe, su logo cargado.
 - El empleado solo puede ver sus recibos.
 - Cada usuario puede elegir modo claro, oscuro o sistema.
 - Un estudio no puede usar funciones no contratadas aunque intente acceder por URL o request directa.
