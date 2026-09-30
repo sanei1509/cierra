@@ -41,6 +41,35 @@
   color-scheme: light;
 }
 
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-lienzo: #111715;
+  --color-superficie: #18211e;
+  --color-hundido: #202c28;
+  --color-linea: #34423e;
+
+  --color-tinta: #edf5f1;
+  --color-tinta-2: #c3d0ca;
+  --color-apagado: #92a19b;
+
+  --color-petroleo: #0f5b51;
+  --color-petroleo-2: #147366;
+  --color-petroleo-3: #4db7a3;
+  --color-sol: #ecc450;
+  --color-sol-suave: #463c20;
+
+  --color-menta: #173c2b;
+  --color-menta-t: #bcebd0;
+  --color-lila: #2d294a;
+  --color-lila-t: #d6cff5;
+  --color-crema: #403717;
+  --color-crema-t: #f4d477;
+  --color-cielo: #18364a;
+  --color-cielo-t: #bbdef4;
+  --color-rosa: #4a241f;
+  --color-rosa-t: #f1c2b9;
+}
+
 body {
   background: var(--color-lienzo);
   color: var(--color-tinta);

@@ -3,12 +3,13 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, FileText, Home, Search, Settings, ShieldCheck, Users, Eye, RotateCcw, Menu, X, CalendarDays, ListChecks, KeyRound, UserCog, BriefcaseBusiness, UserRound } from "lucide-react";
+import { Building2, FileText, Home, Search, Settings, ShieldCheck, Users, Eye, RotateCcw, Menu, X, CalendarDays, ListChecks, KeyRound, UserCog, BriefcaseBusiness, UserRound, Monitor, Moon, Sun } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { useHidratado, useStore, useUsuario } from "@/lib/store";
 import { USUARIOS, ESTUDIO } from "@/lib/seed";
 import { MES_ACTUAL, nombreMes } from "@/lib/format";
 import { Avatar } from "./ui";
+import { TEMA_LABELS, type TemaPreferido } from "@/lib/theme";
 
 const NAV = [
   { href: "/", label: "Inicio", icon: Home },
@@ -166,6 +167,36 @@ function Usuario() {
   );
 }
 
+const TEMA_ICONOS = { system: Monitor, light: Sun, dark: Moon };
+
+function SelectorTema() {
+  const u = useUsuario();
+  const tema = useStore((s) => s.temaPorUsuario[u.id] ?? "system");
+  const setTema = useStore((s) => s.setTemaUsuario);
+
+  return (
+    <div className="flex items-center gap-1 rounded-xl border border-linea bg-superficie p-1" aria-label="Tema visual">
+      {(Object.keys(TEMA_LABELS) as TemaPreferido[]).map((t) => {
+        const Icono = TEMA_ICONOS[t];
+        const activo = tema === t;
+        return (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTema(t)}
+            className={clsx("inline-flex size-8 items-center justify-center rounded-lg transition-colors", activo ? "bg-petroleo text-white" : "text-apagado hover:bg-hundido hover:text-tinta")}
+            aria-label={`Usar tema ${TEMA_LABELS[t].toLowerCase()}`}
+            title={TEMA_LABELS[t]}
+            aria-pressed={activo}
+          >
+            <Icono size={15} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function DevAccessBar() {
   const router = useRouter();
   const setUsuario = useStore((s) => s.setUsuario);
@@ -230,6 +261,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <CalendarDays size={16} className="text-petroleo" /> {nombreMes(MES_ACTUAL)}
             </span>
             <span className="hidden rounded-xl border border-linea bg-superficie px-4 py-2.5 text-sm text-apagado xl:block">{ESTUDIO.nombre}</span>
+            {ok && <SelectorTema />}
             {ok && <Usuario />}
           </div>
         </header>

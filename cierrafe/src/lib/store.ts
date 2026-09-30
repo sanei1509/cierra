@@ -10,6 +10,7 @@ import { MOTOR_VERSION, parametrosVigentes } from "./params";
 import { MES_ACTUAL } from "./format";
 import { validar, pendientes } from "./validations";
 import { estadoVisible } from "./status";
+import type { TemaPreferido } from "./theme";
 
 interface Datos {
   empresas: Empresa[];
@@ -18,6 +19,7 @@ interface Datos {
   periodos: Periodo[];
   audit: AuditEvent[];
   usuarioId: string;
+  temaPorUsuario: Record<string, TemaPreferido>;
   /** Recibos vistos por el empleado: `${empleadoId}|${mes}` -> fecha ISO */
   vistas: Record<string, string>;
 }
@@ -31,6 +33,7 @@ export type Accion =
 
 interface Acciones {
   setUsuario: (id: string) => void;
+  setTemaUsuario: (tema: TemaPreferido) => void;
   puede: (a: Accion) => boolean;
   agregarNovedad: (n: Omit<Novedad, "id" | "fecha">) => void;
   borrarNovedad: (id: string, actor?: string) => void;
@@ -104,7 +107,13 @@ function estadoInicial(): Datos {
     if (p.etapa === "cerrada") np.cerrado = { fecha: fechas[p.empresaId], por, version: 1 };
     return np;
   });
-  return { ...s, periodos, usuarioId: "u1", vistas: { "espiga-1|2026-09": "2026-09-19T20:14:00", "espiga-2|2026-09": "2026-09-20T08:02:00", "delprado-1|2026-09": "2026-09-21T12:40:00" } };
+  return {
+    ...s,
+    periodos,
+    usuarioId: "u1",
+    temaPorUsuario: {},
+    vistas: { "espiga-1|2026-09": "2026-09-19T20:14:00", "espiga-2|2026-09": "2026-09-20T08:02:00", "delprado-1|2026-09": "2026-09-21T12:40:00" },
+  };
 }
 
 export const useStore = create<Datos & Acciones>()(
@@ -121,6 +130,7 @@ export const useStore = create<Datos & Acciones>()(
       return {
         ...estadoInicial(),
         setUsuario: (id) => set({ usuarioId: id }),
+        setTemaUsuario: (tema) => set((s) => ({ temaPorUsuario: { ...s.temaPorUsuario, [s.usuarioId]: tema } })),
         puede: (a) => {
           const rol = USUARIOS.find((u) => u.id === get().usuarioId)!.rol;
           if (rol === "lectura") return false;
@@ -245,7 +255,7 @@ export const useStore = create<Datos & Acciones>()(
     },
     {
       name: "cierra-demo-v1",
-      version: 3,
+      version: 4,
       // Cambió el modelo de datos: se regeneran los datos de ejemplo
       migrate: () => estadoInicial() as never,
     },

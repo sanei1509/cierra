@@ -168,18 +168,18 @@
 **Description:** Add per-user appearance preference for light mode, dark mode or system mode.
 
 **Acceptance criteria:**
-- [ ] User preference supports `light`, `dark` and `system`.
-- [ ] Preference is stored per user.
-- [ ] Login screen defaults to system preference.
-- [ ] Authenticated screens apply the saved preference.
-- [ ] Theme tokens preserve contrast in both modes.
-- [ ] Logos remain readable on both backgrounds.
+- [x] User preference supports `light`, `dark` and `system`.
+- [x] Preference is stored per user.
+- [x] Login screen defaults to system preference.
+- [x] Authenticated screens apply the saved preference.
+- [x] Theme tokens preserve contrast in both modes.
+- [x] Logos remain readable on both backgrounds.
 
 **Verification:**
-- [ ] Unit test for preference mapping.
+- [x] Unit test for preference mapping.
 - [ ] Manual visual check on study, company and employee screens.
-- [ ] `corepack pnpm lint`
-- [ ] `corepack pnpm build`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
 
 **Dependencies:** Task 6
 
