@@ -21,6 +21,7 @@ El alcance funcional inicial sera reemplazar, de forma ordenada y segura, las pl
 - La base productiva sera PostgreSQL con `estudio_id` en tablas de negocio.
 - El login sera mixto: email/contrasena y magic link como base, con posibilidad de sumar Google/Microsoft para estudios que lo pidan.
 - Cada usuario autenticado tendra rol y alcance: sistema, estudio, empresa o empleado.
+- La cadena de altas sera: Cierra da acceso a estudios; el estudio da acceso a empresas; la empresa da acceso a empleados.
 - Estudios y empresas podran editar su nombre visible, datos basicos y logo.
 - Cada usuario podra elegir modo claro, oscuro o seguir sistema.
 - Las funciones del sistema podran habilitarse o deshabilitarse por estudio mediante modulos, paquetes y add-ons.
@@ -128,7 +129,9 @@ Convenciones:
 - Un administrador del sistema puede activar/desactivar modulos por estudio.
 - Un administrador del sistema puede asignar paquete, add-ons y precios a un estudio.
 - Un administrador del sistema puede dar ingreso a un estudio y, en ese momento, definir su paquete inicial, modulos activos y precio fijo mensual.
-- Un estudio puede crear empresa y empleado con vigencias.
+- Un estudio puede dar ingreso a sus empresas cliente.
+- Una empresa puede dar ingreso a sus empleados.
+- Un estudio puede operar empresas y empleados de sus clientes segun permisos.
 - Un estudio puede editar su perfil y logo.
 - Una empresa puede entrar, ver su pantalla con nombre/logo propio y editar datos permitidos.
 - Un cliente puede cargar novedades del mes.

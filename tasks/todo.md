@@ -61,15 +61,16 @@
 **Description:** Define the product and code contracts for system admins, studies, companies and employees before wiring authentication.
 
 **Acceptance criteria:**
-- [ ] Role names are defined for system, study, company and employee actors.
-- [ ] Each protected resource has an owner path: study, company and/or employee.
-- [ ] Backend access context can represent all actor types.
-- [ ] Permission checks distinguish authenticated, unauthorized and not-found cases.
-- [ ] The implementation follows `docs/accesos-marca-y-tenancy.md`.
+- [x] Role names are defined for system, study, company and employee actors.
+- [x] Each protected resource has an owner path: study, company and/or employee.
+- [x] Backend access context can represent all actor types.
+- [x] Access creation chain is enforced: system admin creates studies, studies create companies, companies create employees.
+- [x] Permission checks distinguish authenticated, unauthorized and not-found cases.
+- [x] The implementation follows `docs/accesos-marca-y-tenancy.md`.
 
 **Verification:**
-- [ ] `corepack pnpm typecheck`
-- [ ] Unit tests for access context and permission decisions.
+- [x] `corepack pnpm typecheck`
+- [x] Unit tests for access context and permission decisions.
 
 **Dependencies:** Task 3
 

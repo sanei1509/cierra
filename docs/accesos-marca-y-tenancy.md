@@ -17,6 +17,7 @@ Es el equipo dueño de Cierra.
 Puede:
 - Ver todos los estudios contables.
 - Crear, activar, suspender o quitar acceso a contadores/estudios.
+- Cargar los datos iniciales de un estudio contable y registrar su usuario dueño/administrador.
 - Ver todas las empresas asociadas a cada estudio.
 - Ver empleados, periodos, liquidaciones, recibos, errores y actividad.
 - Revisar auditoria global del sistema.
@@ -38,6 +39,8 @@ Puede:
 - Cargar nombre visible, razon social, RUT, telefono, email y otros datos de contacto.
 - Elegir modo claro u oscuro para su usuario.
 - Gestionar empresas propias.
+- Cargar los datos iniciales de sus empresas cliente.
+- Crear, activar, suspender o quitar acceso a usuarios de sus empresas cliente.
 - Gestionar empleados de sus empresas.
 - Liquidar sueldos, publicar recibos y ver auditoria de su propio espacio.
 - Invitar usuarios internos del estudio, por ejemplo administrador, liquidador o solo lectura.
@@ -59,6 +62,8 @@ Puede:
 - Editar datos permitidos de su perfil, como nombre comercial, logo, telefono, contactos, email y preferencias.
 - Elegir modo claro u oscuro para su usuario.
 - Ver sus propios empleados.
+- Cargar los datos iniciales de sus empleados.
+- Crear, activar, suspender o quitar acceso a sus empleados.
 - Cargar novedades mensuales de sus empleados.
 - Adjuntar comprobantes cuando corresponda.
 - Revisar liquidaciones enviadas por el estudio.
@@ -111,6 +116,24 @@ Cierra
   -> auditoria global
 ```
 
+## Jerarquia de altas y accesos
+La creacion de cuentas y registros sigue una cadena de responsabilidad:
+
+```text
+Administrador Cierra
+  -> crea y da acceso al estudio contable / contador
+      -> el estudio crea y da acceso a sus empresas cliente
+          -> la empresa crea y da acceso a sus empleados
+```
+
+Reglas:
+- El administrador de Cierra es quien habilita un estudio nuevo y su usuario inicial.
+- El estudio contable es quien carga/crea sus empresas cliente y les da acceso.
+- La empresa es quien carga/crea sus empleados y les da acceso.
+- Soporte de Cierra puede asistir, pero toda accion debe quedar auditada con actor, motivo y fecha.
+- Nadie puede darse acceso a si mismo a un nivel superior.
+- Las altas tambien deben respetar modulos contratados cuando corresponda.
+
 ## Regla de aislamiento
 Cada registro de negocio debe tener una forma clara de llegar a su dueño.
 
@@ -150,10 +173,13 @@ Ejemplos:
 | Ver empresas de un estudio | Si | Solo propias | No | No |
 | Editar perfil de estudio | Si | Solo propio | No | No |
 | Subir logo de estudio | Si | Solo propio | No | No |
-| Crear empresa | Si | Solo en su estudio | No | No |
+| Crear empresa | Soporte auditado | Solo en su estudio | No | No |
+| Crear acceso a empresa | Soporte auditado | Solo empresas propias | No | No |
 | Editar perfil de empresa | Si | Solo propias | Solo propia y campos permitidos | No |
 | Subir logo de empresa | Si | Solo propias | Solo propia | No |
 | Ver empleados | Si | Solo empresas propias | Solo empresa propia | Solo si mismo |
+| Crear empleado | Soporte auditado | No normalmente | Solo empresa propia | No |
+| Crear acceso a empleado | Soporte auditado | No normalmente | Solo empresa propia | No |
 | Editar empleado | Si | Solo empresas propias | Campos permitidos si aplica | Campos personales permitidos si aplica |
 | Cargar novedades | Si | Solo empresas propias | Solo empresa propia | No, salvo flujo futuro |
 | Calcular liquidacion | Si | Solo empresas propias | No | No |
@@ -248,6 +274,7 @@ Campos importantes:
 - `company_id` cuando el dato pertenece a una empresa.
 - `employee_id` cuando el dato pertenece a una persona.
 - `created_by_user_id` y `updated_by_user_id` en datos sensibles.
+- `created_by_actor_type` para distinguir altas hechas por admin, estudio, empresa o soporte.
 
 ### Frontend
 El frontend debe:

@@ -21,6 +21,10 @@ export function sinPermiso(message = "No tenes permiso para realizar esta accion
   throw new ErrorDominio("SIN_PERMISO", message, details);
 }
 
+export function noAutenticado(message = "Tenes que iniciar sesion para continuar", details?: unknown): never {
+  throw new ErrorDominio("NO_AUTENTICADO", message, details);
+}
+
 export function noEncontrado(message = "No encontramos el recurso solicitado", details?: unknown): never {
   throw new ErrorDominio("NO_ENCONTRADO", message, details);
 }
@@ -28,4 +32,3 @@ export function noEncontrado(message = "No encontramos el recurso solicitado", d
 export function validacion(message: string, details?: unknown): never {
   throw new ErrorDominio("VALIDACION", message, details);
 }
-

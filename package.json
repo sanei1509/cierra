@@ -9,7 +9,7 @@
     "build:fe": "pnpm --filter cierrafe build",
     "lint": "pnpm --filter cierrafe lint",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter cierrafe test",
+    "test": "pnpm -r test",
     "db:generate": "pnpm --filter cierrabe db:generate",
     "db:migrate": "pnpm --filter cierrabe db:migrate",
     "db:studio": "pnpm --filter cierrabe db:studio"
