@@ -23,6 +23,13 @@ export default function Configuracion() {
 
       <div className="grid gap-3 xl:grid-cols-2">
         <Panel className="p-6">
+          <div className="mb-5 flex items-start gap-4 rounded-2xl bg-hundido px-4 py-4">
+            <Avatar nombre={ESTUDIO.nombre} tono="tinta" size={52} />
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold tracking-tight">{ESTUDIO.nombre}</h2>
+              <p className="text-sm text-apagado">{ESTUDIO.ciudad} · identidad visible del estudio para pantallas y comunicaciones.</p>
+            </div>
+          </div>
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-lg font-bold tracking-tight">Parámetros normativos</h2>

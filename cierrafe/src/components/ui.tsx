@@ -7,6 +7,7 @@ import { useEffect, type ReactNode, type ButtonHTMLAttributes } from "react";
 import type { Tono } from "@/lib/types";
 import { ESTADOS, type EstadoVisible } from "@/lib/status";
 import { iniciales } from "@/lib/format";
+import { nombreEmpresaVisible } from "@/lib/empresa";
 
 export const TONOS: Record<Tono | "tinta", { bg: string; fg: string; dot: string }> = {
   menta: { bg: "bg-menta", fg: "text-menta-t", dot: "bg-menta-t" },
@@ -165,13 +166,14 @@ export function Vacio({ titulo, children }: { titulo: string; children?: ReactNo
 }
 
 /** Logo de la empresa si existe; si no, sus iniciales */
-export function MarcaEmpresa({ empresa, size = 40 }: { empresa: { nombre: string; tono: Tono | "tinta"; logo?: string }; size?: number }) {
+export function MarcaEmpresa({ empresa, size = 40 }: { empresa: { nombre: string; nombreVisible?: string; tono: Tono | "tinta"; logo?: string }; size?: number }) {
+  const nombre = nombreEmpresaVisible(empresa);
   if (empresa.logo)
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={empresa.logo} alt={`Logo de ${empresa.nombre}`} width={size} height={size} className="shrink-0 rounded-full bg-white object-contain ring-1 ring-linea" style={{ width: size, height: size }} />
+      <img src={empresa.logo} alt={`Logo de ${nombre}`} width={size} height={size} className="shrink-0 rounded-full bg-white object-contain ring-1 ring-linea" style={{ width: size, height: size }} />
     );
-  return <Avatar nombre={empresa.nombre} tono={empresa.tono} size={size} />;
+  return <Avatar nombre={nombre} tono={empresa.tono} size={size} />;
 }
 
 /** Reduce una imagen a máx. `lado` px y la devuelve como data URL (para no llenar el almacenamiento) */

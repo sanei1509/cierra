@@ -10,6 +10,8 @@ export interface Usuario {
 export interface Empresa {
   id: string;
   nombre: string;
+  nombreVisible?: string;
+  razonSocial?: string;
   rut: string;
   nroBps: string;
   actividad: string;
@@ -18,6 +20,7 @@ export interface Empresa {
   responsableId: string;
   requiereAprobacion: boolean;
   contacto: { nombre: string; email: string };
+  direccion?: string;
   tono: Tono;
   /** Logo como data URL (en producción: archivo en storage) */
   logo?: string;

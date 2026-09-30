@@ -1,5 +1,6 @@
 import type { Empleado, Empresa, Periodo, ResultadoEmpleado } from "@/lib/types";
 import { fmt2, nombreMes } from "@/lib/format";
+import { datosEmpresaRecibo } from "@/lib/empresa";
 import { ESTUDIO } from "@/lib/seed";
 import { MarcaEmpresa } from "./ui";
 
@@ -19,15 +20,17 @@ function Fila({ c, d, i }: { c: string; d?: string; i: number }) {
 export function ReciboDoc({ empresa, empleado: e, mes, r, periodo, huella }: { empresa: Empresa; empleado: Empleado; mes: string; r: ResultadoEmpleado; periodo: Periodo; huella: string }) {
   const haberes = r.lineas.filter((l) => l.tipo === "haber");
   const desc = r.lineas.filter((l) => l.tipo === "descuento");
+  const datos = datosEmpresaRecibo(empresa);
   return (
     <article className="rounded-[var(--radius-panel)] bg-white p-8 text-[13px] break-after-page print:rounded-none print:p-0">
       <header className="flex flex-wrap justify-between gap-4 border-b-2 border-tinta pb-4">
         <div className="flex items-start gap-3">
-          {empresa.logo && <MarcaEmpresa empresa={empresa} size={48} />}
+          <MarcaEmpresa empresa={empresa} size={48} />
           <div>
-            <p className="text-lg font-extrabold">{empresa.nombre}</p>
-            <p>RUT {empresa.rut} · BPS {empresa.nroBps}</p>
-            <p className="text-apagado">{empresa.actividad} · Grupo {empresa.grupo}.{empresa.subgrupo}</p>
+            <p className="text-lg font-extrabold">{datos.nombre}</p>
+            <p>{datos.razonSocial !== datos.nombre ? `${datos.razonSocial} · ` : ""}RUT {datos.rut} · BPS {datos.bps}</p>
+            {datos.direccion && <p>{datos.direccion}</p>}
+            <p className="text-apagado">{datos.actividad} · Grupo {datos.grupoSubgrupo}</p>
           </div>
         </div>
         <div className="text-right">

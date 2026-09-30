@@ -145,9 +145,9 @@
 - [x] Company profile supports visible name, legal name, RUT, contact data and logo.
 - [x] Only authorized actors can edit each profile.
 - [x] Logo upload validates file type and size.
-- [ ] UI falls back to initials when no logo exists.
+- [x] UI falls back to initials when no logo exists.
 - [x] Profile and logo changes are audited.
-- [ ] Payroll receipt templates can consume company visible name and logo when available.
+- [x] Payroll receipt templates can consume company visible name and logo when available.
 
 **Verification:**
 - [x] Backend validation tests for profile updates.
