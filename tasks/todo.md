@@ -220,18 +220,18 @@
 **Description:** Model commercial packages and what each study has contracted.
 
 **Acceptance criteria:**
-- [ ] Plans can include multiple modules.
-- [ ] Pricing model supports fixed monthly price by plan.
-- [ ] Pricing model supports fixed monthly price by module/add-on.
-- [ ] Study subscription stores plan, status, dates, currency and internal notes.
-- [ ] Add-ons can enable modules outside the plan.
-- [ ] Admin overrides can enable or disable a module manually.
-- [ ] Commercial changes are audited.
+- [x] Plans can include multiple modules.
+- [x] Pricing model supports fixed monthly price by plan.
+- [x] Pricing model supports fixed monthly price by module/add-on.
+- [x] Study subscription stores plan, status, dates, currency and internal notes.
+- [x] Add-ons can enable modules outside the plan.
+- [x] Admin overrides can enable or disable a module manually.
+- [x] Commercial changes are audited.
 
 **Verification:**
-- [ ] Repository/schema tests for plan and subscription relationships.
-- [ ] Permission tests proving only system admins can change commercial setup.
-- [ ] `corepack pnpm typecheck`
+- [x] Repository/schema tests for plan and subscription relationships.
+- [x] Permission tests proving only system admins can change commercial setup.
+- [x] `corepack pnpm typecheck`
 
 **Dependencies:** Task 9
 

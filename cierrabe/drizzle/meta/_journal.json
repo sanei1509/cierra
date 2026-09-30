@@ -29,6 +29,13 @@
       "when": 1790808559363,
       "tag": "0003_breezy_daimon_hellstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790809195257,
+      "tag": "0004_fast_william_stryker",
+      "breakpoints": true
     }
   ]
 }

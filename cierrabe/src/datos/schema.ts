@@ -22,6 +22,10 @@ export const duenoArchivoMarcaEnum = pgEnum("dueno_archivo_marca", ["estudio", "
 export const tipoArchivoMarcaEnum = pgEnum("tipo_archivo_marca", ["logo", "foto"]);
 export const estadoModuloEnum = pgEnum("estado_modulo", ["activo", "oculto", "beta", "discontinuado"]);
 export const alcanceModuloEnum = pgEnum("alcance_modulo", ["sistema", "estudio", "empresa", "empleado"]);
+export const estadoPlanEnum = pgEnum("estado_plan", ["activo", "oculto", "discontinuado"]);
+export const estadoSuscripcionEnum = pgEnum("estado_suscripcion", ["prueba", "activo", "pausado", "cancelado", "vencido"]);
+export const monedaEnum = pgEnum("moneda", ["UYU", "USD"]);
+export const tipoOverrideModuloEnum = pgEnum("tipo_override_modulo", ["habilitar", "deshabilitar"]);
 export const etapaPeriodoEnum = pgEnum("etapa_periodo", ["novedades", "recibidas", "borrador", "enviada", "devuelta", "aprobada", "cerrada"]);
 export const bpsEstadoEnum = pgEnum("bps_estado", ["pendiente", "generado", "presentado"]);
 export const modalidadEnum = pgEnum("modalidad", ["mensual", "jornalero"]);
@@ -66,6 +70,75 @@ export const modulos = pgTable(
     creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [uniqueIndex("modulos_codigo_unique").on(t.codigo)],
+);
+
+export const planes = pgTable(
+  "planes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    codigo: varchar("codigo", { length: 80 }).notNull(),
+    nombre: text("nombre").notNull(),
+    descripcion: text("descripcion").notNull(),
+    estado: estadoPlanEnum("estado").default("activo").notNull(),
+    moneda: monedaEnum("moneda").default("UYU").notNull(),
+    precioMensualCent: integer("precio_mensual_cent").default(0).notNull(),
+    creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("planes_codigo_unique").on(t.codigo)],
+);
+
+export const planModulos = pgTable(
+  "plan_modulos",
+  {
+    planId: uuid("plan_id").notNull().references(() => planes.id),
+    moduloCodigo: varchar("modulo_codigo", { length: 80 }).notNull().references(() => modulos.codigo),
+  },
+  (t) => [primaryKey({ columns: [t.planId, t.moduloCodigo] })],
+);
+
+export const suscripcionesEstudio = pgTable(
+  "suscripciones_estudio",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    estudioId: uuid("estudio_id").notNull().references(() => estudios.id),
+    planId: uuid("plan_id").notNull().references(() => planes.id),
+    estado: estadoSuscripcionEnum("estado").default("prueba").notNull(),
+    moneda: monedaEnum("moneda").default("UYU").notNull(),
+    precioMensualCent: integer("precio_mensual_cent").default(0).notNull(),
+    inicio: timestamp("inicio", { withTimezone: false }).notNull(),
+    fin: timestamp("fin", { withTimezone: false }),
+    notasInternas: text("notas_internas"),
+    creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("suscripciones_estudio_idx").on(t.estudioId, t.estado)],
+);
+
+export const suscripcionAddons = pgTable(
+  "suscripcion_addons",
+  {
+    suscripcionId: uuid("suscripcion_id").notNull().references(() => suscripcionesEstudio.id),
+    moduloCodigo: varchar("modulo_codigo", { length: 80 }).notNull().references(() => modulos.codigo),
+    precioMensualCent: integer("precio_mensual_cent").default(0).notNull(),
+    inicio: timestamp("inicio", { withTimezone: false }).notNull(),
+    fin: timestamp("fin", { withTimezone: false }),
+  },
+  (t) => [primaryKey({ columns: [t.suscripcionId, t.moduloCodigo] })],
+);
+
+export const moduloOverrides = pgTable(
+  "modulo_overrides",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    suscripcionId: uuid("suscripcion_id").notNull().references(() => suscripcionesEstudio.id),
+    moduloCodigo: varchar("modulo_codigo", { length: 80 }).notNull().references(() => modulos.codigo),
+    tipo: tipoOverrideModuloEnum("tipo").notNull(),
+    motivo: text("motivo").notNull(),
+    inicio: timestamp("inicio", { withTimezone: false }).notNull(),
+    fin: timestamp("fin", { withTimezone: false }),
+    creadoPorUsuarioId: uuid("creado_por_usuario_id").references(() => usuarios.id),
+    creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("modulo_overrides_suscripcion_idx").on(t.suscripcionId, t.moduloCodigo)],
 );
 
 export const usuarios = pgTable(

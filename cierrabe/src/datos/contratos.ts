@@ -1,6 +1,7 @@
 import type { AuditEvent, Empleado, Empresa, Novedad, Periodo, Usuario } from "../dominio/types";
 import type { AuditEventId, EmpleadoId, EmpresaId, EstudioId, NovedadId, PeriodoId, TenantContext, UsuarioId } from "./contexto";
 import type { CodigoModulo, ModuloCatalogo } from "../modulos";
+import type { CrearSuscripcionEstudioInput, SuscripcionEstudio } from "../facturacion";
 
 export interface Estudio {
   id: EstudioId;
@@ -142,6 +143,11 @@ export interface ModulosRepo {
   obtenerPorCodigo(codigo: CodigoModulo): Promise<ModuloCatalogo | null>;
 }
 
+export interface SuscripcionesRepo {
+  obtenerVigente(estudioId: EstudioId): Promise<SuscripcionEstudio | null>;
+  crearOActualizar(estudioId: EstudioId, input: CrearSuscripcionEstudioInput): Promise<SuscripcionEstudio>;
+}
+
 export interface DatosRepos {
   estudios: EstudiosRepo;
   usuarios: UsuariosRepo;
@@ -152,4 +158,5 @@ export interface DatosRepos {
   auditoria: AuditoriaRepo;
   archivosMarca: ArchivosMarcaRepo;
   modulos: ModulosRepo;
+  suscripciones: SuscripcionesRepo;
 }
