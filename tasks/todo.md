@@ -247,16 +247,16 @@
 **Description:** Enforce module availability in backend code before executing optional system functions.
 
 **Acceptance criteria:**
-- [ ] Backend exposes a single guard to check if a study has a module enabled.
-- [ ] Guard combines plan modules, add-ons, overrides and subscription status.
-- [ ] Disabled modules cannot be executed through direct requests.
-- [ ] Frontend receives a clear non-technical reason when a module is not included.
-- [ ] Permission checks and module checks remain separate.
+- [x] Backend exposes a single guard to check if a study has a module enabled.
+- [x] Guard combines plan modules, add-ons, overrides and subscription status.
+- [x] Disabled modules cannot be executed through direct requests.
+- [x] Frontend receives a clear non-technical reason when a module is not included.
+- [x] Permission checks and module checks remain separate.
 
 **Verification:**
-- [ ] Tests for included module, disabled module, add-on, override and paused subscription.
-- [ ] Negative test for URL/request bypass.
-- [ ] `corepack pnpm typecheck`
+- [x] Tests for included module, disabled module, add-on, override and paused subscription.
+- [x] Negative test for URL/request bypass.
+- [x] `corepack pnpm typecheck`
 
 **Dependencies:** Task 10
 

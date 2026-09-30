@@ -1,6 +1,7 @@
 import type { EstudioId, UsuarioId } from "../datos/contexto";
-import { validacion } from "../datos/errores";
-import { expandirDependencias, obtenerModulo, type CodigoModulo } from "../modulos";
+import type { PlanesRepo, SuscripcionesRepo } from "../datos/contratos";
+import { moduloNoContratado, noEncontrado, suscripcionInactiva, validacion } from "../datos/errores";
+import { expandirDependencias, moduloParaFuncion, obtenerModulo, type CodigoFuncionOpcional, type CodigoModulo } from "../modulos";
 
 export type Moneda = "UYU" | "USD";
 export type EstadoPlan = "activo" | "oculto" | "discontinuado";
@@ -123,4 +124,42 @@ export function modulosContratados(plan: PlanComercial, suscripcion: Pick<Suscri
 
 export function totalMensualContratado(suscripcion: Pick<SuscripcionEstudio, "precioMensualCent" | "addons">) {
   return suscripcion.precioMensualCent + suscripcion.addons.reduce((total, addon) => total + addon.precioMensualCent, 0);
+}
+
+export interface GuardModuloContratadoInput {
+  estudioId: EstudioId;
+  modulo?: CodigoModulo;
+  funcion?: CodigoFuncionOpcional;
+}
+
+function resolverModuloRequerido(input: Pick<GuardModuloContratadoInput, "modulo" | "funcion">) {
+  if (input.modulo) return input.modulo;
+  if (input.funcion) return moduloParaFuncion(input.funcion);
+  return validacion("Debe indicarse un modulo o una funcion opcional");
+}
+
+export async function exigirModuloContratado(
+  repos: { suscripciones: SuscripcionesRepo; planes: PlanesRepo },
+  input: GuardModuloContratadoInput,
+) {
+  const requerido = resolverModuloRequerido(input);
+  const suscripcion = await repos.suscripciones.obtenerVigente(input.estudioId);
+
+  if (!suscripcion) {
+    moduloNoContratado("Este modulo no esta incluido en tu plan", { modulo: requerido });
+  }
+
+  if (["pausado", "cancelado", "vencido"].includes(suscripcion.estado)) {
+    suscripcionInactiva("La cuenta no esta activa para usar esta funcion", { estado: suscripcion.estado });
+  }
+
+  const plan = await repos.planes.obtener(suscripcion.planId);
+  if (!plan) noEncontrado("No encontramos el plan contratado por el estudio", { planId: suscripcion.planId });
+
+  const habilitados = modulosContratados(plan, suscripcion);
+  if (!habilitados.includes(requerido)) {
+    moduloNoContratado("Este modulo no esta incluido en tu plan", { modulo: requerido });
+  }
+
+  return { modulo: requerido, plan, suscripcion, habilitados };
 }

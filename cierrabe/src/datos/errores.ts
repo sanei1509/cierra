@@ -4,7 +4,9 @@ export type CodigoErrorDominio =
   | "NO_ENCONTRADO"
   | "CONFLICTO"
   | "VALIDACION"
-  | "FUERA_DE_ALCANCE";
+  | "FUERA_DE_ALCANCE"
+  | "MODULO_NO_CONTRATADO"
+  | "SUSCRIPCION_INACTIVA";
 
 export class ErrorDominio extends Error {
   constructor(
@@ -31,4 +33,12 @@ export function noEncontrado(message = "No encontramos el recurso solicitado", d
 
 export function validacion(message: string, details?: unknown): never {
   throw new ErrorDominio("VALIDACION", message, details);
+}
+
+export function moduloNoContratado(message = "Este modulo no esta incluido en tu plan", details?: unknown): never {
+  throw new ErrorDominio("MODULO_NO_CONTRATADO", message, details);
+}
+
+export function suscripcionInactiva(message = "La cuenta no esta activa para usar esta funcion", details?: unknown): never {
+  throw new ErrorDominio("SUSCRIPCION_INACTIVA", message, details);
 }
