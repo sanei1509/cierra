@@ -2,8 +2,9 @@
 
 import clsx from "clsx";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Plus } from "lucide-react";
+import { crearEmpresaInicial, type AltaRealResult } from "../actions";
 import { useStore, useVistas } from "@/lib/store";
 import { USUARIOS } from "@/lib/seed";
 import { activoEn, totales } from "@/lib/engine";
@@ -29,9 +30,12 @@ function NuevaEmpresaDrawer({ abierto, onCerrar }: { abierto: boolean; onCerrar:
   const usuarioId = useStore((s) => s.usuarioId);
   const existentes = useStore((s) => s.empresas);
   const [error, setError] = useState("");
+  const [resultado, setResultado] = useState<AltaRealResult | null>(null);
+  const [pendiente, startTransition] = useTransition();
 
   const crear = (form: FormData) => {
     setError("");
+    setResultado(null);
     const nombre = String(form.get("nombre") ?? "").trim();
     const rut = String(form.get("rut") ?? "").trim();
     const contactoNombre = String(form.get("contactoNombre") ?? "").trim();
@@ -61,8 +65,30 @@ function NuevaEmpresaDrawer({ abierto, onCerrar }: { abierto: boolean; onCerrar:
       contacto: { nombre: contactoNombre, email: contactoEmail },
       tono,
     };
-    agregarEmpresa(empresa, { nombre: contactoNombre, email: contactoEmail });
-    onCerrar();
+    startTransition(async () => {
+      try {
+        const alta = await crearEmpresaInicial({
+          nombre,
+          rut,
+          nroBps: empresa.nroBps,
+          actividad,
+          grupo: empresa.grupo,
+          subgrupo,
+          contactoNombre,
+          contactoEmail,
+          tono,
+        });
+        agregarEmpresa({ ...empresa, id: alta.id ?? empresa.id }, { nombre: contactoNombre, email: contactoEmail });
+        setResultado(alta);
+        onCerrar();
+      } catch (error) {
+        setResultado({
+          ok: false,
+          modo: "real",
+          mensaje: error instanceof Error ? error.message : "No pudimos crear la empresa.",
+        });
+      }
+    });
   };
 
   return (
@@ -88,7 +114,8 @@ function NuevaEmpresaDrawer({ abierto, onCerrar }: { abierto: boolean; onCerrar:
           </select>
         </Campo>
         {error && <p className="rounded-xl bg-rosa px-3 py-2 text-sm font-semibold text-rosa-t">{error}</p>}
-        <Boton type="submit" tam="lg" className="w-full"><Plus size={16} /> Crear empresa</Boton>
+        {resultado && !resultado.ok && <p className="rounded-xl bg-rosa px-3 py-2 text-sm font-semibold text-rosa-t">{resultado.mensaje}</p>}
+        <Boton type="submit" tam="lg" className="w-full" disabled={pendiente}><Plus size={16} /> {pendiente ? "Creando..." : "Crear empresa"}</Boton>
       </form>
     </Drawer>
   );

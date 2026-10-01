@@ -2,8 +2,9 @@
 
 import clsx from "clsx";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
+import { crearEmpleadoInicial, type AltaRealResult } from "../actions";
 import { useStore } from "@/lib/store";
 import { activoEn } from "@/lib/engine";
 import { MES_ACTUAL, fmt } from "@/lib/format";
@@ -15,9 +16,12 @@ function NuevoEmpleadoDrawer({ abierto, onCerrar, empresaInicial }: { abierto: b
   const empleados = useStore((s) => s.empleados);
   const agregarEmpleado = useStore((s) => s.agregarEmpleado);
   const [error, setError] = useState("");
+  const [resultado, setResultado] = useState<AltaRealResult | null>(null);
+  const [pendiente, startTransition] = useTransition();
 
   const crear = (form: FormData) => {
     setError("");
+    setResultado(null);
     const empresaId = String(form.get("empresaId") ?? empresaInicial);
     const nombre = String(form.get("nombre") ?? "").trim();
     const apellido = String(form.get("apellido") ?? "").trim();
@@ -53,8 +57,33 @@ function NuevoEmpleadoDrawer({ abierto, onCerrar, empresaInicial }: { abierto: b
       conyugeFonasa: false,
       telefono: String(form.get("telefono") ?? "").trim() || undefined,
     };
-    agregarEmpleado(empleado, { nombre: `${nombre} ${apellido}`, email });
-    onCerrar();
+    startTransition(async () => {
+      try {
+        const alta = await crearEmpleadoInicial({
+          empresaId,
+          nombre,
+          apellido,
+          ci,
+          email,
+          cargo,
+          categoria,
+          ingreso,
+          modalidad,
+          sueldo,
+          hijos: empleado.hijos,
+          telefono: empleado.telefono,
+        });
+        agregarEmpleado({ ...empleado, id: alta.id ?? empleado.id }, { nombre: `${nombre} ${apellido}`, email });
+        setResultado(alta);
+        onCerrar();
+      } catch (error) {
+        setResultado({
+          ok: false,
+          modo: "real",
+          mensaje: error instanceof Error ? error.message : "No pudimos crear el empleado.",
+        });
+      }
+    });
   };
 
   return (
@@ -92,7 +121,8 @@ function NuevoEmpleadoDrawer({ abierto, onCerrar, empresaInicial }: { abierto: b
         </div>
         <Campo label="Teléfono"><input name="telefono" className={inputCls} /></Campo>
         {error && <p className="rounded-xl bg-rosa px-3 py-2 text-sm font-semibold text-rosa-t">{error}</p>}
-        <Boton type="submit" tam="lg" className="w-full"><Plus size={16} /> Crear empleado</Boton>
+        {resultado && !resultado.ok && <p className="rounded-xl bg-rosa px-3 py-2 text-sm font-semibold text-rosa-t">{resultado.mensaje}</p>}
+        <Boton type="submit" tam="lg" className="w-full" disabled={pendiente}><Plus size={16} /> {pendiente ? "Creando..." : "Crear empleado"}</Boton>
         <p className="text-xs text-apagado">Actuales en demo: {empleados.length}. En producción este alta también enviará la invitación.</p>
       </form>
     </Drawer>

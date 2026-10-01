@@ -1,14 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { configurarSuscripcionEstudio, generarResumenCobroAdmin, registrarPagoEstudioAdmin } from "cierrabe/acciones";
+import { configurarSuscripcionEstudio, crearEstudioConAccesoInicial, generarResumenCobroAdmin, registrarPagoEstudioAdmin } from "cierrabe/acciones";
 import type { AccessContext, EstudioId, UsuarioId } from "cierrabe/datos/contexto";
-import { crearAuditoriaRepo, crearPagosRepo, crearPlanesRepo, crearResumenesCobroRepo, crearSuscripcionesRepo, crearUsoFacturableRepo } from "cierrabe/datos/repos";
+import { crearAuditoriaRepo, crearEstudiosRepo, crearPagosRepo, crearPlanesRepo, crearResumenesCobroRepo, crearSuscripcionesRepo, crearUsoFacturableRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
 import type { AjusteManualCobro, CrearSuscripcionEstudioInput } from "cierrabe/facturacion";
 import { ADDONS_ADMIN, planPorCodigo, resumenCobroDemo, type AjusteCobroAdmin, type CodigoModulo, type EstudioAdmin, type ResumenCobroAdmin } from "@/lib/comercial-demo";
 
 export interface GuardarConfiguracionComercialInput {
   estudio: EstudioAdmin;
+}
+
+export interface CrearEstudioInicialInput {
+  nombre: string;
+  duenoNombre: string;
+  duenoEmail: string;
 }
 
 export interface RegistrarPagoComercialInput {
@@ -32,6 +38,10 @@ export interface GuardarConfiguracionComercialResult {
   modo: "real" | "demo";
 }
 
+export interface CrearEstudioInicialResult extends GuardarConfiguracionComercialResult {
+  estudioId?: string;
+}
+
 export interface GenerarResumenCobroInput {
   estudio: EstudioAdmin;
   mes: string;
@@ -52,6 +62,10 @@ const adminDesarrollo: AccessContext = {
 };
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function puedeUsarBackendAdmin() {
+  return Boolean(process.env.DATABASE_URL && uuidRegex.test(adminDesarrollo.usuarioId));
+}
 
 function addonInput(codigos: CodigoModulo[], inicio: string) {
   return ADDONS_ADMIN.filter((addon) => codigos.includes(addon.moduloCodigo)).map((addon) => ({
@@ -105,6 +119,45 @@ export async function guardarConfiguracionComercial(input: GuardarConfiguracionC
     ok: true,
     modo: "real",
     mensaje: "Configuracion comercial guardada en el backend.",
+  };
+}
+
+export async function crearEstudioInicialAdmin(input: CrearEstudioInicialInput): Promise<CrearEstudioInicialResult> {
+  if (!puedeUsarBackendAdmin()) {
+    return {
+      ok: true,
+      modo: "demo",
+      mensaje: "Estudio creado en demo: falta DATABASE_URL o admin de desarrollo con UUID real.",
+    };
+  }
+
+  const { db } = await import("cierrabe/datos/db");
+  const res = await crearEstudioConAccesoInicial(
+    adminDesarrollo,
+    {
+      estudios: crearEstudiosRepo(db),
+      usuarios: crearUsuariosRepo(db),
+      auditoria: crearAuditoriaRepo(db),
+    },
+    {
+      estudio: {
+        nombre: input.nombre,
+        nombreVisible: input.nombre,
+        emailContacto: input.duenoEmail,
+      },
+      dueno: {
+        nombre: input.duenoNombre,
+        email: input.duenoEmail,
+      },
+    },
+  );
+
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    modo: "real",
+    mensaje: `Estudio guardado en backend con acceso inicial para ${res.usuario.email}.`,
+    estudioId: res.estudio.id,
   };
 }
 

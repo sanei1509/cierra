@@ -6,7 +6,9 @@ import { useMemo, useState, useTransition } from "react";
 import {
   generarResumenCobroComercial,
   guardarConfiguracionComercial,
+  crearEstudioInicialAdmin,
   registrarPagoComercial,
+  type CrearEstudioInicialResult,
   type GenerarResumenCobroResult,
   type GuardarConfiguracionComercialResult,
   type RegistrarPagoComercialResult,
@@ -61,6 +63,7 @@ export function AdminCommercialConsole() {
   const [seleccionadoId, setSeleccionadoId] = useState(estudios[0].id);
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
   const [errorNuevo, setErrorNuevo] = useState("");
+  const [resultadoNuevo, setResultadoNuevo] = useState<CrearEstudioInicialResult | null>(null);
   const [resultado, setResultado] = useState<GuardarConfiguracionComercialResult | null>(null);
   const [resultadoResumen, setResultadoResumen] = useState<GenerarResumenCobroResult | null>(null);
   const [resultadoPago, setResultadoPago] = useState<RegistrarPagoComercialResult | null>(null);
@@ -71,6 +74,7 @@ export function AdminCommercialConsole() {
   const [mesesAdelantados, setMesesAdelantados] = useState(1);
   const [pagosDemo, setPagosDemo] = useState<Record<string, number>>({});
   const [pendiente, startTransition] = useTransition();
+  const [pendienteNuevo, startNuevoTransition] = useTransition();
   const [pendienteResumen, startResumenTransition] = useTransition();
   const [pendientePago, startPagoTransition] = useTransition();
   const seleccionado = estudios.find((e) => e.id === seleccionadoId) ?? estudios[0];
@@ -97,6 +101,7 @@ export function AdminCommercialConsole() {
 
   const crearEstudio = (form: FormData) => {
     setErrorNuevo("");
+    setResultadoNuevo(null);
     const nombre = String(form.get("nombre") ?? "").trim();
     const duenoNombre = String(form.get("duenoNombre") ?? "").trim();
     const duenoEmail = String(form.get("duenoEmail") ?? "").trim().toLowerCase();
@@ -108,23 +113,35 @@ export function AdminCommercialConsole() {
       setErrorNuevo("Completa estudio, dueno y un email valido.");
       return;
     }
-    const base = slugId(nombre) || "estudio";
-    const id = estudios.some((e) => e.id === base) ? `${base}-${Date.now().toString(36).slice(-4)}` : base;
-    const nuevo: EstudioAdmin = {
-      id,
-      nombre,
-      estado,
-      planCodigo,
-      addons: [],
-      moneda,
-      notas: [`Dueno inicial: ${duenoNombre} <${duenoEmail}>`, notas].filter(Boolean).join(" · "),
-    };
-    setEstudios((actuales) => [nuevo, ...actuales]);
-    setSeleccionadoId(id);
-    setResultado({ ok: true, modo: "demo", mensaje: `Estudio creado en demo con acceso inicial para ${duenoEmail}.` });
-    setResultadoResumen(null);
-    setResultadoPago(null);
-    setNuevoAbierto(false);
+    startNuevoTransition(async () => {
+      try {
+        const alta = await crearEstudioInicialAdmin({ nombre, duenoNombre, duenoEmail });
+        const base = slugId(nombre) || "estudio";
+        const id = alta.estudioId ?? (estudios.some((e) => e.id === base) ? `${base}-${Date.now().toString(36).slice(-4)}` : base);
+        const nuevo: EstudioAdmin = {
+          id,
+          nombre,
+          estado,
+          planCodigo,
+          addons: [],
+          moneda,
+          notas: [`Dueno inicial: ${duenoNombre} <${duenoEmail}>`, notas].filter(Boolean).join(" · "),
+        };
+        setEstudios((actuales) => [nuevo, ...actuales]);
+        setSeleccionadoId(id);
+        setResultadoNuevo(alta);
+        setResultado(alta);
+        setResultadoResumen(null);
+        setResultadoPago(null);
+        setNuevoAbierto(false);
+      } catch (error) {
+        setResultadoNuevo({
+          ok: false,
+          modo: "real",
+          mensaje: error instanceof Error ? error.message : "No pudimos crear el estudio.",
+        });
+      }
+    });
   };
 
   const seleccionar = (id: string) => {
@@ -255,7 +272,8 @@ export function AdminCommercialConsole() {
           </Campo>
           <Campo label="Notas internas"><textarea name="notas" className={clsx(inputCls, "min-h-24 py-3")} /></Campo>
           {errorNuevo && <p className="rounded-xl bg-rosa px-3 py-2 text-sm font-semibold text-rosa-t">{errorNuevo}</p>}
-          <Boton type="submit" tam="lg" className="w-full"><Plus size={16} /> Crear estudio</Boton>
+          {resultadoNuevo && !resultadoNuevo.ok && <p className="rounded-xl bg-rosa px-3 py-2 text-sm font-semibold text-rosa-t">{resultadoNuevo.mensaje}</p>}
+          <Boton type="submit" tam="lg" className="w-full" disabled={pendienteNuevo}><Plus size={16} /> {pendienteNuevo ? "Creando..." : "Crear estudio"}</Boton>
         </form>
       </Drawer>
 

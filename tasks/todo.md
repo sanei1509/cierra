@@ -555,3 +555,36 @@
 - `cierrabe/src/datos/repos/index.ts`
 
 **Estimated scope:** Medium
+
+## Task 22: Frontend Provisioning Actions
+**Description:** Connect the demo provisioning forms to Next Server Actions that call backend provisioning actions and PostgreSQL repositories when real backend configuration is available.
+
+**Acceptance criteria:**
+- [x] Admin create-study flow calls a Server Action before updating the demo UI.
+- [x] Study create-company flow calls a Server Action before updating the demo UI.
+- [x] Study create-employee flow calls a Server Action before updating the demo UI.
+- [x] Server Actions call `cierrabe` provisioning actions and real repositories when `DATABASE_URL` and required UUID IDs exist.
+- [x] Server Actions fall back to demo mode with clear messages when running against demo IDs or without database configuration.
+- [x] Protected backend provisioning actions still perform authorization and validation server-side.
+
+**Verification:**
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Notes:**
+- [ ] Pending later: load real study/company IDs from authenticated sessions instead of development env vars.
+- [ ] Pending later: show real success messages after closing drawers without relying only on local demo state.
+- [ ] Pending later: create current-month period in PostgreSQL when a company is created.
+
+**Dependencies:** Task 18, Task 19, Task 20, Task 21
+
+**Files likely touched:**
+- `cierrafe/src/app/admin/actions.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/components/admin-commercial-console.tsx`
+- `cierrafe/src/app/(estudio)/empresas/page.tsx`
+- `cierrafe/src/app/(estudio)/empleados/page.tsx`
+
+**Estimated scope:** Medium
