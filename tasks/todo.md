@@ -620,3 +620,36 @@
 - `cierrafe/src/app/(estudio)/actions.ts`
 
 **Estimated scope:** Small
+
+## Task 24: Shared Development Backend Context
+**Description:** Centralize the temporary development access contexts used by Server Actions so real backend writes require explicit database configuration and UUID actor ids.
+
+**Acceptance criteria:**
+- [x] Development system-admin context is created from `CIERRA_DEV_ADMIN_ID` instead of a hardcoded demo id.
+- [x] Development study-admin context is created from `CIERRA_DEV_ESTUDIO_ID` and `CIERRA_DEV_USUARIO_ID`.
+- [x] Server Actions fall back to demo mode when `DATABASE_URL` or required UUID env vars are missing.
+- [x] Admin commercial/provisioning actions share the same context helper.
+- [x] Study provisioning actions share the same context helper.
+- [x] `.env.example` documents the development UUID variables.
+
+**Verification:**
+- [x] Unit tests for backend development context resolution.
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Notes:**
+- [ ] Pending later: replace development env contexts with authenticated session resolution.
+- [ ] Pending later: seed or admin-create the UUID users/studies required for local real-backend testing.
+
+**Dependencies:** Task 22, Task 23
+
+**Files likely touched:**
+- `.env.example`
+- `cierrafe/src/lib/backend-dev-context.ts`
+- `cierrafe/src/app/admin/actions.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/tests/backend-dev-context.test.ts`
+
+**Estimated scope:** Small

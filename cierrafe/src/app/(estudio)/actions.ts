@@ -2,12 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { crearEmpleadoConAccesoInicial, crearEmpresaConAccesoInicial } from "cierrabe/acciones";
-import type { AccessContext, EmpresaId, EstudioId, UsuarioId } from "cierrabe/datos/contexto";
+import type { EmpresaId } from "cierrabe/datos/contexto";
 import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearPeriodosRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
+import { contextoEstudioDesarrollo, uuidValido } from "@/lib/backend-dev-context";
 import { MES_ACTUAL } from "@/lib/format";
 import type { Modalidad, Tono } from "@/lib/types";
-
-const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface AltaRealResult {
   ok: boolean;
@@ -43,23 +42,8 @@ export interface CrearEmpleadoInicialInput {
   telefono?: string;
 }
 
-type EstudioAccessContext = Extract<AccessContext, { actorTipo: "estudio" }>;
-
-function contextoEstudioReal(): EstudioAccessContext | null {
-  const estudioId = process.env.CIERRA_DEV_ESTUDIO_ID;
-  const usuarioId = process.env.CIERRA_DEV_USUARIO_ID;
-  if (!process.env.DATABASE_URL || !estudioId || !usuarioId || !uuidRegex.test(estudioId) || !uuidRegex.test(usuarioId)) return null;
-  return {
-    actorTipo: "estudio",
-    usuarioId: usuarioId as UsuarioId,
-    estudioId: estudioId as EstudioId,
-    rol: "studio_admin",
-    empresasPermitidas: "todas",
-  };
-}
-
 export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Promise<AltaRealResult> {
-  const ctx = contextoEstudioReal();
+  const ctx = contextoEstudioDesarrollo();
   if (!ctx) {
     return {
       ok: true,
@@ -119,8 +103,8 @@ export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Prom
 }
 
 export async function crearEmpleadoInicial(input: CrearEmpleadoInicialInput): Promise<AltaRealResult> {
-  const ctx = contextoEstudioReal();
-  if (!ctx || !uuidRegex.test(input.empresaId)) {
+  const ctx = contextoEstudioDesarrollo();
+  if (!ctx || !uuidValido(input.empresaId)) {
     return {
       ok: true,
       modo: "demo",

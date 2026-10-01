@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { configurarSuscripcionEstudio, crearEstudioConAccesoInicial, generarResumenCobroAdmin, registrarPagoEstudioAdmin } from "cierrabe/acciones";
-import type { AccessContext, EstudioId, UsuarioId } from "cierrabe/datos/contexto";
+import type { EstudioId } from "cierrabe/datos/contexto";
 import { crearAuditoriaRepo, crearEstudiosRepo, crearPagosRepo, crearPlanesRepo, crearResumenesCobroRepo, crearSuscripcionesRepo, crearUsoFacturableRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
 import type { AjusteManualCobro, CrearSuscripcionEstudioInput } from "cierrabe/facturacion";
+import { contextoAdminDesarrollo, uuidValido } from "@/lib/backend-dev-context";
 import { ADDONS_ADMIN, planPorCodigo, resumenCobroDemo, type AjusteCobroAdmin, type CodigoModulo, type EstudioAdmin, type ResumenCobroAdmin } from "@/lib/comercial-demo";
 
 export interface GuardarConfiguracionComercialInput {
@@ -55,18 +56,6 @@ export interface GenerarResumenCobroResult {
   resumen: ResumenCobroAdmin;
 }
 
-const adminDesarrollo: AccessContext = {
-  actorTipo: "sistema",
-  usuarioId: "00000000-0000-4000-8000-000000000001" as UsuarioId,
-  rol: "system_admin",
-};
-
-const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function puedeUsarBackendAdmin() {
-  return Boolean(process.env.DATABASE_URL && uuidRegex.test(adminDesarrollo.usuarioId));
-}
-
 function addonInput(codigos: CodigoModulo[], inicio: string) {
   return ADDONS_ADMIN.filter((addon) => codigos.includes(addon.moduloCodigo)).map((addon) => ({
     moduloCodigo: addon.moduloCodigo,
@@ -94,11 +83,12 @@ function suscripcionDesdeEstudio(estudio: EstudioAdmin): CrearSuscripcionEstudio
 }
 
 export async function guardarConfiguracionComercial(input: GuardarConfiguracionComercialInput): Promise<GuardarConfiguracionComercialResult> {
-  if (!process.env.DATABASE_URL) {
+  const adminDesarrollo = contextoAdminDesarrollo();
+  if (!adminDesarrollo) {
     return {
       ok: true,
       modo: "demo",
-      mensaje: "Guardado simulado: falta DATABASE_URL para escribir en PostgreSQL.",
+      mensaje: "Guardado simulado: falta DATABASE_URL o CIERRA_DEV_ADMIN_ID con UUID real.",
     };
   }
 
@@ -123,7 +113,8 @@ export async function guardarConfiguracionComercial(input: GuardarConfiguracionC
 }
 
 export async function crearEstudioInicialAdmin(input: CrearEstudioInicialInput): Promise<CrearEstudioInicialResult> {
-  if (!puedeUsarBackendAdmin()) {
+  const adminDesarrollo = contextoAdminDesarrollo();
+  if (!adminDesarrollo) {
     return {
       ok: true,
       modo: "demo",
@@ -171,7 +162,8 @@ function ajustesBackend(ajustes: AjusteCobroAdmin[] | undefined): AjusteManualCo
 
 export async function generarResumenCobroComercial(input: GenerarResumenCobroInput): Promise<GenerarResumenCobroResult> {
   const resumenDemo = resumenCobroDemo(input.estudio, input.mes, input.ajustes);
-  if (!process.env.DATABASE_URL || !uuidRegex.test(input.estudio.id)) {
+  const adminDesarrollo = contextoAdminDesarrollo();
+  if (!adminDesarrollo || !uuidValido(input.estudio.id)) {
     return {
       ok: true,
       modo: "demo",
@@ -222,7 +214,8 @@ export async function generarResumenCobroComercial(input: GenerarResumenCobroInp
 }
 
 export async function registrarPagoComercial(input: RegistrarPagoComercialInput): Promise<RegistrarPagoComercialResult> {
-  if (!process.env.DATABASE_URL || !uuidRegex.test(input.estudio.id)) {
+  const adminDesarrollo = contextoAdminDesarrollo();
+  if (!adminDesarrollo || !uuidValido(input.estudio.id)) {
     return {
       ok: true,
       modo: "demo",
