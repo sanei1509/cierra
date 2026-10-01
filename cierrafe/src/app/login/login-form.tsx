@@ -9,7 +9,7 @@ import { CierraLoadingOverlay } from "@/components/cierra-loading";
 import { ACCESOS_DESARROLLO, type DevAccess, type DevAccessId } from "@/lib/dev-session";
 
 const inicial: LoginState = { email: "", error: null, submitKey: 0 };
-const LOGIN_LOADER_DELAY_MS = 5200;
+const LOGIN_LOADER_DELAY_MS = 2500;
 const loginInputCls =
   "h-11 w-full rounded-[14px] border border-[#D8E1F0] bg-white px-3.5 text-sm text-[#102247] outline-none transition-colors placeholder:text-[#97A3BA] focus:border-[#2F6BFF] focus:ring-2 focus:ring-[#2F6BFF]/20";
 
