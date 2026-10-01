@@ -525,3 +525,33 @@
 - `cierrafe/src/components/admin-commercial-console.tsx`
 
 **Estimated scope:** Small
+
+## Task 21: Provisioning Persistence Repositories
+**Description:** Add PostgreSQL repository implementations for studies, users/accesses, companies and employees so provisioning actions can persist real data.
+
+**Acceptance criteria:**
+- [x] Studies repo can create, read and update study profile fields.
+- [x] Users repo can create an invited user and attach study/company scoped access.
+- [x] Companies repo can create, list, read and update companies within a tenant.
+- [x] Employees repo can create employee ficha, labor relation and salary vigencias.
+- [x] Employee reads reconstruct the domain employee from ficha, relation and vigencias tables.
+- [x] Fine-grained access roles are mapped conservatively to the current membership schema.
+
+**Verification:**
+- [x] Unit test for role mapping.
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Notes:**
+- [ ] Pending later: apply migrations and run repository integration tests against PostgreSQL.
+- [ ] Pending later: add dedicated company/employee account tables if we need role fidelity beyond the current membership schema.
+
+**Dependencies:** Task 18
+
+**Files likely touched:**
+- `cierrabe/src/datos/repos/provisioning.ts`
+- `cierrabe/src/datos/repos/index.ts`
+
+**Estimated scope:** Medium
