@@ -287,7 +287,8 @@
 - [x] `corepack pnpm build`
 
 **Notes:**
-- [ ] Pending later: persist admin console changes through real backend repositories/routes.
+- [x] Backend commercial repositories exist for plans and study subscriptions.
+- [ ] Pending later: wire admin console buttons to real Next Server Actions/API routes.
 
 **Dependencies:** Task 11
 
