@@ -3,16 +3,108 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { activoEn } from "@/lib/engine";
 import { MES_ACTUAL, fmt } from "@/lib/format";
-import { Avatar, Chip, Panel, inputCls } from "@/components/ui";
+import { Avatar, Boton, Campo, Chip, Drawer, Panel, inputCls } from "@/components/ui";
+import type { Empleado, Modalidad } from "@/lib/types";
+
+function NuevoEmpleadoDrawer({ abierto, onCerrar, empresaInicial }: { abierto: boolean; onCerrar: () => void; empresaInicial: string }) {
+  const empresas = useStore((s) => s.empresas);
+  const empleados = useStore((s) => s.empleados);
+  const agregarEmpleado = useStore((s) => s.agregarEmpleado);
+  const [error, setError] = useState("");
+
+  const crear = (form: FormData) => {
+    setError("");
+    const empresaId = String(form.get("empresaId") ?? empresaInicial);
+    const nombre = String(form.get("nombre") ?? "").trim();
+    const apellido = String(form.get("apellido") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim().toLowerCase();
+    const ci = String(form.get("ci") ?? "").trim();
+    const cargo = String(form.get("cargo") ?? "").trim();
+    const categoria = String(form.get("categoria") ?? "").trim();
+    const ingreso = String(form.get("ingreso") ?? "").trim();
+    const sueldo = Number(form.get("sueldo") ?? 0);
+    const modalidad = String(form.get("modalidad") ?? "mensual") as Modalidad;
+    if (!empresaId || !nombre || !apellido || !ci || !cargo || !categoria || !ingreso || !/^\S+@\S+\.\S+$/.test(email)) {
+      setError("Completá empresa, datos personales, cargo, categoría, ingreso y email válido.");
+      return;
+    }
+    if (modalidad === "mensual" && (!Number.isFinite(sueldo) || sueldo <= 0)) {
+      setError("Para mensual necesitás cargar un sueldo base mayor a cero.");
+      return;
+    }
+    const id = `${empresaId}-manual${Date.now().toString(36)}`;
+    const empleado: Empleado = {
+      id,
+      empresaId,
+      nombre,
+      apellido,
+      ci,
+      email,
+      cargo,
+      categoria,
+      modalidad,
+      ingreso,
+      sueldos: modalidad === "mensual" ? [{ desde: ingreso, monto: sueldo }] : [],
+      hijos: Number(form.get("hijos") ?? 0) || 0,
+      conyugeFonasa: false,
+      telefono: String(form.get("telefono") ?? "").trim() || undefined,
+    };
+    agregarEmpleado(empleado, { nombre: `${nombre} ${apellido}`, email });
+    onCerrar();
+  };
+
+  return (
+    <Drawer abierto={abierto} onCerrar={onCerrar} titulo="Nuevo empleado" subtitulo="Alta inicial con usuario empleado">
+      <form action={crear} className="space-y-4">
+        <Campo label="Empresa">
+          <select name="empresaId" className={inputCls} defaultValue={empresaInicial === "todas" ? empresas[0]?.id : empresaInicial} required>
+            {empresas.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+          </select>
+        </Campo>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo label="Nombre"><input name="nombre" className={inputCls} required /></Campo>
+          <Campo label="Apellido"><input name="apellido" className={inputCls} required /></Campo>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo label="Cédula"><input name="ci" className={inputCls} required /></Campo>
+          <Campo label="Email de acceso"><input name="email" type="email" className={inputCls} required /></Campo>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo label="Cargo"><input name="cargo" className={inputCls} required /></Campo>
+          <Campo label="Categoría"><input name="categoria" className={inputCls} required /></Campo>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo label="Ingreso"><input name="ingreso" type="date" className={inputCls} defaultValue={`${MES_ACTUAL}-01`} required /></Campo>
+          <Campo label="Modalidad">
+            <select name="modalidad" className={inputCls} defaultValue="mensual">
+              <option value="mensual">Mensual</option>
+              <option value="jornalero">Jornalero</option>
+            </select>
+          </Campo>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo label="Sueldo base"><input name="sueldo" type="number" min="0" step="1" className={inputCls} /></Campo>
+          <Campo label="Hijos"><input name="hijos" type="number" min="0" step="1" className={inputCls} defaultValue={0} /></Campo>
+        </div>
+        <Campo label="Teléfono"><input name="telefono" className={inputCls} /></Campo>
+        {error && <p className="rounded-xl bg-rosa px-3 py-2 text-sm font-semibold text-rosa-t">{error}</p>}
+        <Boton type="submit" tam="lg" className="w-full"><Plus size={16} /> Crear empleado</Boton>
+        <p className="text-xs text-apagado">Actuales en demo: {empleados.length}. En producción este alta también enviará la invitación.</p>
+      </form>
+    </Drawer>
+  );
+}
 
 export default function Empleados() {
   const empleados = useStore((s) => s.empleados);
   const empresas = useStore((s) => s.empresas);
   const [q, setQ] = useState("");
   const [emp, setEmp] = useState("todas");
+  const [nuevo, setNuevo] = useState(false);
   const lista = useMemo(() => {
     const t = q.toLowerCase();
     return empleados
@@ -33,7 +125,9 @@ export default function Empleados() {
           <option value="todas">Todas las empresas</option>
           {empresas.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
         </select>
+        <Boton onClick={() => setNuevo(true)}><Plus size={15} /> Nuevo empleado</Boton>
       </Panel>
+      <NuevoEmpleadoDrawer abierto={nuevo} onCerrar={() => setNuevo(false)} empresaInicial={emp} />
       <Panel className="p-3">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">

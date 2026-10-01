@@ -52,6 +52,8 @@ interface Acciones {
   rectificar: (periodoId: string, motivo: string) => void;
   actualizarEmpleado: (id: string, cambios: Partial<Empleado>, resumen: string) => void;
   agregarNota: (periodoId: string, texto: string) => void;
+  agregarEmpresa: (empresa: Empresa, usuarioAcceso: { nombre: string; email: string }) => void;
+  agregarEmpleado: (empleado: Empleado, usuarioAcceso?: { nombre: string; email: string }) => void;
   agregarEmpleados: (empleados: Empleado[], empresaId: string) => void;
   actualizarEmpresa: (id: string, cambios: Partial<Empresa>, resumen: string) => void;
   marcarVisto: (empleadoId: string, mes: string) => void;
@@ -234,6 +236,37 @@ export const useStore = create<Datos & Acciones>()(
         },
         agregarNota: (id, texto) => {
           upd(id, (p) => ({ notas: [...p.notas, { fecha: ahora(), por: actor(), texto }] }));
+        },
+        agregarEmpresa: (empresa, usuarioAcceso) => {
+          const periodo: Periodo = {
+            id: `${empresa.id}-${MES_ACTUAL}`,
+            empresaId: empresa.id,
+            mes: MES_ACTUAL,
+            etapa: "novedades",
+            fechaObjetivo: `${MES_ACTUAL}-28`,
+            sinNovedades: false,
+            versiones: [],
+            advertenciasAceptadas: {},
+            bps: "pendiente",
+            rectificaciones: [],
+            notas: [],
+          };
+          set((s) => ({ empresas: [...s.empresas, empresa], periodos: [...s.periodos, periodo] }));
+          log({
+            empresaId: empresa.id,
+            entidad: "Empresa",
+            accion: `Creó empresa ${empresa.nombre}`,
+            detalle: `Acceso inicial para ${usuarioAcceso.nombre} <${usuarioAcceso.email}>`,
+          });
+        },
+        agregarEmpleado: (empleado, usuarioAcceso) => {
+          set((s) => ({ empleados: [...s.empleados, empleado] }));
+          log({
+            empresaId: empleado.empresaId,
+            entidad: "Empleado",
+            accion: `Creó ficha de ${empleado.nombre} ${empleado.apellido}`,
+            detalle: usuarioAcceso ? `Acceso inicial para ${usuarioAcceso.nombre} <${usuarioAcceso.email}>` : `Acceso inicial para ${empleado.email}`,
+          });
         },
         agregarEmpleados: (nuevos, empresaId) => {
           set((s) => ({ empleados: [...s.empleados, ...nuevos] }));

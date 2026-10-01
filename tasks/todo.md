@@ -470,3 +470,32 @@
 - `cierrabe/tests/altas.test.ts`
 
 **Estimated scope:** Medium
+
+## Task 19: Demo Provisioning Forms
+**Description:** Add usable frontend entry points for creating companies and employees in the demo flow, matching the access-provisioning chain.
+
+**Acceptance criteria:**
+- [x] Study dashboard has an enabled "Nueva empresa" flow.
+- [x] Creating a company captures responsible person and email for initial access.
+- [x] New companies create a current-month period so they appear in the work queue.
+- [x] Employees page has an enabled "Nuevo empleado" flow.
+- [x] Creating an employee captures employee email for future login access.
+- [x] Demo store records audit events for company and employee provisioning.
+
+**Verification:**
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Notes:**
+- [ ] Pending next: connect these forms to backend provisioning actions and real repositories.
+
+**Dependencies:** Task 18
+
+**Files likely touched:**
+- `cierrafe/src/app/(estudio)/empresas/page.tsx`
+- `cierrafe/src/app/(estudio)/empleados/page.tsx`
+- `cierrafe/src/lib/store.ts`
+
+**Estimated scope:** Medium
