@@ -162,7 +162,9 @@ body {
 }
 
 .cierra-loader-symbol-yellow-pulse {
-  clip-path: inset(23% 5% 46% 66%);
+  clip-path: polygon(77% 28%, 91% 28%, 96% 48%, 69% 48%, 69% 39%);
+  filter: brightness(1.18) saturate(1.15);
+  mix-blend-mode: screen;
   opacity: 0;
 }
 
@@ -233,7 +235,7 @@ body {
     animation: cierra-loader-symbol-fill 2200ms cubic-bezier(0.3, 0, 0.15, 1) forwards;
   }
   .cierra-loader-symbol-yellow-pulse {
-    animation: cierra-loader-symbol-yellow-pulse 700ms ease-in-out 2200ms infinite;
+    animation: cierra-loader-symbol-yellow-pulse 560ms ease-in-out 1500ms infinite;
   }
 }
 @keyframes entra-drawer {
@@ -254,10 +256,12 @@ body {
 }
 @keyframes cierra-loader-symbol-yellow-pulse {
   0%, 100% {
-    opacity: 0.45;
+    filter: brightness(1.18) saturate(1.15);
+    opacity: 0.08;
   }
   50% {
-    opacity: 1;
+    filter: brightness(1.75) saturate(1.45);
+    opacity: 0.72;
   }
 }
 
