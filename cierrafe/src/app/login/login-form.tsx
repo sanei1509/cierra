@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Building2, BriefcaseBusiness, Eye, LogIn, ShieldCheck, UserCog, UserRound } from "lucide-react";
+import { Building2, BriefcaseBusiness, Eye, EyeOff, LogIn, ShieldCheck, UserCog, UserRound } from "lucide-react";
 import { iniciarSesion, type LoginState } from "./actions";
 import { Boton } from "@/components/ui";
 import { ACCESOS_DESARROLLO, type DevAccess, type DevAccessId } from "@/lib/dev-session";
@@ -72,6 +72,7 @@ export function LoginForm({ mostrarAccesosDesarrollo = false, devPassword = "Cie
   const [state, action, pending] = useActionState(iniciarSesion, inicial);
   const [email, setEmail] = useState(state.email);
   const [password, setPassword] = useState("");
+  const [mostrarPassword, setMostrarPassword] = useState(false);
 
   return (
     <div className="space-y-3">
@@ -83,8 +84,16 @@ export function LoginForm({ mostrarAccesosDesarrollo = false, devPassword = "Cie
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-[#1B315F]">Contraseña</span>
           <span className="relative block">
-            <input name="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required className={`${loginInputCls} pr-11`} placeholder="Tu contraseña" />
-            <Eye size={17} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#667592]" aria-hidden />
+            <input name="password" type={mostrarPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required className={`${loginInputCls} pr-11`} placeholder="Tu contraseña" />
+            <button
+              type="button"
+              className="absolute right-2.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#667592] transition-colors hover:bg-[#EAF2FF] hover:text-[#2459E6] focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/25"
+              aria-label={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-pressed={mostrarPassword}
+              onClick={() => setMostrarPassword((actual) => !actual)}
+            >
+              {mostrarPassword ? <EyeOff size={17} aria-hidden /> : <Eye size={17} aria-hidden />}
+            </button>
           </span>
         </label>
         {state.error && <p className="rounded-[14px] border border-[#E25555]/30 bg-[#FDE7E7] px-3 py-2 text-sm font-semibold text-[#B43232]">{state.error}</p>}

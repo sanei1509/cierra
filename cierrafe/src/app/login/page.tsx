@@ -114,10 +114,15 @@ export default function LoginPage() {
               <div className="mt-6">
                 <LoginForm mostrarAccesosDesarrollo={mostrarAccesosDesarrollo} devPassword={mostrarAccesosDesarrollo ? devPassword : ""} />
               </div>
-              <div className="mt-5 rounded-[14px] bg-[#EAF2FF] px-4 py-3 text-center">
+              <a
+                href="https://nmbtech.net"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-5 block rounded-[14px] bg-[#EAF2FF] px-4 py-3 text-center transition-colors hover:bg-[#DCEBFF] focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/25"
+              >
                 <p className="text-sm font-bold text-[#102247]">¿Necesitás acceso?</p>
-                <p className="text-xs font-medium text-[#667592]">Contactá a tu administrador.</p>
-              </div>
+                <p className="text-xs font-medium text-[#667592]">Conectá con un administrador.</p>
+              </a>
             </Panel>
           </div>
         </section>
