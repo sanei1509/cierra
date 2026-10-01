@@ -10,7 +10,7 @@ import { USUARIOS } from "@/lib/seed";
 import { activoEn, totales } from "@/lib/engine";
 import { MES_ACTUAL, fmt } from "@/lib/format";
 import { ESTADOS } from "@/lib/status";
-import { Avatar, Boton, Campo, Drawer, EstadoChip, MarcaEmpresa, Panel, TONOS, inputCls } from "@/components/ui";
+import { Avatar, Boton, Campo, Drawer, EstadoChip, MarcaEmpresa, Panel, ResultadoAccion, TONOS, inputCls } from "@/components/ui";
 import type { Empresa, Tono } from "@/lib/types";
 
 const TONOS_EMPRESA: Tono[] = ["menta", "cielo", "crema", "lila", "rosa"];
@@ -25,7 +25,15 @@ function slugId(s: string) {
     .slice(0, 28);
 }
 
-function NuevaEmpresaDrawer({ abierto, onCerrar }: { abierto: boolean; onCerrar: () => void }) {
+function NuevaEmpresaDrawer({
+  abierto,
+  onCerrar,
+  onResultado,
+}: {
+  abierto: boolean;
+  onCerrar: () => void;
+  onResultado: (resultado: AltaRealResult | null) => void;
+}) {
   const agregarEmpresa = useStore((s) => s.agregarEmpresa);
   const usuarioId = useStore((s) => s.usuarioId);
   const existentes = useStore((s) => s.empresas);
@@ -36,6 +44,7 @@ function NuevaEmpresaDrawer({ abierto, onCerrar }: { abierto: boolean; onCerrar:
   const crear = (form: FormData) => {
     setError("");
     setResultado(null);
+    onResultado(null);
     const nombre = String(form.get("nombre") ?? "").trim();
     const rut = String(form.get("rut") ?? "").trim();
     const contactoNombre = String(form.get("contactoNombre") ?? "").trim();
@@ -80,13 +89,16 @@ function NuevaEmpresaDrawer({ abierto, onCerrar }: { abierto: boolean; onCerrar:
         });
         agregarEmpresa({ ...empresa, id: alta.id ?? empresa.id }, { nombre: contactoNombre, email: contactoEmail });
         setResultado(alta);
+        onResultado(alta);
         onCerrar();
       } catch (error) {
-        setResultado({
+        const fallo = {
           ok: false,
           modo: "real",
           mensaje: error instanceof Error ? error.message : "No pudimos crear la empresa.",
-        });
+        } satisfies AltaRealResult;
+        setResultado(fallo);
+        onResultado(fallo);
       }
     });
   };
@@ -113,8 +125,8 @@ function NuevaEmpresaDrawer({ abierto, onCerrar }: { abierto: boolean; onCerrar:
             {TONOS_EMPRESA.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </Campo>
-        {error && <p className="rounded-xl bg-rosa px-3 py-2 text-sm font-semibold text-rosa-t">{error}</p>}
-        {resultado && !resultado.ok && <p className="rounded-xl bg-rosa px-3 py-2 text-sm font-semibold text-rosa-t">{resultado.mensaje}</p>}
+        {error && <ResultadoAccion resultado={{ ok: false, mensaje: error }} />}
+        <ResultadoAccion resultado={resultado && !resultado.ok ? resultado : null} />
         <Boton type="submit" tam="lg" className="w-full" disabled={pendiente}><Plus size={16} /> {pendiente ? "Creando..." : "Crear empresa"}</Boton>
       </form>
     </Drawer>
@@ -126,6 +138,7 @@ export default function Empresas() {
   const empleados = useStore((s) => s.empleados);
   const [q, setQ] = useState("");
   const [nuevo, setNuevo] = useState(false);
+  const [resultado, setResultado] = useState<AltaRealResult | null>(null);
   const lista = vistas
     .filter((v) => v.empresa.nombre.toLowerCase().includes(q.toLowerCase()) || v.empresa.rut.includes(q))
     .sort((a, b) => ESTADOS[a.estado].orden - ESTADOS[b.estado].orden);
@@ -137,9 +150,17 @@ export default function Empresas() {
           <p className="mt-1 text-[15px] text-apagado">{vistas.length} clientes · {empleados.filter((e) => activoEn(e, MES_ACTUAL)).length} personas en nómina</p>
         </div>
         <input className={clsx(inputCls, "max-w-xs")} placeholder="Filtrar por nombre o RUT" value={q} onChange={(e) => setQ(e.target.value)} />
-        <Boton onClick={() => setNuevo(true)}><Plus size={15} /> Nueva empresa</Boton>
+        <Boton
+          onClick={() => {
+            setResultado(null);
+            setNuevo(true);
+          }}
+        >
+          <Plus size={15} /> Nueva empresa
+        </Boton>
       </Panel>
-      <NuevaEmpresaDrawer abierto={nuevo} onCerrar={() => setNuevo(false)} />
+      <ResultadoAccion resultado={resultado} />
+      <NuevaEmpresaDrawer abierto={nuevo} onCerrar={() => setNuevo(false)} onResultado={setResultado} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {lista.map((v) => {
           const n = empleados.filter((e) => e.empresaId === v.empresa.id && activoEn(e, MES_ACTUAL)).length;

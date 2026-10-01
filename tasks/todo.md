@@ -747,3 +747,30 @@
 - `README.md`
 
 **Estimated scope:** Small
+
+## Task 28: Study Provisioning Feedback
+**Description:** Keep create-company and create-employee Server Action results visible after the drawer closes, so real/demo success or failure messages are not lost.
+
+**Acceptance criteria:**
+- [x] Company creation shows the Server Action result outside the drawer after a successful submit.
+- [x] Employee creation shows the Server Action result outside the drawer after a successful submit.
+- [x] Drawer validation and Server Action errors remain visible while the drawer stays open.
+- [x] Feedback uses themed success/error surfaces instead of ad hoc inline colors.
+- [x] Opening a new create drawer clears the previous page-level result.
+
+**Verification:**
+- [x] `npm run typecheck` in `cierrafe`
+- [x] `npm run lint` in `cierrafe`
+- [x] `npm run build` in `cierrafe`
+
+**Notes:**
+- [ ] Pending later: replace development env contexts with authenticated session resolution.
+
+**Dependencies:** Task 24, Task 26
+
+**Files touched:**
+- `cierrafe/src/components/ui.tsx`
+- `cierrafe/src/app/(estudio)/empresas/page.tsx`
+- `cierrafe/src/app/(estudio)/empleados/page.tsx`
+
+**Estimated scope:** Small

@@ -46,6 +46,28 @@ export function Chip({ tono = "menta", children, className }: { tono?: Tono | "t
   );
 }
 
+export function ResultadoAccion({
+  resultado,
+  className,
+}: {
+  resultado: { ok: boolean; mensaje: string } | null;
+  className?: string;
+}) {
+  if (!resultado) return null;
+  return (
+    <p
+      role={resultado.ok ? "status" : "alert"}
+      className={clsx(
+        "rounded-xl px-3.5 py-2 text-sm font-semibold",
+        resultado.ok ? "bg-menta text-menta-t" : "bg-rosa text-rosa-t",
+        className,
+      )}
+    >
+      {resultado.mensaje}
+    </p>
+  );
+}
+
 type BtnVariant = "primario" | "secundario" | "fantasma" | "peligro" | "claro";
 const BTN: Record<BtnVariant, string> = {
   primario: "bg-petroleo text-white shadow-[0_8px_18px_rgb(47_107_255/0.22)] hover:bg-petroleo-2 disabled:bg-hundido disabled:text-apagado disabled:shadow-none disabled:hover:bg-hundido",
