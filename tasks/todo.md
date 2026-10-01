@@ -774,3 +774,32 @@
 - `cierrafe/src/app/(estudio)/empleados/page.tsx`
 
 **Estimated scope:** Small
+
+## Task 29: Development Session Backend Context
+**Description:** Resolve temporary backend access contexts from the active development session cookie so Server Actions use the selected development role instead of always assuming the default env role.
+
+**Acceptance criteria:**
+- [x] Admin Server Actions require an active system-admin development session before using real backend context.
+- [x] Study provisioning Server Actions derive the active study role from the development session.
+- [x] Payroll operator and read-only study sessions map to their matching backend roles.
+- [x] Delegated admin-as-study sessions preserve system-admin delegation metadata when UUIDs are configured.
+- [x] Missing or mismatched sessions continue to fall back to demo mode instead of writing with the wrong actor.
+
+**Verification:**
+- [x] `npm run typecheck` in `cierrafe`
+- [x] `npm test -- backend-dev-context` in `cierrafe`
+- [x] `npm run lint` in `cierrafe`
+- [x] `npm run build` in `cierrafe`
+
+**Notes:**
+- [ ] Pending later: replace development session cookie parsing with the real authenticated session resolver.
+
+**Dependencies:** Task 17, Task 24
+
+**Files touched:**
+- `cierrafe/src/lib/backend-dev-context.ts`
+- `cierrafe/src/app/admin/actions.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/tests/backend-dev-context.test.ts`
+
+**Estimated scope:** Small

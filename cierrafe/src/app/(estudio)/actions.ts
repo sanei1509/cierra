@@ -5,6 +5,7 @@ import { crearEmpleadoConAccesoInicial, crearEmpresaConAccesoInicial } from "cie
 import type { EmpresaId } from "cierrabe/datos/contexto";
 import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearPeriodosRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
 import { contextoEstudioDesarrollo, uuidValido } from "@/lib/backend-dev-context";
+import { obtenerSesionDev } from "@/lib/dev-auth";
 import { MES_ACTUAL } from "@/lib/format";
 import type { Modalidad, Tono } from "@/lib/types";
 
@@ -43,7 +44,7 @@ export interface CrearEmpleadoInicialInput {
 }
 
 export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Promise<AltaRealResult> {
-  const ctx = contextoEstudioDesarrollo();
+  const ctx = contextoEstudioDesarrollo(await obtenerSesionDev());
   if (!ctx) {
     return {
       ok: true,
@@ -103,7 +104,7 @@ export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Prom
 }
 
 export async function crearEmpleadoInicial(input: CrearEmpleadoInicialInput): Promise<AltaRealResult> {
-  const ctx = contextoEstudioDesarrollo();
+  const ctx = contextoEstudioDesarrollo(await obtenerSesionDev());
   if (!ctx || !uuidValido(input.empresaId)) {
     return {
       ok: true,

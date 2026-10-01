@@ -7,6 +7,7 @@ import { crearAuditoriaRepo, crearEstudiosRepo, crearPagosRepo, crearPlanesRepo,
 import type { AjusteManualCobro, CrearSuscripcionEstudioInput } from "cierrabe/facturacion";
 import { contextoAdminDesarrollo, uuidValido } from "@/lib/backend-dev-context";
 import { ADDONS_ADMIN, planPorCodigo, resumenCobroDemo, type AjusteCobroAdmin, type CodigoModulo, type EstudioAdmin, type ResumenCobroAdmin } from "@/lib/comercial-demo";
+import { obtenerSesionDev } from "@/lib/dev-auth";
 
 export interface GuardarConfiguracionComercialInput {
   estudio: EstudioAdmin;
@@ -83,7 +84,7 @@ function suscripcionDesdeEstudio(estudio: EstudioAdmin): CrearSuscripcionEstudio
 }
 
 export async function guardarConfiguracionComercial(input: GuardarConfiguracionComercialInput): Promise<GuardarConfiguracionComercialResult> {
-  const adminDesarrollo = contextoAdminDesarrollo();
+  const adminDesarrollo = contextoAdminDesarrollo(await obtenerSesionDev());
   if (!adminDesarrollo) {
     return {
       ok: true,
@@ -113,7 +114,7 @@ export async function guardarConfiguracionComercial(input: GuardarConfiguracionC
 }
 
 export async function crearEstudioInicialAdmin(input: CrearEstudioInicialInput): Promise<CrearEstudioInicialResult> {
-  const adminDesarrollo = contextoAdminDesarrollo();
+  const adminDesarrollo = contextoAdminDesarrollo(await obtenerSesionDev());
   if (!adminDesarrollo) {
     return {
       ok: true,
@@ -162,7 +163,7 @@ function ajustesBackend(ajustes: AjusteCobroAdmin[] | undefined): AjusteManualCo
 
 export async function generarResumenCobroComercial(input: GenerarResumenCobroInput): Promise<GenerarResumenCobroResult> {
   const resumenDemo = resumenCobroDemo(input.estudio, input.mes, input.ajustes);
-  const adminDesarrollo = contextoAdminDesarrollo();
+  const adminDesarrollo = contextoAdminDesarrollo(await obtenerSesionDev());
   if (!adminDesarrollo || !uuidValido(input.estudio.id)) {
     return {
       ok: true,
@@ -214,7 +215,7 @@ export async function generarResumenCobroComercial(input: GenerarResumenCobroInp
 }
 
 export async function registrarPagoComercial(input: RegistrarPagoComercialInput): Promise<RegistrarPagoComercialResult> {
-  const adminDesarrollo = contextoAdminDesarrollo();
+  const adminDesarrollo = contextoAdminDesarrollo(await obtenerSesionDev());
   if (!adminDesarrollo || !uuidValido(input.estudio.id)) {
     return {
       ok: true,
