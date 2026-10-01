@@ -3,10 +3,14 @@ import type { Db } from "../db";
 import type { EstudioId } from "../contexto";
 import type { ResumenesCobroRepo, UsoFacturableRepo } from "../contratos";
 import { eventosUsoFacturable, resumenesCobro } from "../schema";
-import type { EventoUsoFacturable, Moneda, ResumenCobroEstudio } from "../../facturacion";
+import { aplicacionesPago, pagosEstudio } from "../schema";
+import type { AplicacionPago, EventoUsoFacturable, Moneda, PagoEstudio, ResumenCobroEstudio } from "../../facturacion";
+import type { PagosRepo } from "../contratos";
 
 type EventoUsoRow = typeof eventosUsoFacturable.$inferSelect;
 type ResumenCobroRow = typeof resumenesCobro.$inferSelect;
+type PagoRow = typeof pagosEstudio.$inferSelect;
+type AplicacionRow = typeof aplicacionesPago.$inferSelect;
 
 function mapEvento(row: EventoUsoRow): EventoUsoFacturable {
   return {
@@ -33,6 +37,34 @@ function mapResumen(row: ResumenCobroRow): ResumenCobroEstudio {
     totalCent: row.totalCent,
     notasInternas: row.notasInternas ?? undefined,
     generado: row.generado.toISOString(),
+  };
+}
+
+function fecha(row: Date | string) {
+  return row instanceof Date ? row.toISOString().slice(0, 10) : String(row).slice(0, 10);
+}
+
+function mapPago(row: PagoRow): PagoEstudio {
+  return {
+    id: row.id,
+    estudioId: row.estudioId as EstudioId,
+    moneda: row.moneda as Moneda,
+    importeCent: row.importeCent,
+    fecha: fecha(row.fecha),
+    medio: row.medio ?? undefined,
+    referencia: row.referencia ?? undefined,
+    nota: row.nota ?? undefined,
+  };
+}
+
+function mapAplicacion(row: AplicacionRow): AplicacionPago {
+  return {
+    id: row.id,
+    pagoId: row.pagoId,
+    estudioId: row.estudioId as EstudioId,
+    mes: row.mes,
+    importeCent: row.importeCent,
+    nota: row.nota ?? undefined,
   };
 }
 
@@ -116,6 +148,67 @@ export function crearResumenesCobroRepo(db: Db): ResumenesCobroRepo {
         .orderBy(desc(resumenesCobro.generado));
 
       return rows.map(mapResumen);
+    },
+  };
+}
+
+export function crearPagosRepo(db: Db): PagosRepo {
+  return {
+    async registrarPago(input, aplicaciones) {
+      return db.transaction(async (tx) => {
+        const [pago] = await tx
+          .insert(pagosEstudio)
+          .values({
+            id: input.id,
+            estudioId: input.estudioId,
+            moneda: input.moneda,
+            importeCent: input.importeCent,
+            fecha: new Date(`${input.fecha}T00:00:00`),
+            medio: input.medio,
+            referencia: input.referencia,
+            nota: input.nota,
+          })
+          .returning();
+
+        const guardadas = aplicaciones.length
+          ? await tx
+              .insert(aplicacionesPago)
+              .values(
+                aplicaciones.map((aplicacion) => ({
+                  id: aplicacion.id,
+                  pagoId: pago.id,
+                  estudioId: aplicacion.estudioId,
+                  mes: aplicacion.mes,
+                  importeCent: aplicacion.importeCent,
+                  nota: aplicacion.nota,
+                })),
+              )
+              .returning()
+          : [];
+
+        return { pago: mapPago(pago), aplicaciones: guardadas.map(mapAplicacion) };
+      });
+    },
+
+    async listarPagos(filtros) {
+      const rows = await db
+        .select()
+        .from(pagosEstudio)
+        .where(filtros.estudioId ? eq(pagosEstudio.estudioId, filtros.estudioId) : undefined)
+        .orderBy(desc(pagosEstudio.fecha));
+
+      return rows.map(mapPago);
+    },
+
+    async listarAplicaciones(filtros) {
+      const condiciones = [filtros.estudioId ? eq(aplicacionesPago.estudioId, filtros.estudioId) : undefined, filtros.mes ? eq(aplicacionesPago.mes, filtros.mes) : undefined].filter(Boolean);
+      const rows = await db
+        .select()
+        .from(aplicacionesPago)
+        .where(condiciones.length ? and(...condiciones) : undefined)
+        .orderBy(desc(aplicacionesPago.creado));
+
+      return rows.map(mapAplicacion);
     },
   };
 }

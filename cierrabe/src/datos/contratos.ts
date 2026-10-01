@@ -1,7 +1,7 @@
 import type { AuditEvent, Empleado, Empresa, Novedad, Periodo, Usuario } from "../dominio/types";
 import type { AuditEventId, EmpleadoId, EmpresaId, EstudioId, NovedadId, PeriodoId, TenantContext, UsuarioId } from "./contexto";
 import type { CodigoModulo, ModuloCatalogo } from "../modulos";
-import type { CrearSuscripcionEstudioInput, EventoUsoFacturable, PlanComercial, ResumenCobroEstudio, SuscripcionEstudio } from "../facturacion";
+import type { AplicacionPago, CrearSuscripcionEstudioInput, EventoUsoFacturable, PagoEstudio, PlanComercial, ResumenCobroEstudio, SuscripcionEstudio } from "../facturacion";
 
 export interface Estudio {
   id: EstudioId;
@@ -163,6 +163,12 @@ export interface ResumenesCobroRepo {
   listar(filtros: { mes?: string; estudioId?: EstudioId }): Promise<ResumenCobroEstudio[]>;
 }
 
+export interface PagosRepo {
+  registrarPago(input: PagoEstudio, aplicaciones: Omit<AplicacionPago, "pagoId">[]): Promise<{ pago: PagoEstudio; aplicaciones: AplicacionPago[] }>;
+  listarPagos(filtros: { estudioId?: EstudioId }): Promise<PagoEstudio[]>;
+  listarAplicaciones(filtros: { estudioId?: EstudioId; mes?: string }): Promise<AplicacionPago[]>;
+}
+
 export interface DatosRepos {
   estudios: EstudiosRepo;
   usuarios: UsuariosRepo;
@@ -177,4 +183,5 @@ export interface DatosRepos {
   suscripciones: SuscripcionesRepo;
   usoFacturable: UsoFacturableRepo;
   resumenesCobro: ResumenesCobroRepo;
+  pagos: PagosRepo;
 }

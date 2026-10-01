@@ -1,11 +1,19 @@
 "use client";
 
 import clsx from "clsx";
-import { Calculator, Check, CircleDollarSign, ClipboardList, FileClock, Layers3, Save, Settings2, ShieldCheck } from "lucide-react";
+import { Calculator, Check, CircleDollarSign, ClipboardList, CreditCard, FileClock, Layers3, Save, Settings2, ShieldCheck } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
-import { generarResumenCobroComercial, guardarConfiguracionComercial, type GenerarResumenCobroResult, type GuardarConfiguracionComercialResult } from "@/app/admin/actions";
+import {
+  generarResumenCobroComercial,
+  guardarConfiguracionComercial,
+  registrarPagoComercial,
+  type GenerarResumenCobroResult,
+  type GuardarConfiguracionComercialResult,
+  type RegistrarPagoComercialResult,
+} from "@/app/admin/actions";
 import {
   ADDONS_ADMIN,
+  estadoPagoDemo,
   ESTUDIOS_ADMIN,
   fmtCent,
   modulosHabilitados,
@@ -43,12 +51,16 @@ export function AdminCommercialConsole() {
   const [seleccionadoId, setSeleccionadoId] = useState(estudios[0].id);
   const [resultado, setResultado] = useState<GuardarConfiguracionComercialResult | null>(null);
   const [resultadoResumen, setResultadoResumen] = useState<GenerarResumenCobroResult | null>(null);
+  const [resultadoPago, setResultadoPago] = useState<RegistrarPagoComercialResult | null>(null);
   const [mesCobro, setMesCobro] = useState("2026-10");
   const [ajusteDescripcion, setAjusteDescripcion] = useState("");
   const [ajusteMonto, setAjusteMonto] = useState("");
   const [ajusteNota, setAjusteNota] = useState("");
+  const [mesesAdelantados, setMesesAdelantados] = useState(1);
+  const [pagosDemo, setPagosDemo] = useState<Record<string, number>>({});
   const [pendiente, startTransition] = useTransition();
   const [pendienteResumen, startResumenTransition] = useTransition();
+  const [pendientePago, startPagoTransition] = useTransition();
   const seleccionado = estudios.find((e) => e.id === seleccionadoId) ?? estudios[0];
   const plan = planPorCodigo(seleccionado.planCodigo);
   const modulos = useMemo(() => modulosHabilitados(seleccionado), [seleccionado]);
@@ -60,16 +72,21 @@ export function AdminCommercialConsole() {
   }, [ajusteDescripcion, ajusteMonto, ajusteNota]);
   const resumenPreview = useMemo(() => resumenCobroDemo(seleccionado, mesCobro, ajustes), [seleccionado, mesCobro, ajustes]);
   const resumenVisible = resultadoResumen?.resumen ?? resumenPreview;
+  const pagoKey = `${seleccionado.id}:${mesCobro}`;
+  const pagadoDemoCent = pagosDemo[pagoKey] ?? 0;
+  const estadoPago = estadoPagoDemo(resumenVisible.totalCent, pagadoDemoCent);
 
   const actualizar = (cambios: Partial<EstudioAdmin>) => {
     setResultado(null);
     setResultadoResumen(null);
+    setResultadoPago(null);
     setEstudios((actuales) => actuales.map((e) => (e.id === seleccionado.id ? { ...e, ...cambios } : e)));
   };
 
   const seleccionar = (id: string) => {
     setResultado(null);
     setResultadoResumen(null);
+    setResultadoPago(null);
     setSeleccionadoId(id);
   };
 
@@ -97,6 +114,29 @@ export function AdminCommercialConsole() {
           modo: "real",
           mensaje: error instanceof Error ? error.message : "No pudimos generar el resumen de cobro.",
           resumen: resumenPreview,
+        });
+      }
+    });
+  };
+
+  const registrarPago = (importeCent: number, meses: number) => {
+    startPagoTransition(async () => {
+      try {
+        const resultadoPagoNuevo = await registrarPagoComercial({
+          estudio: seleccionado,
+          mes: mesCobro,
+          importeCent,
+          mesesCubiertos: meses,
+          nota: meses > 1 ? `Pago adelantado por ${meses} meses` : "Pago mensual marcado desde consola admin",
+        });
+        setResultadoPago(resultadoPagoNuevo);
+        setPagosDemo((actual) => ({ ...actual, [pagoKey]: (actual[pagoKey] ?? 0) + importeCent }));
+      } catch (error) {
+        setResultadoPago({
+          ok: false,
+          modo: "real",
+          mensaje: error instanceof Error ? error.message : "No pudimos registrar el pago.",
+          pagadoCent: pagadoDemoCent,
         });
       }
     });
@@ -260,6 +300,38 @@ export function AdminCommercialConsole() {
             <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Nota del ajuste</span>
             <input className={inputCls} value={ajusteNota} onChange={(e) => setAjusteNota(e.target.value)} placeholder="Motivo interno visible para administracion" />
           </label>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+            <div className="rounded-xl border border-linea bg-hundido px-4 py-3">
+              <p className="text-xs font-bold uppercase tracking-[0.06em] text-apagado">Estado de pago</p>
+              <p className="mt-1 text-lg font-extrabold capitalize">{estadoPago.estado.replaceAll("_", " ")}</p>
+              <p className="mt-1 text-sm text-apagado">
+                Pagado {fmtCent(estadoPago.pagadoCent, resumenVisible.moneda)} · Pendiente {fmtCent(estadoPago.saldoPendienteCent, resumenVisible.moneda)}
+                {estadoPago.saldoAFavorCent > 0 ? ` · A favor ${fmtCent(estadoPago.saldoAFavorCent, resumenVisible.moneda)}` : ""}
+              </p>
+            </div>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Meses adelantados</span>
+              <input className={inputCls} type="number" min={1} max={24} value={mesesAdelantados} onChange={(e) => setMesesAdelantados(Math.max(1, Number(e.target.value) || 1))} />
+            </label>
+            <div className="flex items-end">
+              <Boton
+                type="button"
+                variante="secundario"
+                className="w-full"
+                onClick={() => registrarPago(resumenVisible.totalCent * mesesAdelantados, mesesAdelantados)}
+                disabled={pendientePago || resumenVisible.totalCent <= 0}
+              >
+                <CreditCard size={15} /> {pendientePago ? "Registrando..." : mesesAdelantados > 1 ? "Pago adelantado" : "Marcar pagado"}
+              </Boton>
+            </div>
+          </div>
+
+          {resultadoPago && (
+            <p className={clsx("mt-4 rounded-xl px-3 py-2 text-sm font-semibold", resultadoPago.ok ? "bg-menta text-menta-t" : "bg-rosa text-rosa-t")} role="status">
+              {resultadoPago.mensaje}
+            </p>
+          )}
 
           {resultadoResumen && (
             <p className={clsx("mt-4 rounded-xl px-3 py-2 text-sm font-semibold", resultadoResumen.ok ? "bg-menta text-menta-t" : "bg-rosa text-rosa-t")} role="status">

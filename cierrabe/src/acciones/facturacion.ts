@@ -1,6 +1,7 @@
 import type { AccessContext, EstudioId } from "../datos/contexto";
-import type { AjusteManualCobro, ResumenCobroEstudio } from "../facturacion";
-import type { AuditoriaRepo, PlanesRepo, ResumenesCobroRepo, SuscripcionesRepo, UsoFacturableRepo } from "../datos/contratos";
+import type { AjusteManualCobro, PagoEstudio, ResumenCobroEstudio } from "../facturacion";
+import { calcularEstadoCobro, crearAplicacionesPagoAdelantado, validarPagoEstudio } from "../facturacion";
+import type { AuditoriaRepo, PagosRepo, PlanesRepo, ResumenesCobroRepo, SuscripcionesRepo, UsoFacturableRepo } from "../datos/contratos";
 import { noEncontrado, sinPermiso } from "../datos/errores";
 import { generarResumenCobroEstudio } from "../facturacion";
 import { assertAutenticado, puedeAdministrarSistema } from "../permisos";
@@ -10,6 +11,11 @@ export interface GenerarResumenCobroAdminInput {
   mes: string;
   ajustes?: AjusteManualCobro[];
   generado?: string;
+}
+
+export interface RegistrarPagoEstudioAdminInput extends Omit<PagoEstudio, "estudioId"> {
+  desdeMes: string;
+  mesesCubiertos?: number;
 }
 
 export async function generarResumenCobroAdmin(
@@ -59,4 +65,53 @@ export async function generarResumenCobroAdmin(
   });
 
   return guardado;
+}
+
+export async function registrarPagoEstudioAdmin(
+  ctx: AccessContext | null | undefined,
+  repos: {
+    pagos: PagosRepo;
+    resumenesCobro: ResumenesCobroRepo;
+    auditoria: AuditoriaRepo;
+  },
+  estudioId: EstudioId,
+  input: RegistrarPagoEstudioAdminInput,
+) {
+  assertAutenticado(ctx);
+  if (!puedeAdministrarSistema(ctx)) sinPermiso();
+
+  const pago = validarPagoEstudio({ ...input, estudioId });
+  const mesesCubiertos = input.mesesCubiertos ?? 1;
+  const aplicaciones = crearAplicacionesPagoAdelantado({
+    estudioId,
+    pagoId: input.id,
+    desdeMes: input.desdeMes,
+    meses: mesesCubiertos,
+    importeTotalCent: pago.importeCent,
+    nota: pago.nota,
+  });
+
+  const guardado = await repos.pagos.registrarPago(pago, aplicaciones);
+  const resumenes = await repos.resumenesCobro.listar({ estudioId });
+  const estados = resumenes.map((resumen) => ({
+    mes: resumen.mes,
+    ...calcularEstadoCobro(resumen, guardado.aplicaciones),
+  }));
+
+  await repos.auditoria.registrar(tenantParaEstudio(ctx, estudioId), {
+    actor: ctx.usuarioId,
+    entidad: "PagoEstudio",
+    entidadId: estudioId,
+    accion: "pago_estudio_registrado",
+    detalle: `Pago registrado por ${pago.moneda} ${pago.importeCent / 100}`,
+    despues: JSON.stringify({
+      importeCent: pago.importeCent,
+      fecha: pago.fecha,
+      desdeMes: input.desdeMes,
+      mesesCubiertos,
+      aplicaciones: guardado.aplicaciones.map((aplicacion) => ({ mes: aplicacion.mes, importeCent: aplicacion.importeCent })),
+    }),
+  });
+
+  return { ...guardado, estados };
 }

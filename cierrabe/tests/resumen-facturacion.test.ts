@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EstudioId } from "../src/datos/contexto";
 import { ErrorDominio } from "../src/datos/errores";
-import { generarResumenCobroEstudio, type PlanComercial, type SuscripcionEstudio } from "../src/facturacion";
+import { calcularEstadoCobro, crearAplicacionesPagoAdelantado, generarResumenCobroEstudio, type PlanComercial, type SuscripcionEstudio } from "../src/facturacion";
 
 const estudioId = "estudio-a" as EstudioId;
 
@@ -91,5 +91,28 @@ describe("resumen interno de facturacion", () => {
         eventosUso: [{ estudioId, mes: "2026-09", tipo: "empleado_activo", cantidad: 5 }],
       }),
     ).toThrow(ErrorDominio);
+  });
+
+  it("calcula estado de cobro pendiente, parcial, pagado y saldo a favor", () => {
+    const resumen = generarResumenCobroEstudio({ mes: "2026-10", plan, suscripcion, generado: "2026-10-31T12:00:00.000Z" });
+
+    expect(calcularEstadoCobro(resumen, [])).toMatchObject({ estado: "pendiente", saldoPendienteCent: 185000 });
+    expect(calcularEstadoCobro(resumen, [{ estudioId, mes: "2026-10", importeCent: 50000 }])).toMatchObject({ estado: "parcial", saldoPendienteCent: 135000 });
+    expect(calcularEstadoCobro(resumen, [{ estudioId, mes: "2026-10", importeCent: 185000 }])).toMatchObject({ estado: "pagado", saldoPendienteCent: 0 });
+    expect(calcularEstadoCobro(resumen, [{ estudioId, mes: "2026-10", importeCent: 200000 }])).toMatchObject({ estado: "saldo_a_favor", saldoAFavorCent: 15000 });
+  });
+
+  it("permite repartir un pago adelantado en varios meses", () => {
+    const aplicaciones = crearAplicacionesPagoAdelantado({
+      estudioId,
+      desdeMes: "2026-10",
+      meses: 12,
+      importeTotalCent: 2_220_000,
+      nota: "Pago anual adelantado",
+    });
+
+    expect(aplicaciones).toHaveLength(12);
+    expect(aplicaciones[0]).toMatchObject({ mes: "2026-10", importeCent: 185000 });
+    expect(aplicaciones[11]).toMatchObject({ mes: "2027-09", importeCent: 185000 });
   });
 });

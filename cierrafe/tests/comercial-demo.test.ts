@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ESTUDIOS_ADMIN, fmtCent, modulosHabilitados, resumenCobroDemo, totalMensualCent } from "../src/lib/comercial-demo";
+import { estadoPagoDemo, ESTUDIOS_ADMIN, fmtCent, modulosHabilitados, resumenCobroDemo, totalMensualCent } from "../src/lib/comercial-demo";
 
 describe("consola comercial demo", () => {
   it("calcula el total mensual como plan mas add-ons", () => {
@@ -28,5 +28,12 @@ describe("consola comercial demo", () => {
       { tipo: "ajuste", totalCent: -150000, nota: "Primer mes" },
     ]);
     expect(resumen.notasInternas).toContain("Piloto");
+  });
+
+  it("muestra si un resumen esta pendiente, pagado o con saldo a favor", () => {
+    expect(estadoPagoDemo(100000, 0)).toMatchObject({ estado: "pendiente", saldoPendienteCent: 100000 });
+    expect(estadoPagoDemo(100000, 50000)).toMatchObject({ estado: "parcial", saldoPendienteCent: 50000 });
+    expect(estadoPagoDemo(100000, 100000)).toMatchObject({ estado: "pagado", saldoPendienteCent: 0 });
+    expect(estadoPagoDemo(100000, 120000)).toMatchObject({ estado: "saldo_a_favor", saldoAFavorCent: 20000 });
   });
 });

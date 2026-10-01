@@ -328,3 +328,28 @@
 - `cierrafe/src/app/admin/*`
 
 **Estimated scope:** Medium
+
+## Task 14: Internal Collections and Study Payments
+**Description:** Track whether studies paid their monthly summaries, support partial payments and register prepaid months so paid periods do not keep appearing as debt.
+
+**Acceptance criteria:**
+- [x] Admin can register a payment for a study.
+- [x] Payments can be applied to one month or spread across multiple prepaid months.
+- [x] Monthly collection state distinguishes pending, partial, paid and credit balance.
+- [x] Backend stores payments and payment applications separately from billing summaries.
+- [x] Admin console can mark the current month as paid and register prepaid months.
+
+**Verification:**
+- [x] Unit tests for pending, partial, paid and credit balance states.
+- [x] Unit tests for spreading an annual/prepaid payment across months.
+- [x] `corepack pnpm typecheck`
+
+**Dependencies:** Task 13
+
+**Files likely touched:**
+- `cierrabe/src/facturacion/*`
+- `cierrabe/src/datos/schema.ts`
+- `cierrabe/src/datos/repos/*`
+- `cierrafe/src/app/admin/*`
+
+**Estimated scope:** Medium

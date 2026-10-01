@@ -184,6 +184,36 @@ export const resumenesCobro = pgTable(
   ],
 );
 
+export const pagosEstudio = pgTable(
+  "pagos_estudio",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    estudioId: uuid("estudio_id").notNull().references(() => estudios.id),
+    moneda: monedaEnum("moneda").default("UYU").notNull(),
+    importeCent: integer("importe_cent").notNull(),
+    fecha: timestamp("fecha", { withTimezone: false }).notNull(),
+    medio: text("medio"),
+    referencia: text("referencia"),
+    nota: text("nota"),
+    creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("pagos_estudio_fecha_idx").on(t.estudioId, t.fecha)],
+);
+
+export const aplicacionesPago = pgTable(
+  "aplicaciones_pago",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    pagoId: uuid("pago_id").notNull().references(() => pagosEstudio.id),
+    estudioId: uuid("estudio_id").notNull().references(() => estudios.id),
+    mes: varchar("mes", { length: 7 }).notNull(),
+    importeCent: integer("importe_cent").notNull(),
+    nota: text("nota"),
+    creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("aplicaciones_pago_estudio_mes_idx").on(t.estudioId, t.mes)],
+);
+
 export const usuarios = pgTable(
   "usuarios",
   {

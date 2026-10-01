@@ -1,14 +1,29 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { configurarSuscripcionEstudio, generarResumenCobroAdmin } from "cierrabe/acciones";
+import { configurarSuscripcionEstudio, generarResumenCobroAdmin, registrarPagoEstudioAdmin } from "cierrabe/acciones";
 import type { AccessContext, EstudioId, UsuarioId } from "cierrabe/datos/contexto";
-import { crearAuditoriaRepo, crearPlanesRepo, crearResumenesCobroRepo, crearSuscripcionesRepo, crearUsoFacturableRepo } from "cierrabe/datos/repos";
+import { crearAuditoriaRepo, crearPagosRepo, crearPlanesRepo, crearResumenesCobroRepo, crearSuscripcionesRepo, crearUsoFacturableRepo } from "cierrabe/datos/repos";
 import type { AjusteManualCobro, CrearSuscripcionEstudioInput } from "cierrabe/facturacion";
 import { ADDONS_ADMIN, planPorCodigo, resumenCobroDemo, type AjusteCobroAdmin, type CodigoModulo, type EstudioAdmin, type ResumenCobroAdmin } from "@/lib/comercial-demo";
 
 export interface GuardarConfiguracionComercialInput {
   estudio: EstudioAdmin;
+}
+
+export interface RegistrarPagoComercialInput {
+  estudio: EstudioAdmin;
+  mes: string;
+  importeCent: number;
+  mesesCubiertos: number;
+  nota?: string;
+}
+
+export interface RegistrarPagoComercialResult {
+  ok: boolean;
+  mensaje: string;
+  modo: "real" | "demo";
+  pagadoCent: number;
 }
 
 export interface GuardarConfiguracionComercialResult {
@@ -150,5 +165,44 @@ export async function generarResumenCobroComercial(input: GenerarResumenCobroInp
       notasInternas: resumen.notasInternas,
       generado: resumen.generado,
     },
+  };
+}
+
+export async function registrarPagoComercial(input: RegistrarPagoComercialInput): Promise<RegistrarPagoComercialResult> {
+  if (!process.env.DATABASE_URL || !uuidRegex.test(input.estudio.id)) {
+    return {
+      ok: true,
+      modo: "demo",
+      mensaje: input.mesesCubiertos > 1 ? `Pago adelantado simulado para ${input.mesesCubiertos} meses.` : "Pago mensual simulado.",
+      pagadoCent: input.importeCent,
+    };
+  }
+
+  const { db } = await import("cierrabe/datos/db");
+  await registrarPagoEstudioAdmin(
+    adminDesarrollo,
+    {
+      pagos: crearPagosRepo(db),
+      resumenesCobro: crearResumenesCobroRepo(db),
+      auditoria: crearAuditoriaRepo(db),
+    },
+    input.estudio.id as EstudioId,
+    {
+      moneda: input.estudio.moneda,
+      importeCent: input.importeCent,
+      fecha: new Date().toISOString().slice(0, 10),
+      medio: "manual",
+      nota: input.nota,
+      desdeMes: input.mes,
+      mesesCubiertos: input.mesesCubiertos,
+    },
+  );
+
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    modo: "real",
+    mensaje: "Pago registrado en el backend.",
+    pagadoCent: input.importeCent,
   };
 }

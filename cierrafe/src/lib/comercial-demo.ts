@@ -73,6 +73,13 @@ export interface ResumenCobroAdmin {
   generado: string;
 }
 
+export interface EstadoPagoAdmin {
+  estado: "pendiente" | "parcial" | "pagado" | "saldo_a_favor";
+  pagadoCent: number;
+  saldoPendienteCent: number;
+  saldoAFavorCent: number;
+}
+
 export const MODULOS_ADMIN: ModuloAdmin[] = [
   { codigo: "rrhh_core", nombre: "Datos RRHH base", grupo: "Base" },
   { codigo: "payroll_core", nombre: "Liquidacion de sueldos", grupo: "Liquidacion" },
@@ -191,6 +198,17 @@ export function resumenCobroDemo(estudio: EstudioAdmin, mes: string, ajustes: Aj
     totalCent: lineas.reduce((total, linea) => total + linea.totalCent, 0),
     notasInternas: estudio.notas,
     generado: new Date().toISOString(),
+  };
+}
+
+export function estadoPagoDemo(totalCent: number, pagadoCent: number): EstadoPagoAdmin {
+  if (pagadoCent <= 0) return { estado: "pendiente", pagadoCent: 0, saldoPendienteCent: totalCent, saldoAFavorCent: 0 };
+  if (pagadoCent < totalCent) return { estado: "parcial", pagadoCent, saldoPendienteCent: totalCent - pagadoCent, saldoAFavorCent: 0 };
+  return {
+    estado: pagadoCent > totalCent ? "saldo_a_favor" : "pagado",
+    pagadoCent,
+    saldoPendienteCent: 0,
+    saldoAFavorCent: pagadoCent - totalCent,
   };
 }
 
