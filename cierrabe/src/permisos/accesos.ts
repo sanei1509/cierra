@@ -39,6 +39,7 @@ export function puedeDarAltaEmpresa(ctx: AccessContext, recurso: RecursoEstudio)
 export function puedeDarAltaEmpleado(ctx: AccessContext, recurso: RecursoEmpresa) {
   if (!puedeVerEmpresa(ctx, recurso)) return false;
   if (ctx.actorTipo === "sistema") return ctx.rol === "system_admin";
+  if (ctx.actorTipo === "estudio") return ctx.rol !== "studio_readonly";
   return ctx.actorTipo === "empresa" && (ctx.rol === "company_owner" || ctx.rol === "company_operator");
 }
 

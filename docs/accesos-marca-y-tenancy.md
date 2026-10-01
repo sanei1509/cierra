@@ -41,7 +41,7 @@ Puede:
 - Gestionar empresas propias.
 - Cargar los datos iniciales de sus empresas cliente.
 - Crear, activar, suspender o quitar acceso a usuarios de sus empresas cliente.
-- Gestionar empleados de sus empresas.
+- Gestionar empleados de sus empresas, incluyendo verlos, cargarlos, editarlos y cargar novedades como lo haria la empresa cliente.
 - Liquidar sueldos, publicar recibos y ver auditoria de su propio espacio.
 - Invitar usuarios internos del estudio, por ejemplo administrador, liquidador o solo lectura.
 
@@ -130,6 +130,7 @@ Reglas:
 - El administrador de Cierra es quien habilita un estudio nuevo y su usuario inicial.
 - El estudio contable es quien carga/crea sus empresas cliente y les da acceso.
 - La empresa es quien carga/crea sus empleados y les da acceso.
+- El estudio contable tambien puede cargar/crear empleados y operar sobre ellos dentro de sus empresas cliente. Esto permite que el contador sustituya completamente las planillas cuando la empresa delega esa tarea.
 - Soporte de Cierra puede asistir, pero toda accion debe quedar auditada con actor, motivo y fecha.
 - Nadie puede darse acceso a si mismo a un nivel superior.
 - Las altas tambien deben respetar modulos contratados cuando corresponda.
@@ -178,8 +179,8 @@ Ejemplos:
 | Editar perfil de empresa | Si | Solo propias | Solo propia y campos permitidos | No |
 | Subir logo de empresa | Si | Solo propias | Solo propia | No |
 | Ver empleados | Si | Solo empresas propias | Solo empresa propia | Solo si mismo |
-| Crear empleado | Soporte auditado | No normalmente | Solo empresa propia | No |
-| Crear acceso a empleado | Soporte auditado | No normalmente | Solo empresa propia | No |
+| Crear empleado | Soporte auditado | Solo empresas propias | Solo empresa propia | No |
+| Crear acceso a empleado | Soporte auditado | Solo empresas propias | Solo empresa propia | No |
 | Editar empleado | Si | Solo empresas propias | Campos permitidos si aplica | Campos personales permitidos si aplica |
 | Cargar novedades | Si | Solo empresas propias | Solo empresa propia | No, salvo flujo futuro |
 | Calcular liquidacion | Si | Solo empresas propias | No | No |

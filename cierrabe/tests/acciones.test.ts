@@ -125,11 +125,21 @@ describe("acciones backend con guards", () => {
     expect(repo.ctxs[0].empresasPermitidas).toEqual([empresaA]);
   });
 
-  it("estudio no crea acceso/registro inicial de empleado", async () => {
+  it("estudio puede crear empleados de sus empresas cliente", async () => {
     const repo = empleadosRepoMock();
     const input: CrearEmpleadoInput = { ...empleado(), id: undefined };
 
-    await expect(crearEmpleado(estudioAdmin, repo, { estudioId: estudioA, empresaId: empresaA }, input)).rejects.toBeInstanceOf(ErrorDominio);
+    await crearEmpleado(estudioAdmin, repo, { estudioId: estudioA, empresaId: empresaA }, input);
+
+    expect(repo.crear).toHaveBeenCalledTimes(1);
+    expect(repo.ctxs[0]).toMatchObject({ estudioId: estudioA, rol: "admin", empresasPermitidas: "todas" });
+  });
+
+  it("estudio no puede crear empleados en empresas fuera de su alcance", async () => {
+    const repo = empleadosRepoMock();
+    const input: CrearEmpleadoInput = { ...empleado(), id: undefined };
+
+    await expect(crearEmpleado(liquidadorLimitado, repo, { estudioId: estudioA, empresaId: empresaB }, input)).rejects.toBeInstanceOf(ErrorDominio);
     expect(repo.crear).not.toHaveBeenCalled();
   });
 

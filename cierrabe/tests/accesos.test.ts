@@ -25,6 +25,7 @@ const systemAdmin: AccessContext = { actorTipo: "sistema", usuarioId: usuario, r
 const supportAdmin: AccessContext = { actorTipo: "sistema", usuarioId: usuario, rol: "support_admin" };
 const studioAdmin: AccessContext = { actorTipo: "estudio", usuarioId: usuario, estudioId: estudioA, rol: "studio_admin", empresasPermitidas: "todas" };
 const payroll: AccessContext = { actorTipo: "estudio", usuarioId: usuario, estudioId: estudioA, rol: "payroll_operator", empresasPermitidas: [empresaA] };
+const studioReadonly: AccessContext = { actorTipo: "estudio", usuarioId: usuario, estudioId: estudioA, rol: "studio_readonly", empresasPermitidas: "todas" };
 const companyOwner: AccessContext = { actorTipo: "empresa", usuarioId: usuario, estudioId: estudioA, empresaId: empresaA, rol: "company_owner" };
 const companyReadonly: AccessContext = { actorTipo: "empresa", usuarioId: usuario, estudioId: estudioA, empresaId: empresaA, rol: "company_readonly" };
 const employeeSelf: AccessContext = { actorTipo: "empleado", usuarioId: usuario, estudioId: estudioA, empresaId: empresaA, empleadoId: empleadoA, rol: "employee_self" };
@@ -48,7 +49,18 @@ describe("politicas de acceso", () => {
     expect(puedeDarAltaEmpresa(companyOwner, { estudioId: estudioA })).toBe(false);
 
     expect(puedeDarAltaEmpleado(companyOwner, { estudioId: estudioA, empresaId: empresaA })).toBe(true);
-    expect(puedeDarAltaEmpleado(payroll, { estudioId: estudioA, empresaId: empresaA })).toBe(false);
+    expect(puedeDarAltaEmpleado(studioAdmin, { estudioId: estudioA, empresaId: empresaA })).toBe(true);
+    expect(puedeDarAltaEmpleado(payroll, { estudioId: estudioA, empresaId: empresaA })).toBe(true);
+    expect(puedeDarAltaEmpleado(payroll, { estudioId: estudioA, empresaId: empresaB })).toBe(false);
+    expect(puedeDarAltaEmpleado(studioReadonly, { estudioId: estudioA, empresaId: empresaA })).toBe(false);
+  });
+
+  it("permite al estudio operar empleados y novedades de sus empresas", () => {
+    expect(puedeAccionEmpresa(studioAdmin, "cargar_novedades", { estudioId: estudioA, empresaId: empresaA })).toBe(true);
+    expect(puedeVerEmpleado(studioAdmin, { estudioId: estudioA, empresaId: empresaA, empleadoId: empleadoA })).toBe(true);
+    expect(() => exigirEmpleado(studioAdmin, "editar_datos", { estudioId: estudioA, empresaId: empresaA, empleadoId: empleadoA })).not.toThrow();
+
+    expect(puedeAccionEmpresa(studioReadonly, "cargar_novedades", { estudioId: estudioA, empresaId: empresaA })).toBe(false);
   });
 
   it("limita al liquidador a sus empresas permitidas", () => {
