@@ -144,17 +144,24 @@ body {
   font-feature-settings: "cv11";
 }
 
-.cierra-loader-mark {
-  filter: drop-shadow(0 20px 36px rgb(47 107 255 / 0.24));
+.cierra-loader-symbol {
+  background-image: url("/brand/cierra-symbol.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
 }
 
-.cierra-loader-stroke,
-.cierra-loader-cap {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
+.cierra-loader-symbol-base {
+  filter: grayscale(1) saturate(0);
+  opacity: 0.26;
 }
 
-.cierra-loader-cap {
+.cierra-loader-symbol-fill {
+  clip-path: inset(0 100% 0 0);
+  filter: drop-shadow(0 18px 34px rgb(47 107 255 / 0.28));
+}
+
+.cierra-loader-symbol-pulse {
   opacity: 0;
 }
 
@@ -221,13 +228,11 @@ body {
     animation: crece 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
     transform-origin: left;
   }
-  .cierra-loader-stroke {
-    animation: cierra-loader-stroke 4200ms cubic-bezier(0.3, 0, 0.15, 1) forwards;
+  .cierra-loader-symbol-fill {
+    animation: cierra-loader-symbol-fill 2200ms cubic-bezier(0.3, 0, 0.15, 1) forwards;
   }
-  .cierra-loader-cap {
-    animation:
-      cierra-loader-cap-fill 4200ms cubic-bezier(0.3, 0, 0.15, 1) forwards,
-      cierra-loader-cap-pulse 900ms ease-in-out 4200ms infinite;
+  .cierra-loader-symbol-pulse {
+    animation: cierra-loader-symbol-pulse 700ms ease-in-out 2200ms infinite;
   }
 }
 @keyframes entra-drawer {
@@ -242,35 +247,26 @@ body {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
 }
-@keyframes cierra-loader-stroke {
-  from { stroke-dashoffset: 1; }
-  to { stroke-dashoffset: 0; }
+@keyframes cierra-loader-symbol-fill {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
 }
-@keyframes cierra-loader-cap-fill {
-  0%, 72% {
-    opacity: 0;
-    stroke-dashoffset: 1;
-  }
-  100% {
-    opacity: 1;
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes cierra-loader-cap-pulse {
+@keyframes cierra-loader-symbol-pulse {
   0%, 100% {
-    opacity: 0.7;
-    filter: drop-shadow(0 0 14px rgb(245 182 51 / 0.5));
+    opacity: 0.3;
+    transform: scale(0.86);
   }
   50% {
-    opacity: 1;
-    filter: drop-shadow(0 0 24px rgb(245 182 51 / 0.9));
+    opacity: 0.85;
+    transform: scale(1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cierra-loader-stroke,
-  .cierra-loader-cap {
-    stroke-dashoffset: 0;
+  .cierra-loader-symbol-fill {
+    clip-path: inset(0 0 0 0);
+  }
+  .cierra-loader-symbol-pulse {
     opacity: 1;
   }
 }
