@@ -1,7 +1,7 @@
 import type { AuditEvent, Empleado, Empresa, Novedad, Periodo, Usuario } from "../dominio/types";
 import type { AuditEventId, EmpleadoId, EmpresaId, EstudioId, NovedadId, PeriodoId, TenantContext, UsuarioId } from "./contexto";
 import type { CodigoModulo, ModuloCatalogo } from "../modulos";
-import type { CrearSuscripcionEstudioInput, PlanComercial, SuscripcionEstudio } from "../facturacion";
+import type { CrearSuscripcionEstudioInput, EventoUsoFacturable, PlanComercial, ResumenCobroEstudio, SuscripcionEstudio } from "../facturacion";
 
 export interface Estudio {
   id: EstudioId;
@@ -153,6 +153,16 @@ export interface SuscripcionesRepo {
   crearOActualizar(estudioId: EstudioId, input: CrearSuscripcionEstudioInput): Promise<SuscripcionEstudio>;
 }
 
+export interface UsoFacturableRepo {
+  registrar(input: EventoUsoFacturable): Promise<EventoUsoFacturable>;
+  listar(filtros: { mes?: string; estudioId?: EstudioId }): Promise<EventoUsoFacturable[]>;
+}
+
+export interface ResumenesCobroRepo {
+  guardar(resumen: ResumenCobroEstudio): Promise<ResumenCobroEstudio>;
+  listar(filtros: { mes?: string; estudioId?: EstudioId }): Promise<ResumenCobroEstudio[]>;
+}
+
 export interface DatosRepos {
   estudios: EstudiosRepo;
   usuarios: UsuariosRepo;
@@ -165,4 +175,6 @@ export interface DatosRepos {
   modulos: ModulosRepo;
   planes: PlanesRepo;
   suscripciones: SuscripcionesRepo;
+  usoFacturable: UsoFacturableRepo;
+  resumenesCobro: ResumenesCobroRepo;
 }

@@ -305,16 +305,20 @@
 **Description:** Track commercial setup and produce a monthly internal summary of what each study should be charged.
 
 **Acceptance criteria:**
-- [ ] Usage events can be recorded for internal reference.
-- [ ] Billing summary includes fixed plan price, fixed module/add-on prices and manual adjustments.
-- [ ] Summary can be filtered by month and study.
-- [ ] Prices are versioned or snapshotted so historical totals do not change silently.
-- [ ] Admin can see notes explaining manual adjustments.
+- [x] Usage events can be recorded for internal reference.
+- [x] Billing summary includes fixed plan price, fixed module/add-on prices and manual adjustments.
+- [x] Summary can be filtered by month and study.
+- [x] Prices are versioned or snapshotted so historical totals do not change silently.
+- [ ] Admin can see notes explaining manual adjustments in the UI.
 
 **Verification:**
-- [ ] Unit tests for billing summary calculation.
-- [ ] Tests for historical price snapshot behavior.
-- [ ] `corepack pnpm typecheck`
+- [x] Unit tests for billing summary calculation.
+- [x] Tests for historical price snapshot behavior.
+- [x] `corepack pnpm typecheck`
+
+**Notes:**
+- [x] Backend billing calculation, usage events, billing snapshots and admin generation action exist.
+- [ ] Pending later: render saved billing summaries in the admin console.
 
 **Dependencies:** Task 12
 

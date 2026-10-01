@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AccessContext, EstudioId, TenantContext, UsuarioId } from "../src/datos/contexto";
-import type { AuditoriaRepo, SuscripcionesRepo } from "../src/datos/contratos";
+import type { AuditoriaRepo, PlanesRepo, ResumenesCobroRepo, SuscripcionesRepo, UsoFacturableRepo } from "../src/datos/contratos";
 import type { AuditEvent } from "../src/dominio/types";
 import { ErrorDominio } from "../src/datos/errores";
-import { configurarSuscripcionEstudio } from "../src/acciones";
+import { configurarSuscripcionEstudio, generarResumenCobroAdmin } from "../src/acciones";
 import {
   modulosContratados,
   totalMensualContratado,
@@ -56,6 +56,27 @@ function suscripcionesRepoMock(): SuscripcionesRepo {
   return {
     obtenerVigente: vi.fn(async () => null),
     crearOActualizar: vi.fn(async (_estudioId, input) => ({ ...input, id: input.id ?? "sub-1", addons: input.addons ?? [], overrides: input.overrides ?? [] })),
+  };
+}
+
+function planesRepoMock(): PlanesRepo {
+  return {
+    listar: vi.fn(async () => [plan]),
+    obtener: vi.fn(async () => plan),
+  };
+}
+
+function usoFacturableRepoMock(): UsoFacturableRepo {
+  return {
+    registrar: vi.fn(async (input) => input),
+    listar: vi.fn(async () => [{ estudioId, mes: "2026-10", tipo: "recibo_generado", cantidad: 120 }]),
+  };
+}
+
+function resumenesCobroRepoMock(): ResumenesCobroRepo {
+  return {
+    guardar: vi.fn(async (resumen) => resumen),
+    listar: vi.fn(async () => []),
   };
 }
 
@@ -112,6 +133,34 @@ describe("planes y suscripciones", () => {
         ...suscripcion,
         resumen: "Intento de autogestion comercial",
       }),
+    ).rejects.toBeInstanceOf(ErrorDominio);
+  });
+
+  it("solo admin sistema genera resumen interno de cobro y lo audita", async () => {
+    const suscripciones: SuscripcionesRepo = { ...suscripcionesRepoMock(), obtenerVigente: vi.fn(async () => suscripcion) };
+    const planes = planesRepoMock();
+    const usoFacturable = usoFacturableRepoMock();
+    const resumenesCobro = resumenesCobroRepoMock();
+    const auditoria = auditoriaRepoMock();
+
+    const resumen = await generarResumenCobroAdmin(
+      systemAdmin,
+      { suscripciones, planes, usoFacturable, resumenesCobro, auditoria },
+      estudioId,
+      {
+        mes: "2026-10",
+        ajustes: [{ descripcion: "Descuento lanzamiento", importeCent: -20000 }],
+        generado: "2026-10-31T12:00:00.000Z",
+      },
+    );
+
+    expect(resumen.totalCent).toBe(165000);
+    expect(usoFacturable.listar).toHaveBeenCalledWith({ estudioId, mes: "2026-10" });
+    expect(resumenesCobro.guardar).toHaveBeenCalledTimes(1);
+    expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ estudioId }), expect.objectContaining({ accion: "resumen_cobro_generado" }));
+
+    await expect(
+      generarResumenCobroAdmin(estudioAdmin, { suscripciones, planes, usoFacturable, resumenesCobro, auditoria }, estudioId, { mes: "2026-10" }),
     ).rejects.toBeInstanceOf(ErrorDominio);
   });
 });

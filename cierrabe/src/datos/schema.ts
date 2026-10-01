@@ -13,6 +13,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import type { EventoUsoFacturable, LineaCobro } from "../facturacion";
 
 export const rolEnum = pgEnum("rol", ["admin", "liquidador", "lectura"]);
 export const estadoUsuarioEnum = pgEnum("estado_usuario", ["invitado", "activo", "suspendido"]);
@@ -26,6 +27,7 @@ export const estadoPlanEnum = pgEnum("estado_plan", ["activo", "oculto", "discon
 export const estadoSuscripcionEnum = pgEnum("estado_suscripcion", ["prueba", "activo", "pausado", "cancelado", "vencido"]);
 export const monedaEnum = pgEnum("moneda", ["UYU", "USD"]);
 export const tipoOverrideModuloEnum = pgEnum("tipo_override_modulo", ["habilitar", "deshabilitar"]);
+export const tipoEventoUsoEnum = pgEnum("tipo_evento_uso", ["empresa_activa", "empleado_activo", "recibo_generado", "recibo_enviado"]);
 export const etapaPeriodoEnum = pgEnum("etapa_periodo", ["novedades", "recibidas", "borrador", "enviada", "devuelta", "aprobada", "cerrada"]);
 export const bpsEstadoEnum = pgEnum("bps_estado", ["pendiente", "generado", "presentado"]);
 export const modalidadEnum = pgEnum("modalidad", ["mensual", "jornalero"]);
@@ -139,6 +141,47 @@ export const moduloOverrides = pgTable(
     creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("modulo_overrides_suscripcion_idx").on(t.suscripcionId, t.moduloCodigo)],
+);
+
+export const eventosUsoFacturable = pgTable(
+  "eventos_uso_facturable",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    estudioId: uuid("estudio_id").notNull().references(() => estudios.id),
+    mes: varchar("mes", { length: 7 }).notNull(),
+    tipo: tipoEventoUsoEnum("tipo").notNull(),
+    cantidad: integer("cantidad").notNull(),
+    referenciaId: text("referencia_id"),
+    nota: text("nota"),
+    creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("eventos_uso_estudio_mes_idx").on(t.estudioId, t.mes),
+    index("eventos_uso_tipo_idx").on(t.tipo),
+  ],
+);
+
+export const resumenesCobro = pgTable(
+  "resumenes_cobro",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    estudioId: uuid("estudio_id").notNull().references(() => estudios.id),
+    mes: varchar("mes", { length: 7 }).notNull(),
+    moneda: monedaEnum("moneda").default("UYU").notNull(),
+    suscripcionId: uuid("suscripcion_id").notNull().references(() => suscripcionesEstudio.id),
+    planId: uuid("plan_id").notNull().references(() => planes.id),
+    estadoSuscripcion: estadoSuscripcionEnum("estado_suscripcion").notNull(),
+    lineas: jsonb("lineas").$type<LineaCobro[]>().default([]).notNull(),
+    eventosUso: jsonb("eventos_uso").$type<EventoUsoFacturable[]>().default([]).notNull(),
+    totalCent: integer("total_cent").default(0).notNull(),
+    notasInternas: text("notas_internas"),
+    generado: timestamp("generado", { withTimezone: true }).notNull(),
+    creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("resumenes_cobro_estudio_mes_unique").on(t.estudioId, t.mes),
+    index("resumenes_cobro_mes_idx").on(t.mes),
+  ],
 );
 
 export const usuarios = pgTable(
