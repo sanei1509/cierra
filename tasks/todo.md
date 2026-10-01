@@ -653,3 +653,40 @@
 - `cierrafe/tests/backend-dev-context.test.ts`
 
 **Estimated scope:** Small
+
+## Task 25: Development Database Seed
+**Description:** Add an idempotent development seed so local PostgreSQL can create the UUID admin, study and study user expected by the development backend contexts.
+
+**Acceptance criteria:**
+- [x] Backend has a `db:seed:dev` script.
+- [x] Workspace root exposes `pnpm db:seed:dev`.
+- [x] Seed creates or updates the development study from env/default values.
+- [x] Seed creates or updates the development system admin user.
+- [x] Seed creates or updates the development study admin user and membership.
+- [x] Seed closes the PostgreSQL pool after finishing.
+- [x] README documents the local backend seed flow.
+
+**Verification:**
+- [x] Unit tests for seed configuration defaults and env overrides.
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+- [ ] Manual `pnpm db:seed:dev` against local PostgreSQL. Pending because PostgreSQL may not be running locally.
+
+**Notes:**
+- [ ] Pending later: add password credentials once real password login route is connected.
+- [ ] Pending later: seed base commercial plans/modules into PostgreSQL for fully real admin flows.
+
+**Dependencies:** Task 24
+
+**Files likely touched:**
+- `package.json`
+- `cierrabe/package.json`
+- `.env.example`
+- `README.md`
+- `cierrabe/src/dev/*`
+- `cierrabe/src/datos/db.ts`
+- `cierrabe/tests/seed-desarrollo.test.ts`
+
+**Estimated scope:** Small

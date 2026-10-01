@@ -20,3 +20,8 @@ if (process.env.NODE_ENV !== "production") globalForDb.cierraPgPool = pool;
 
 export const db = drizzle({ client: pool, schema });
 export type Db = typeof db;
+
+export async function cerrarDb() {
+  await pool.end();
+  if (process.env.NODE_ENV !== "production") delete globalForDb.cierraPgPool;
+}

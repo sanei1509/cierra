@@ -12,7 +12,8 @@
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter cierrabe db:generate",
     "db:migrate": "pnpm --filter cierrabe db:migrate",
-    "db:studio": "pnpm --filter cierrabe db:studio"
+    "db:studio": "pnpm --filter cierrabe db:studio",
+    "db:seed:dev": "pnpm --filter cierrabe db:seed:dev"
   },
   "devDependencies": {
     "drizzle-orm": "^0.45.3",

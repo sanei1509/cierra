@@ -14,7 +14,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:seed:dev": "tsx src/dev/seed-desarrollo.ts"
   },
   "dependencies": {
     "dotenv": "^18.0.4",
