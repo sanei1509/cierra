@@ -1,13 +1,15 @@
 import "dotenv/config";
 import { eq, sql } from "drizzle-orm";
+import { crearPasswordHash } from "../auth";
 import { db, cerrarDb } from "../datos/db";
-import { estudios, membresias, modulos, planModulos, planes, usuarios } from "../datos/schema";
+import { credencialesPassword, estudios, membresias, modulos, planModulos, planes, usuarios } from "../datos/schema";
 import { CATALOGO_MODULOS } from "../modulos";
 import { resolverSeedDesarrollo } from "./seed-config";
 import { PLANES_COMERCIALES_BASE } from "./seed-comercial";
 
 async function seedDesarrollo() {
   const config = resolverSeedDesarrollo(process.env);
+  const passwordHash = crearPasswordHash(config.password);
 
   await db.transaction(async (tx) => {
     await tx
@@ -46,6 +48,20 @@ async function seedDesarrollo() {
       });
 
     await tx
+      .insert(credencialesPassword)
+      .values({
+        usuarioId: config.adminId,
+        passwordHash,
+      })
+      .onConflictDoUpdate({
+        target: credencialesPassword.usuarioId,
+        set: {
+          passwordHash,
+          actualizada: sql`now()`,
+        },
+      });
+
+    await tx
       .insert(usuarios)
       .values({
         id: config.usuarioEstudioId,
@@ -59,6 +75,20 @@ async function seedDesarrollo() {
           email: config.estudioEmail,
           nombre: config.usuarioEstudioNombre,
           estado: "activo",
+        },
+      });
+
+    await tx
+      .insert(credencialesPassword)
+      .values({
+        usuarioId: config.usuarioEstudioId,
+        passwordHash,
+      })
+      .onConflictDoUpdate({
+        target: credencialesPassword.usuarioId,
+        set: {
+          passwordHash,
+          actualizada: sql`now()`,
         },
       });
 
@@ -130,6 +160,7 @@ async function seedDesarrollo() {
   console.log(`- Admin sistema: ${config.adminEmail} (${config.adminId})`);
   console.log(`- Estudio: ${config.estudioNombre} (${config.estudioId})`);
   console.log(`- Usuario estudio: ${config.estudioEmail} (${config.usuarioEstudioId})`);
+  console.log("- Credenciales password dev actualizadas");
   console.log(`- Modulos comerciales: ${CATALOGO_MODULOS.length}`);
   console.log(`- Planes comerciales: ${PLANES_COMERCIALES_BASE.map((plan) => plan.codigo).join(", ")}`);
 }

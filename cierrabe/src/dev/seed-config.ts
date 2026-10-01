@@ -15,6 +15,7 @@ export interface SeedDesarrolloConfig {
   usuarioEstudioId: string;
   adminEmail: string;
   estudioEmail: string;
+  password: string;
   estudioNombre: string;
   usuarioEstudioNombre: string;
 }
@@ -26,6 +27,7 @@ export function resolverSeedDesarrollo(env: NodeJS.ProcessEnv): SeedDesarrolloCo
     usuarioEstudioId: env.CIERRA_DEV_USUARIO_ID ?? DEV_IDS_DEFAULT.usuarioEstudioId,
     adminEmail: env.CIERRA_DEV_ADMIN_EMAIL ?? DEV_EMAILS_DEFAULT.admin,
     estudioEmail: env.CIERRA_DEV_USUARIO_EMAIL ?? DEV_EMAILS_DEFAULT.estudio,
+    password: env.CIERRA_DEV_PASSWORD ?? "CierraDemo123",
     estudioNombre: env.CIERRA_DEV_ESTUDIO_NOMBRE ?? "Estudio Pereira & Asociados",
     usuarioEstudioNombre: env.CIERRA_DEV_USUARIO_NOMBRE ?? "Lucia Pereira",
   };

@@ -10,6 +10,7 @@ describe("seed de desarrollo", () => {
     expect(config.usuarioEstudioId).toBe(DEV_IDS_DEFAULT.usuarioEstudioId);
     expect(config.adminEmail).toBe("admin@cierra.local");
     expect(config.estudioEmail).toBe("lucia@estudiopereira.uy");
+    expect(config.password).toBe("CierraDemo123");
   });
 
   it("permite sobreescribir ids y nombres por entorno", () => {
@@ -19,6 +20,7 @@ describe("seed de desarrollo", () => {
       CIERRA_DEV_USUARIO_ID: "00000000-0000-4000-8000-000000000103",
       CIERRA_DEV_ADMIN_EMAIL: "cesar@cierra.local",
       CIERRA_DEV_USUARIO_EMAIL: "contador@estudio.uy",
+      CIERRA_DEV_PASSWORD: "OtraClave123",
       CIERRA_DEV_ESTUDIO_NOMBRE: "Estudio Demo",
       CIERRA_DEV_USUARIO_NOMBRE: "Contador Demo",
     });
@@ -29,6 +31,7 @@ describe("seed de desarrollo", () => {
       usuarioEstudioId: "00000000-0000-4000-8000-000000000103",
       adminEmail: "cesar@cierra.local",
       estudioEmail: "contador@estudio.uy",
+      password: "OtraClave123",
       estudioNombre: "Estudio Demo",
       usuarioEstudioNombre: "Contador Demo",
     });

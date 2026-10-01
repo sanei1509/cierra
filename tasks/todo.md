@@ -675,8 +675,8 @@
 - [ ] Manual `pnpm db:seed:dev` against local PostgreSQL. Pending because PostgreSQL may not be running locally.
 
 **Notes:**
-- [ ] Pending later: add password credentials once real password login route is connected.
-- [ ] Pending later: seed base commercial plans/modules into PostgreSQL for fully real admin flows.
+- [x] Development seed now creates password credentials for the seeded admin and study user.
+- [x] Base commercial plans/modules are seeded into PostgreSQL development environments in Task 27.
 
 **Dependencies:** Task 24
 
@@ -803,3 +803,47 @@
 - `cierrafe/tests/backend-dev-context.test.ts`
 
 **Estimated scope:** Small
+
+## Task 30: Real Password Login And Session Cookie
+**Description:** Connect the login form to backend password authentication when PostgreSQL is configured, while preserving explicit development shortcuts as a separate fallback.
+
+**Acceptance criteria:**
+- [x] Backend exposes a password authentication service with generic invalid-credential errors.
+- [x] Backend PostgreSQL repo reads users, password hashes and available access spaces.
+- [x] Suspended users are rejected during password authentication.
+- [x] Development seed creates password credentials for the system admin and study admin users.
+- [x] Frontend login attempts real password auth when `DATABASE_URL` is configured.
+- [x] Frontend emits an httpOnly signed real session cookie after successful real login.
+- [x] Protected route guards accept valid real sessions in addition to development sessions.
+- [x] Logout clears both real and development session cookies.
+- [x] Development quick-access buttons remain available in non-production builds.
+
+**Verification:**
+- [x] `npm run typecheck` in `cierrabe`
+- [x] `npm test -- auth seed-desarrollo` in `cierrabe`
+- [x] `npm run typecheck` in `cierrafe`
+- [x] `npm test -- auth-session dev-session` in `cierrafe`
+- [x] `npm run lint` in `cierrafe`
+- [x] `npm run build` in `cierrafe`
+
+**Notes:**
+- [ ] Pending later: persist real sessions in the `sesiones` table and support revocation/refresh.
+- [ ] Pending later: add account selection when a user has multiple access spaces.
+- [ ] Pending later: resolve Server Action backend contexts from the real session instead of the development session bridge.
+
+**Dependencies:** Task 5, Task 17, Task 25, Task 29
+
+**Files touched:**
+- `cierrabe/src/auth/*`
+- `cierrabe/src/datos/repos/auth.ts`
+- `cierrabe/src/dev/*`
+- `cierrabe/tests/auth.test.ts`
+- `cierrabe/tests/seed-desarrollo.test.ts`
+- `cierrafe/src/app/login/actions.ts`
+- `cierrafe/src/lib/auth-session.ts`
+- `cierrafe/src/lib/dev-auth.ts`
+- `cierrafe/tests/auth-session.test.ts`
+- `.env.example`
+- `README.md`
+
+**Estimated scope:** Medium

@@ -4,6 +4,7 @@
   "private": true,
   "exports": {
     "./acciones": "./src/acciones/index.ts",
+    "./auth": "./src/auth/index.ts",
     "./datos/contexto": "./src/datos/contexto.ts",
     "./datos/db": "./src/datos/db.ts",
     "./datos/repos": "./src/datos/repos/index.ts",

@@ -57,3 +57,14 @@ export interface AuthContext {
   expira: Date;
   acceso: AccessContext;
 }
+
+export interface CredencialesPasswordAuth {
+  usuario: UsuarioAuth;
+  passwordHash: string | null;
+  espacios: EspacioAcceso[];
+}
+
+export interface AuthPasswordRepo {
+  obtenerPorEmail(email: string): Promise<CredencialesPasswordAuth | null>;
+  registrarUltimoAcceso(usuarioId: UsuarioId, fecha: Date): Promise<void>;
+}
