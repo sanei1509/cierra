@@ -690,3 +690,31 @@
 - `cierrabe/tests/seed-desarrollo.test.ts`
 
 **Estimated scope:** Small
+
+## Task 26: Admin Theme Contrast Fix
+**Description:** Fix the admin dashboard contrast issue where dark-theme text could render over light cards because Tailwind color utilities were generated from fixed values while the body used runtime theme variables.
+
+**Acceptance criteria:**
+- [x] Theme color utilities are backed by runtime CSS variables for light/dark mode.
+- [x] Admin panels, inputs and secondary buttons use themed surfaces instead of fixed white backgrounds.
+- [x] Uploaded company logos can still keep a white backing for readability.
+- [x] `/admin` remains reachable on the local dev server.
+
+**Verification:**
+- [x] `npx pnpm@11.22.0 lint`
+- [x] `npx pnpm@11.22.0 build`
+- [x] `Invoke-WebRequest http://localhost:3000/admin`
+- [ ] Browser screenshot regression. Pending because Playwright is not installed in the workspace.
+
+**Notes:**
+- [ ] Pending later: add visual regression tooling for light/dark screenshots on admin and study dashboards.
+
+**Dependencies:** Task 10, Task 11
+
+**Files likely touched:**
+- `cierrafe/src/app/globals.css`
+- `cierrafe/src/components/ui.tsx`
+- `cierrafe/src/components/admin-commercial-console.tsx`
+- `cierrafe/src/app/admin/page.tsx`
+
+**Estimated scope:** Small

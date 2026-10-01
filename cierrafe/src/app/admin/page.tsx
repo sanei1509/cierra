@@ -55,7 +55,7 @@ export default function AdminSistema() {
           <h2 className="text-lg font-bold tracking-tight">Atajos de desarrollo</h2>
           <div className="mt-4 grid gap-2">
             {accesos.map((a) => (
-              <Link key={a.href} href={a.href} className="flex items-center gap-3 rounded-xl border border-linea bg-white px-3 py-3 hover:bg-hundido">
+              <Link key={a.href} href={a.href} className="flex items-center gap-3 rounded-xl border border-linea bg-superficie px-3 py-3 hover:bg-hundido">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-hundido text-petroleo">
                   <a.icon size={18} />
                 </span>

@@ -213,7 +213,7 @@ export function AdminCommercialConsole() {
           <button
             type="button"
             onClick={() => setNuevoAbierto(true)}
-            className="inline-flex size-9 items-center justify-center rounded-xl border border-linea bg-white text-petroleo hover:bg-hundido"
+            className="inline-flex size-9 items-center justify-center rounded-xl border border-linea bg-superficie text-petroleo hover:bg-hundido"
             aria-label="Crear estudio"
             title="Crear estudio"
           >

@@ -49,10 +49,10 @@ export function Chip({ tono = "menta", children, className }: { tono?: Tono | "t
 type BtnVariant = "primario" | "secundario" | "fantasma" | "peligro" | "claro";
 const BTN: Record<BtnVariant, string> = {
   primario: "bg-petroleo text-white hover:bg-petroleo-2 disabled:bg-petroleo/40 shadow-[0_1px_1px_rgb(17_26_23/0.12)]",
-  secundario: "border border-linea bg-white text-tinta hover:border-petroleo/45 hover:bg-hundido disabled:opacity-50",
+  secundario: "border border-linea bg-superficie text-tinta hover:border-petroleo/45 hover:bg-hundido disabled:opacity-50",
   fantasma: "text-tinta-2 hover:bg-hundido hover:text-tinta disabled:opacity-50",
   peligro: "bg-rosa text-rosa-t hover:bg-rosa-t hover:text-white disabled:opacity-50",
-  claro: "bg-white text-petroleo hover:bg-sol-suave disabled:opacity-60",
+  claro: "bg-superficie text-petroleo hover:bg-sol-suave disabled:opacity-60",
 };
 
 export function Boton({
@@ -154,7 +154,7 @@ export function Campo({ label, children, ayuda }: { label: string; children: Rea
 }
 
 export const inputCls =
-  "h-11 w-full rounded-xl border border-linea bg-white px-3.5 text-sm outline-none transition-colors placeholder:text-apagado focus:border-petroleo-3 focus:bg-white focus:ring-2 focus:ring-petroleo-3/15";
+  "h-11 w-full rounded-xl border border-linea bg-superficie px-3.5 text-sm text-tinta outline-none transition-colors placeholder:text-apagado focus:border-petroleo-3 focus:bg-superficie focus:ring-2 focus:ring-petroleo-3/20";
 
 export function Vacio({ titulo, children }: { titulo: string; children?: ReactNode }) {
   return (
