@@ -499,3 +499,29 @@
 - `cierrafe/src/lib/store.ts`
 
 **Estimated scope:** Medium
+
+## Task 20: Demo Study Provisioning Form
+**Description:** Add an admin-facing demo flow to create a new accounting study with its initial owner access and commercial setup.
+
+**Acceptance criteria:**
+- [x] Admin commercial console has a visible create-study control.
+- [x] Creating a study captures study name, owner name and owner email.
+- [x] Creating a study captures initial plan, status and currency.
+- [x] Newly created demo study appears in the admin study list and becomes selected.
+- [x] The flow keeps owner access information in internal notes until real repositories are connected.
+
+**Verification:**
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Notes:**
+- [ ] Pending next: connect this admin form to `crearEstudioConAccesoInicial` and persistent repositories.
+
+**Dependencies:** Task 18
+
+**Files likely touched:**
+- `cierrafe/src/components/admin-commercial-console.tsx`
+
+**Estimated scope:** Small

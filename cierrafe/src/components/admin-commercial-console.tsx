@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Calculator, Check, CircleDollarSign, ClipboardList, CreditCard, FileClock, Layers3, Save, Settings2, ShieldCheck } from "lucide-react";
+import { Calculator, Check, CircleDollarSign, ClipboardList, CreditCard, FileClock, Layers3, Plus, Save, Settings2, ShieldCheck } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import {
   generarResumenCobroComercial,
@@ -26,7 +26,17 @@ import {
   type CodigoModulo,
   type EstudioAdmin,
 } from "@/lib/comercial-demo";
-import { Boton, Chip, Panel, inputCls } from "./ui";
+import { Boton, Campo, Chip, Drawer, Panel, inputCls } from "./ui";
+
+function slugId(s: string) {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 32);
+}
 
 function estadoChip(estado: EstudioAdmin["estado"]) {
   if (estado === "activo") return <Chip tono="menta">Activo</Chip>;
@@ -49,6 +59,8 @@ function usoNombre(tipo: string) {
 export function AdminCommercialConsole() {
   const [estudios, setEstudios] = useState(ESTUDIOS_ADMIN);
   const [seleccionadoId, setSeleccionadoId] = useState(estudios[0].id);
+  const [nuevoAbierto, setNuevoAbierto] = useState(false);
+  const [errorNuevo, setErrorNuevo] = useState("");
   const [resultado, setResultado] = useState<GuardarConfiguracionComercialResult | null>(null);
   const [resultadoResumen, setResultadoResumen] = useState<GenerarResumenCobroResult | null>(null);
   const [resultadoPago, setResultadoPago] = useState<RegistrarPagoComercialResult | null>(null);
@@ -81,6 +93,38 @@ export function AdminCommercialConsole() {
     setResultadoResumen(null);
     setResultadoPago(null);
     setEstudios((actuales) => actuales.map((e) => (e.id === seleccionado.id ? { ...e, ...cambios } : e)));
+  };
+
+  const crearEstudio = (form: FormData) => {
+    setErrorNuevo("");
+    const nombre = String(form.get("nombre") ?? "").trim();
+    const duenoNombre = String(form.get("duenoNombre") ?? "").trim();
+    const duenoEmail = String(form.get("duenoEmail") ?? "").trim().toLowerCase();
+    const planCodigo = String(form.get("planCodigo") ?? PLANES_ADMIN[0].codigo);
+    const estado = String(form.get("estado") ?? "prueba") as EstudioAdmin["estado"];
+    const moneda = String(form.get("moneda") ?? "UYU") as EstudioAdmin["moneda"];
+    const notas = String(form.get("notas") ?? "").trim();
+    if (!nombre || !duenoNombre || !/^\S+@\S+\.\S+$/.test(duenoEmail)) {
+      setErrorNuevo("Completa estudio, dueno y un email valido.");
+      return;
+    }
+    const base = slugId(nombre) || "estudio";
+    const id = estudios.some((e) => e.id === base) ? `${base}-${Date.now().toString(36).slice(-4)}` : base;
+    const nuevo: EstudioAdmin = {
+      id,
+      nombre,
+      estado,
+      planCodigo,
+      addons: [],
+      moneda,
+      notas: [`Dueno inicial: ${duenoNombre} <${duenoEmail}>`, notas].filter(Boolean).join(" · "),
+    };
+    setEstudios((actuales) => [nuevo, ...actuales]);
+    setSeleccionadoId(id);
+    setResultado({ ok: true, modo: "demo", mensaje: `Estudio creado en demo con acceso inicial para ${duenoEmail}.` });
+    setResultadoResumen(null);
+    setResultadoPago(null);
+    setNuevoAbierto(false);
   };
 
   const seleccionar = (id: string) => {
@@ -145,10 +189,19 @@ export function AdminCommercialConsole() {
   return (
     <div className="grid gap-3 xl:grid-cols-[360px_1fr]">
       <Panel className="overflow-hidden">
-        <div className="border-b border-linea px-5 py-4">
+        <div className="flex items-center justify-between gap-3 border-b border-linea px-5 py-4">
           <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
             <ShieldCheck size={18} className="text-petroleo" /> Estudios
           </h2>
+          <button
+            type="button"
+            onClick={() => setNuevoAbierto(true)}
+            className="inline-flex size-9 items-center justify-center rounded-xl border border-linea bg-white text-petroleo hover:bg-hundido"
+            aria-label="Crear estudio"
+            title="Crear estudio"
+          >
+            <Plus size={16} />
+          </button>
         </div>
         <div className="divide-y divide-linea">
           {estudios.map((estudio) => {
@@ -172,6 +225,39 @@ export function AdminCommercialConsole() {
           })}
         </div>
       </Panel>
+
+      <Drawer abierto={nuevoAbierto} onCerrar={() => setNuevoAbierto(false)} titulo="Nuevo estudio" subtitulo="Alta inicial con usuario dueño">
+        <form action={crearEstudio} className="space-y-4">
+          <Campo label="Nombre del estudio"><input name="nombre" className={inputCls} required /></Campo>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo label="Dueño / contador"><input name="duenoNombre" className={inputCls} required /></Campo>
+            <Campo label="Email de acceso"><input name="duenoEmail" type="email" className={inputCls} required /></Campo>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo label="Plan inicial">
+              <select name="planCodigo" className={inputCls} defaultValue="basico">
+                {PLANES_ADMIN.map((p) => <option key={p.codigo} value={p.codigo}>{p.nombre} · {fmtCent(p.precioMensualCent)}</option>)}
+              </select>
+            </Campo>
+            <Campo label="Estado">
+              <select name="estado" className={inputCls} defaultValue="prueba">
+                <option value="prueba">Prueba</option>
+                <option value="activo">Activo</option>
+                <option value="pausado">Pausado</option>
+              </select>
+            </Campo>
+          </div>
+          <Campo label="Moneda">
+            <select name="moneda" className={inputCls} defaultValue="UYU">
+              <option value="UYU">UYU</option>
+              <option value="USD">USD</option>
+            </select>
+          </Campo>
+          <Campo label="Notas internas"><textarea name="notas" className={clsx(inputCls, "min-h-24 py-3")} /></Campo>
+          {errorNuevo && <p className="rounded-xl bg-rosa px-3 py-2 text-sm font-semibold text-rosa-t">{errorNuevo}</p>}
+          <Boton type="submit" tam="lg" className="w-full"><Plus size={16} /> Crear estudio</Boton>
+        </form>
+      </Drawer>
 
       <div className="space-y-3">
         <Panel className="p-5">
