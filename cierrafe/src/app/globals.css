@@ -222,12 +222,12 @@ body {
     transform-origin: left;
   }
   .cierra-loader-stroke {
-    animation: cierra-loader-stroke 2800ms cubic-bezier(0.3, 0, 0.15, 1) forwards;
+    animation: cierra-loader-stroke 4200ms cubic-bezier(0.3, 0, 0.15, 1) forwards;
   }
   .cierra-loader-cap {
     animation:
-      cierra-loader-cap-fill 2800ms cubic-bezier(0.3, 0, 0.15, 1) forwards,
-      cierra-loader-cap-pulse 900ms ease-in-out 2800ms infinite;
+      cierra-loader-cap-fill 4200ms cubic-bezier(0.3, 0, 0.15, 1) forwards,
+      cierra-loader-cap-pulse 900ms ease-in-out 4200ms infinite;
   }
 }
 @keyframes entra-drawer {
