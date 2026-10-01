@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Building2, BriefcaseBusiness, Eye, EyeOff, LogIn, ShieldCheck, UserCog, UserRound } from "lucide-react";
 import { iniciarSesion, type LoginState } from "./actions";
 import { Boton } from "@/components/ui";
+import { CierraLoadingOverlay } from "@/components/cierra-loading";
 import { ACCESOS_DESARROLLO, type DevAccess, type DevAccessId } from "@/lib/dev-session";
 
 const inicial: LoginState = { email: "", error: null };
@@ -76,6 +77,7 @@ export function LoginForm({ mostrarAccesosDesarrollo = false, devPassword = "Cie
 
   return (
     <div className="space-y-3">
+      {pending && <CierraLoadingOverlay />}
       <form action={action} className="space-y-4">
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-[#1B315F]">Email</span>

@@ -873,3 +873,29 @@
 - `cierrafe/src/app/login/page.tsx`
 
 **Estimated scope:** Small
+
+## Task 32: Branded Loading Overlay
+**Description:** Add a Cierra-branded loading overlay for visible delays, using the isotipo as a watermark/fill animation instead of a generic spinner.
+
+**Acceptance criteria:**
+- [x] Loader dims/desaturates the current screen with a subtle grey overlay.
+- [x] Loader centers the Cierra symbol as a watermark.
+- [x] Loader shows the colored Cierra symbol filling upward.
+- [x] Login pending state uses the branded loader.
+- [x] App route loading state uses the branded loader.
+- [x] Reduced-motion users get a static filled symbol instead of the animation.
+
+**Verification:**
+- [x] `npm run typecheck` in `cierrafe`
+- [x] `npm run lint` in `cierrafe`
+- [x] `npm run build` in `cierrafe`
+
+**Dependencies:** Task 30, Task 31
+
+**Files touched:**
+- `cierrafe/src/components/cierra-loading.tsx`
+- `cierrafe/src/app/loading.tsx`
+- `cierrafe/src/app/login/login-form.tsx`
+- `cierrafe/src/app/globals.css`
+
+**Estimated scope:** Small
