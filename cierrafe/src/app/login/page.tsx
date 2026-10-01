@@ -1,20 +1,8 @@
 import type { ReactNode } from "react";
-import { Building2, Eye, KeyRound, ReceiptText, ShieldCheck, UserCog, UserRound, BriefcaseBusiness, Users, ClipboardCheck } from "lucide-react";
+import { Building2, KeyRound, ReceiptText, Users, ClipboardCheck } from "lucide-react";
 import { LoginForm } from "./login-form";
-import { entrarComoDesarrollo } from "./actions";
 import { Panel } from "@/components/ui";
 import { Logo } from "@/components/shell";
-import { ACCESOS_DESARROLLO, type DevAccessId } from "@/lib/dev-session";
-
-const iconos = {
-  system_admin: UserCog,
-  admin_as_study: ShieldCheck,
-  studio_admin: ShieldCheck,
-  payroll_operator: BriefcaseBusiness,
-  studio_readonly: Eye,
-  company_owner: Building2,
-  employee_self: UserRound,
-} satisfies Record<DevAccessId, typeof UserCog>;
 
 const conceptos = [
   { label: "Empresas", icon: Building2 },
@@ -34,6 +22,9 @@ function PreviewCard({ title, children, className = "" }: { title: string; child
 }
 
 export default function LoginPage() {
+  const mostrarAccesosDesarrollo = process.env.NODE_ENV !== "production";
+  const devPassword = process.env.CIERRA_DEV_PASSWORD ?? "CierraDemo123";
+
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#F7FAFF] p-2 text-[#102247] sm:p-3 lg:p-4">
       <div className="relative mx-auto grid w-full min-w-0 grid-cols-1 min-h-[calc(100vh-16px)] max-w-[1360px] overflow-hidden rounded-[30px] border border-white bg-[linear-gradient(135deg,#FFFFFF_0%,#F7FAFF_52%,#EAF2FF_100%)] shadow-[0_20px_58px_rgba(16,34,71,0.14)] lg:min-h-[calc(100vh-32px)] lg:grid-cols-[minmax(0,1fr)_430px] xl:grid-cols-[minmax(0,1fr)_480px]">
@@ -121,41 +112,13 @@ export default function LoginPage() {
               <h2 className="mt-3 text-[29px] font-extrabold leading-tight tracking-tight text-[#102247]">Entrar a Cierra</h2>
               <p className="mt-2 text-sm leading-relaxed text-[#667592]">Accedé con el email habilitado para tu cuenta.</p>
               <div className="mt-6">
-                <LoginForm />
+                <LoginForm mostrarAccesosDesarrollo={mostrarAccesosDesarrollo} devPassword={mostrarAccesosDesarrollo ? devPassword : ""} />
               </div>
               <div className="mt-5 rounded-[14px] bg-[#EAF2FF] px-4 py-3 text-center">
                 <p className="text-sm font-bold text-[#102247]">¿Necesitás acceso?</p>
                 <p className="text-xs font-medium text-[#667592]">Contactá a tu administrador.</p>
               </div>
             </Panel>
-
-            {process.env.NODE_ENV !== "production" && (
-              <details className="group rounded-[18px] border border-[#D8E1F0] bg-white/78 px-4 py-3 shadow-[0_8px_22px_rgba(16,34,71,0.06)]">
-                <summary className="flex min-w-0 cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[#2459E6] marker:hidden">
-                  <span className="truncate">Accesos rápidos de desarrollo</span>
-                  <span className="text-[#97A3BA] transition-transform group-open:rotate-180">⌄</span>
-                </summary>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                  {ACCESOS_DESARROLLO.map((acceso) => {
-                    const Icono = iconos[acceso.id];
-                    const action = entrarComoDesarrollo.bind(null, acceso.id);
-                    return (
-                      <form key={acceso.id} action={action}>
-                        <button className="flex w-full items-center gap-3 rounded-[14px] border border-[#D8E1F0] bg-white px-3 py-2.5 text-left transition-colors hover:border-[#2F6BFF]/35 hover:bg-[#EAF2FF]" type="submit">
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#EAF2FF] text-[#2F6BFF]">
-                            <Icono size={17} />
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-sm font-bold text-[#102247]">{acceso.label}</span>
-                            <span className="block truncate text-xs text-[#667592]">{acceso.email}</span>
-                          </span>
-                        </button>
-                      </form>
-                    );
-                  })}
-                </div>
-              </details>
-            )}
           </div>
         </section>
       </div>

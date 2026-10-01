@@ -847,3 +847,29 @@
 - `README.md`
 
 **Estimated scope:** Medium
+
+## Task 31: Development Login Autofill
+**Description:** Change login development shortcuts so they fill the email/password fields and require pressing the main login button, exercising the same login form path.
+
+**Acceptance criteria:**
+- [x] Development shortcut buttons no longer submit their own login action from the login screen.
+- [x] Each development shortcut fills the email field.
+- [x] Each development shortcut fills the configured development password.
+- [x] Users must press the main "Entrar" button after selecting a shortcut.
+- [x] Development password is not passed to the client when shortcuts are hidden in production.
+
+**Verification:**
+- [x] `npm run typecheck` in `cierrafe`
+- [x] `npm run lint` in `cierrafe`
+- [x] `npm run build` in `cierrafe`
+
+**Notes:**
+- [ ] Pending later: seed real password credentials for company and employee demo users if they should enter through PostgreSQL real auth.
+
+**Dependencies:** Task 30
+
+**Files touched:**
+- `cierrafe/src/app/login/login-form.tsx`
+- `cierrafe/src/app/login/page.tsx`
+
+**Estimated scope:** Small
