@@ -8,6 +8,7 @@
     "build": "pnpm --filter cierrafe build",
     "build:fe": "pnpm --filter cierrafe build",
     "lint": "pnpm --filter cierrafe lint",
+    "visual:audit": "pnpm --filter cierrafe visual:audit",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter cierrabe db:generate",

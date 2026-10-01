@@ -6,6 +6,7 @@ Spec y modelo de negocio en `../docs/`. Arquitectura del MVP: [`docs/arquitectur
 ```bash
 pnpm install
 pnpm dev          # http://localhost:3000
+pnpm visual:audit # screenshots light/dark con Playwright y Edge
 ```
 
 Backend local opcional:
@@ -21,6 +22,7 @@ pnpm db:seed:dev
 - Cambiá de usuario (arriba a la derecha) para probar roles: Administradora, Liquidador, Solo lectura.
 - "Cliente y empleado" en la barra lateral abre los portales.
 - La fecha de la demo está fija en septiembre 2026.
+- `pnpm visual:audit` reutiliza el servidor local en `localhost:3000` y guarda capturas en `cierrafe/test-results/visual/`.
 
 ## Estructura
 

@@ -704,10 +704,11 @@
 - [x] `npx pnpm@11.22.0 lint`
 - [x] `npx pnpm@11.22.0 build`
 - [x] `Invoke-WebRequest http://localhost:3000/admin`
-- [ ] Browser screenshot regression. Pending because Playwright is not installed in the workspace.
+- [x] `npm run visual:audit`
 
 **Notes:**
-- [ ] Pending later: add visual regression tooling for light/dark screenshots on admin and study dashboards.
+- [x] Visual audit tooling added with Playwright using the installed Edge channel.
+- [x] Screenshots cover login, study dashboard, employee portal and receipt document in light/dark where applicable.
 
 **Dependencies:** Task 10, Task 11
 

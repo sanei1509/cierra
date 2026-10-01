@@ -298,8 +298,12 @@ export const useStore = create<Datos & Acciones>()(
 /** Evita mismatch de hidratación con localStorage */
 export function useHidratado() {
   return useSyncExternalStore(
-    (cb) => useStore.persist.onFinishHydration(cb),
-    () => useStore.persist.hasHydrated(),
+    (cb) => {
+      const unsubscribe = useStore.persist.onFinishHydration(cb);
+      queueMicrotask(cb);
+      return unsubscribe;
+    },
+    () => useStore.persist?.hasHydrated() ?? false,
     () => false,
   );
 }
