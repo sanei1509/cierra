@@ -48,6 +48,9 @@ importers:
 
   cierrafe:
     dependencies:
+      cierrabe:
+        specifier: workspace:*
+        version: link:../cierrabe
       clsx:
         specifier: ^2.1.1
         version: 2.1.1

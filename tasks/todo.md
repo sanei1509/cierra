@@ -288,7 +288,8 @@
 
 **Notes:**
 - [x] Backend commercial repositories exist for plans and study subscriptions.
-- [ ] Pending later: wire admin console buttons to real Next Server Actions/API routes.
+- [x] Admin console save action is wired to a real Next Server Action with backend repositories and audit.
+- [ ] Pending later: replace development admin context with the real authenticated session.
 
 **Dependencies:** Task 11
 

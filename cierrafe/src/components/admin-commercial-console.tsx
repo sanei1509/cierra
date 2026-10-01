@@ -2,7 +2,8 @@
 
 import clsx from "clsx";
 import { Check, CircleDollarSign, ClipboardList, FileClock, Layers3, Save, Settings2, ShieldCheck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { guardarConfiguracionComercial, type GuardarConfiguracionComercialResult } from "@/app/admin/actions";
 import { ADDONS_ADMIN, ESTUDIOS_ADMIN, fmtCent, modulosHabilitados, moduloNombre, PLANES_ADMIN, planPorCodigo, totalMensualCent, type CodigoModulo, type EstudioAdmin } from "@/lib/comercial-demo";
 import { Boton, Chip, Panel, inputCls } from "./ui";
 
@@ -19,13 +20,30 @@ function toggleAddon(addons: CodigoModulo[], codigo: CodigoModulo) {
 export function AdminCommercialConsole() {
   const [estudios, setEstudios] = useState(ESTUDIOS_ADMIN);
   const [seleccionadoId, setSeleccionadoId] = useState(estudios[0].id);
+  const [resultado, setResultado] = useState<GuardarConfiguracionComercialResult | null>(null);
+  const [pendiente, startTransition] = useTransition();
   const seleccionado = estudios.find((e) => e.id === seleccionadoId) ?? estudios[0];
   const plan = planPorCodigo(seleccionado.planCodigo);
   const modulos = useMemo(() => modulosHabilitados(seleccionado), [seleccionado]);
   const total = totalMensualCent(seleccionado);
 
   const actualizar = (cambios: Partial<EstudioAdmin>) => {
+    setResultado(null);
     setEstudios((actuales) => actuales.map((e) => (e.id === seleccionado.id ? { ...e, ...cambios } : e)));
+  };
+
+  const guardar = () => {
+    startTransition(async () => {
+      try {
+        setResultado(await guardarConfiguracionComercial({ estudio: seleccionado }));
+      } catch (error) {
+        setResultado({
+          ok: false,
+          modo: "real",
+          mensaje: error instanceof Error ? error.message : "No pudimos guardar la configuracion comercial.",
+        });
+      }
+    });
   };
 
   return (
@@ -69,10 +87,15 @@ export function AdminCommercialConsole() {
               <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{seleccionado.nombre}</h2>
               <p className="mt-1 text-sm text-apagado">{modulos.length} modulos habilitados · {fmtCent(total, seleccionado.moneda)} mensuales</p>
             </div>
-            <Boton>
-              <Save size={15} /> Guardar configuracion
+            <Boton type="button" onClick={guardar} disabled={pendiente}>
+              <Save size={15} /> {pendiente ? "Guardando..." : "Guardar configuracion"}
             </Boton>
           </div>
+          {resultado && (
+            <p className={clsx("mt-4 rounded-xl px-3 py-2 text-sm font-semibold", resultado.ok ? "bg-menta text-menta-t" : "bg-rosa text-rosa-t")} role="status">
+              {resultado.mensaje}
+            </p>
+          )}
         </Panel>
 
         <div className="grid gap-3 lg:grid-cols-3">

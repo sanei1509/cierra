@@ -21,6 +21,7 @@ export interface ModuloAdmin {
 }
 
 export interface PlanAdmin {
+  id: string;
   codigo: string;
   nombre: string;
   precioMensualCent: number;
@@ -61,18 +62,21 @@ export const MODULOS_ADMIN: ModuloAdmin[] = [
 
 export const PLANES_ADMIN: PlanAdmin[] = [
   {
+    id: "00000000-0000-4000-8000-000000000101",
     codigo: "basico",
     nombre: "Basico",
     precioMensualCent: 900000,
     modulos: ["rrhh_core", "salary_history", "bulk_import_excel", "payroll_core", "payroll_receipts", "audit_basic"],
   },
   {
+    id: "00000000-0000-4000-8000-000000000102",
     codigo: "profesional",
     nombre: "Profesional",
     precioMensualCent: 1450000,
     modulos: ["rrhh_core", "salary_history", "bulk_import_excel", "payroll_core", "payroll_receipts", "bps_exports", "irpf_calculation", "company_portal", "employee_portal", "audit_basic"],
   },
   {
+    id: "00000000-0000-4000-8000-000000000103",
     codigo: "full",
     nombre: "Full",
     precioMensualCent: 2150000,

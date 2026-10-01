@@ -2,6 +2,13 @@
   "name": "cierrabe",
   "version": "0.1.0",
   "private": true,
+  "exports": {
+    "./acciones": "./src/acciones/index.ts",
+    "./datos/contexto": "./src/datos/contexto.ts",
+    "./datos/db": "./src/datos/db.ts",
+    "./datos/repos": "./src/datos/repos/index.ts",
+    "./facturacion": "./src/facturacion/index.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
