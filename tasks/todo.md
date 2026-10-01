@@ -880,7 +880,10 @@
 **Acceptance criteria:**
 - [x] Loader dims/desaturates the current screen with a subtle grey overlay.
 - [x] Loader centers the Cierra symbol as a watermark.
-- [x] Loader shows the colored Cierra symbol filling upward.
+- [x] Loader uses a large Cierra symbol.
+- [x] Loader shows the colored Cierra symbol filling slowly along the symbol curve.
+- [x] The yellow end-cap pulses after the first fill while loading continues.
+- [x] Successful login waits long enough for the first fill to complete before redirecting.
 - [x] Login pending state uses the branded loader.
 - [x] App route loading state uses the branded loader.
 - [x] Reduced-motion users get a static filled symbol instead of the animation.

@@ -24,6 +24,13 @@ const realCookieOptions = {
   secure: process.env.NODE_ENV === "production",
 };
 
+const MARCA_LOGIN_MS = 2800;
+
+async function esperarMarcaLogin(inicio: number) {
+  const restante = MARCA_LOGIN_MS - (Date.now() - inicio);
+  if (restante > 0) await new Promise((resolve) => setTimeout(resolve, restante));
+}
+
 async function guardarSesion(accesoId: DevAccessId) {
   const acceso = ACCESOS_DESARROLLO.find((a) => a.id === accesoId);
   if (!acceso) return null;
@@ -50,6 +57,7 @@ async function iniciarSesionReal(email: string, password: string) {
 }
 
 export async function iniciarSesion(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  const inicio = Date.now();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
@@ -62,7 +70,10 @@ export async function iniciarSesion(_prev: LoginState, formData: FormData): Prom
     } catch {
       return { email, error: "Email o contraseña inválidos." };
     }
-    if (destinoReal) redirect(destinoReal);
+    if (destinoReal) {
+      await esperarMarcaLogin(inicio);
+      redirect(destinoReal);
+    }
     if (process.env.NODE_ENV === "production") return { email, error: "No pudimos iniciar sesión." };
   }
 
@@ -75,6 +86,7 @@ export async function iniciarSesion(_prev: LoginState, formData: FormData): Prom
     await guardarSesion(acceso.id);
   }
 
+  await esperarMarcaLogin(inicio);
   redirect(destino ?? "/");
 }
 

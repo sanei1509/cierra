@@ -10,11 +10,12 @@ export function CierraLoadingOverlay({ className }: { className?: string }) {
       aria-label="Cargando"
     >
       <span className="sr-only">Cargando</span>
-      <div className="relative size-28 sm:size-32" aria-hidden>
-        <Image src="/brand/cierra-symbol.png" alt="" fill sizes="128px" className="object-contain grayscale opacity-20" priority />
-        <span className="cierra-loader-fill absolute inset-x-0 bottom-0 overflow-hidden">
-          <Image src="/brand/cierra-symbol.png" alt="" width={128} height={128} className="absolute bottom-0 left-0 h-28 w-28 object-contain sm:h-32 sm:w-32" priority />
+      <div className="relative size-56 sm:size-64" aria-hidden>
+        <Image src="/brand/cierra-symbol.png" alt="" fill sizes="256px" className="object-contain grayscale opacity-[0.18]" priority />
+        <span className="cierra-loader-fill absolute inset-0">
+          <Image src="/brand/cierra-symbol.png" alt="" fill sizes="256px" className="object-contain" priority />
         </span>
+        <span className="cierra-loader-pulse absolute right-[11%] top-[28%] size-7 rounded-full bg-[#F5B633] shadow-[0_0_24px_rgb(245_182_51/0.65)]" />
       </div>
     </div>
   );
