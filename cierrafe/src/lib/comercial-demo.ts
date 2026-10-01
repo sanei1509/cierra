@@ -43,6 +43,36 @@ export interface EstudioAdmin {
   notas: string;
 }
 
+export interface AjusteCobroAdmin {
+  descripcion: string;
+  importeCent: number;
+  nota?: string;
+}
+
+export interface LineaCobroAdmin {
+  tipo: "plan" | "addon" | "ajuste";
+  concepto: string;
+  cantidad: number;
+  totalCent: number;
+  nota?: string;
+}
+
+export interface EventoUsoAdmin {
+  tipo: "empresa_activa" | "empleado_activo" | "recibo_generado" | "recibo_enviado";
+  cantidad: number;
+}
+
+export interface ResumenCobroAdmin {
+  estudioId: string;
+  mes: string;
+  moneda: EstudioAdmin["moneda"];
+  lineas: LineaCobroAdmin[];
+  eventosUso: EventoUsoAdmin[];
+  totalCent: number;
+  notasInternas?: string;
+  generado: string;
+}
+
 export const MODULOS_ADMIN: ModuloAdmin[] = [
   { codigo: "rrhh_core", nombre: "Datos RRHH base", grupo: "Base" },
   { codigo: "payroll_core", nombre: "Liquidacion de sueldos", grupo: "Liquidacion" },
@@ -111,6 +141,57 @@ export function modulosHabilitados(estudio: EstudioAdmin) {
 export function totalMensualCent(estudio: EstudioAdmin) {
   const plan = planPorCodigo(estudio.planCodigo);
   return plan.precioMensualCent + ADDONS_ADMIN.filter((a) => estudio.addons.includes(a.moduloCodigo)).reduce((s, a) => s + a.precioMensualCent, 0);
+}
+
+export function resumenCobroDemo(estudio: EstudioAdmin, mes: string, ajustes: AjusteCobroAdmin[] = []): ResumenCobroAdmin {
+  const plan = planPorCodigo(estudio.planCodigo);
+  const addons = ADDONS_ADMIN.filter((addon) => estudio.addons.includes(addon.moduloCodigo));
+  const lineas: LineaCobroAdmin[] =
+    estudio.estado === "pausado"
+      ? []
+      : [
+          {
+            tipo: "plan",
+            concepto: `Plan ${plan.nombre}`,
+            cantidad: 1,
+            totalCent: plan.precioMensualCent,
+            nota: "Precio fijo mensual del paquete contratado.",
+          },
+          ...addons.map((addon) => ({
+            tipo: "addon" as const,
+            concepto: moduloNombre(addon.moduloCodigo),
+            cantidad: 1,
+            totalCent: addon.precioMensualCent,
+            nota: "Modulo adicional fijo mensual.",
+          })),
+        ];
+
+  lineas.push(
+    ...ajustes
+      .filter((ajuste) => ajuste.descripcion.trim() && Number.isFinite(ajuste.importeCent))
+      .map((ajuste) => ({
+        tipo: "ajuste" as const,
+        concepto: ajuste.descripcion,
+        cantidad: 1,
+        totalCent: Math.trunc(ajuste.importeCent),
+        nota: ajuste.nota,
+      })),
+  );
+
+  return {
+    estudioId: estudio.id,
+    mes,
+    moneda: estudio.moneda,
+    lineas,
+    eventosUso: [
+      { tipo: "empresa_activa", cantidad: estudio.id === "pereira" ? 12 : estudio.id === "don-pedrito" ? 3 : 7 },
+      { tipo: "empleado_activo", cantidad: estudio.id === "pereira" ? 184 : estudio.id === "don-pedrito" ? 38 : 96 },
+      { tipo: "recibo_generado", cantidad: estudio.id === "pereira" ? 184 : estudio.id === "don-pedrito" ? 38 : 0 },
+    ],
+    totalCent: lineas.reduce((total, linea) => total + linea.totalCent, 0),
+    notasInternas: estudio.notas,
+    generado: new Date().toISOString(),
+  };
 }
 
 export function fmtCent(montoCent: number, moneda = "UYU") {

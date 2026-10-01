@@ -1,10 +1,23 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, CircleDollarSign, ClipboardList, FileClock, Layers3, Save, Settings2, ShieldCheck } from "lucide-react";
+import { Calculator, Check, CircleDollarSign, ClipboardList, FileClock, Layers3, Save, Settings2, ShieldCheck } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
-import { guardarConfiguracionComercial, type GuardarConfiguracionComercialResult } from "@/app/admin/actions";
-import { ADDONS_ADMIN, ESTUDIOS_ADMIN, fmtCent, modulosHabilitados, moduloNombre, PLANES_ADMIN, planPorCodigo, totalMensualCent, type CodigoModulo, type EstudioAdmin } from "@/lib/comercial-demo";
+import { generarResumenCobroComercial, guardarConfiguracionComercial, type GenerarResumenCobroResult, type GuardarConfiguracionComercialResult } from "@/app/admin/actions";
+import {
+  ADDONS_ADMIN,
+  ESTUDIOS_ADMIN,
+  fmtCent,
+  modulosHabilitados,
+  moduloNombre,
+  PLANES_ADMIN,
+  planPorCodigo,
+  resumenCobroDemo,
+  totalMensualCent,
+  type AjusteCobroAdmin,
+  type CodigoModulo,
+  type EstudioAdmin,
+} from "@/lib/comercial-demo";
 import { Boton, Chip, Panel, inputCls } from "./ui";
 
 function estadoChip(estado: EstudioAdmin["estado"]) {
@@ -17,19 +30,47 @@ function toggleAddon(addons: CodigoModulo[], codigo: CodigoModulo) {
   return addons.includes(codigo) ? addons.filter((a) => a !== codigo) : [...addons, codigo];
 }
 
+function usoNombre(tipo: string) {
+  if (tipo === "empresa_activa") return "Empresas activas";
+  if (tipo === "empleado_activo") return "Empleados activos";
+  if (tipo === "recibo_generado") return "Recibos generados";
+  if (tipo === "recibo_enviado") return "Recibos enviados";
+  return tipo;
+}
+
 export function AdminCommercialConsole() {
   const [estudios, setEstudios] = useState(ESTUDIOS_ADMIN);
   const [seleccionadoId, setSeleccionadoId] = useState(estudios[0].id);
   const [resultado, setResultado] = useState<GuardarConfiguracionComercialResult | null>(null);
+  const [resultadoResumen, setResultadoResumen] = useState<GenerarResumenCobroResult | null>(null);
+  const [mesCobro, setMesCobro] = useState("2026-10");
+  const [ajusteDescripcion, setAjusteDescripcion] = useState("");
+  const [ajusteMonto, setAjusteMonto] = useState("");
+  const [ajusteNota, setAjusteNota] = useState("");
   const [pendiente, startTransition] = useTransition();
+  const [pendienteResumen, startResumenTransition] = useTransition();
   const seleccionado = estudios.find((e) => e.id === seleccionadoId) ?? estudios[0];
   const plan = planPorCodigo(seleccionado.planCodigo);
   const modulos = useMemo(() => modulosHabilitados(seleccionado), [seleccionado]);
   const total = totalMensualCent(seleccionado);
+  const ajustes = useMemo<AjusteCobroAdmin[]>(() => {
+    const importe = Number(ajusteMonto.replace(",", "."));
+    if (!ajusteDescripcion.trim() || !Number.isFinite(importe)) return [];
+    return [{ descripcion: ajusteDescripcion.trim(), importeCent: Math.round(importe * 100), nota: ajusteNota.trim() || undefined }];
+  }, [ajusteDescripcion, ajusteMonto, ajusteNota]);
+  const resumenPreview = useMemo(() => resumenCobroDemo(seleccionado, mesCobro, ajustes), [seleccionado, mesCobro, ajustes]);
+  const resumenVisible = resultadoResumen?.resumen ?? resumenPreview;
 
   const actualizar = (cambios: Partial<EstudioAdmin>) => {
     setResultado(null);
+    setResultadoResumen(null);
     setEstudios((actuales) => actuales.map((e) => (e.id === seleccionado.id ? { ...e, ...cambios } : e)));
+  };
+
+  const seleccionar = (id: string) => {
+    setResultado(null);
+    setResultadoResumen(null);
+    setSeleccionadoId(id);
   };
 
   const guardar = () => {
@@ -41,6 +82,21 @@ export function AdminCommercialConsole() {
           ok: false,
           modo: "real",
           mensaje: error instanceof Error ? error.message : "No pudimos guardar la configuracion comercial.",
+        });
+      }
+    });
+  };
+
+  const generarResumen = () => {
+    startResumenTransition(async () => {
+      try {
+        setResultadoResumen(await generarResumenCobroComercial({ estudio: seleccionado, mes: mesCobro, ajustes }));
+      } catch (error) {
+        setResultadoResumen({
+          ok: false,
+          modo: "real",
+          mensaje: error instanceof Error ? error.message : "No pudimos generar el resumen de cobro.",
+          resumen: resumenPreview,
         });
       }
     });
@@ -61,7 +117,7 @@ export function AdminCommercialConsole() {
               <button
                 key={estudio.id}
                 type="button"
-                onClick={() => setSeleccionadoId(estudio.id)}
+                onClick={() => seleccionar(estudio.id)}
                 className={clsx("block w-full px-5 py-4 text-left transition-colors hover:bg-hundido", activo && "bg-hundido")}
               >
                 <span className="flex items-start justify-between gap-3">
@@ -168,6 +224,72 @@ export function AdminCommercialConsole() {
             {modulos.map((m) => (
               <Chip key={m} tono={seleccionado.addons.includes(m) ? "lila" : "gris"}>
                 {moduloNombre(m)}
+              </Chip>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel className="p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+                <Calculator size={18} className="text-petroleo" /> Resumen de cobro
+              </h3>
+              <p className="mt-1 text-sm text-apagado">{fmtCent(resumenVisible.totalCent, resumenVisible.moneda)} para {resumenVisible.mes}</p>
+            </div>
+            <Boton type="button" variante="secundario" onClick={generarResumen} disabled={pendienteResumen}>
+              <Calculator size={15} /> {pendienteResumen ? "Generando..." : "Generar resumen"}
+            </Boton>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-[180px_1fr_160px]">
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Mes</span>
+              <input className={inputCls} type="month" value={mesCobro} onChange={(e) => setMesCobro(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Ajuste manual</span>
+              <input className={inputCls} value={ajusteDescripcion} onChange={(e) => setAjusteDescripcion(e.target.value)} placeholder="Ej. Descuento piloto" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Importe</span>
+              <input className={inputCls} value={ajusteMonto} onChange={(e) => setAjusteMonto(e.target.value)} placeholder="-1500" inputMode="decimal" />
+            </label>
+          </div>
+          <label className="mt-3 block">
+            <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Nota del ajuste</span>
+            <input className={inputCls} value={ajusteNota} onChange={(e) => setAjusteNota(e.target.value)} placeholder="Motivo interno visible para administracion" />
+          </label>
+
+          {resultadoResumen && (
+            <p className={clsx("mt-4 rounded-xl px-3 py-2 text-sm font-semibold", resultadoResumen.ok ? "bg-menta text-menta-t" : "bg-rosa text-rosa-t")} role="status">
+              {resultadoResumen.mensaje}
+            </p>
+          )}
+
+          <div className="mt-4 overflow-hidden rounded-xl border border-linea">
+            <div className="grid grid-cols-[1fr_110px] bg-hundido px-3 py-2 text-xs font-bold uppercase tracking-[0.06em] text-apagado">
+              <span>Concepto</span>
+              <span className="text-right">Importe</span>
+            </div>
+            <div className="divide-y divide-linea bg-superficie">
+              {resumenVisible.lineas.map((linea, index) => (
+                <div key={`${linea.tipo}-${linea.concepto}-${index}`} className="grid grid-cols-[1fr_110px] gap-3 px-3 py-3 text-sm">
+                  <span>
+                    <span className="block font-semibold">{linea.concepto}</span>
+                    {linea.nota && <span className="mt-0.5 block text-xs text-apagado">{linea.nota}</span>}
+                  </span>
+                  <span className={clsx("text-right font-bold", linea.totalCent < 0 && "text-rosa-t")}>{fmtCent(linea.totalCent, resumenVisible.moneda)}</span>
+                </div>
+              ))}
+              {!resumenVisible.lineas.length && <p className="px-3 py-4 text-sm text-apagado">No hay cargos para este estado de contrato.</p>}
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {resumenVisible.eventosUso.map((evento) => (
+              <Chip key={evento.tipo} tono="gris">
+                {usoNombre(evento.tipo)}: {evento.cantidad}
               </Chip>
             ))}
           </div>

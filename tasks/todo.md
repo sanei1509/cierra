@@ -309,7 +309,7 @@
 - [x] Billing summary includes fixed plan price, fixed module/add-on prices and manual adjustments.
 - [x] Summary can be filtered by month and study.
 - [x] Prices are versioned or snapshotted so historical totals do not change silently.
-- [ ] Admin can see notes explaining manual adjustments in the UI.
+- [x] Admin can see notes explaining manual adjustments in the UI.
 
 **Verification:**
 - [x] Unit tests for billing summary calculation.
@@ -318,7 +318,7 @@
 
 **Notes:**
 - [x] Backend billing calculation, usage events, billing snapshots and admin generation action exist.
-- [ ] Pending later: render saved billing summaries in the admin console.
+- [x] Admin console renders billing summary lines, usage references and manual adjustment notes.
 
 **Dependencies:** Task 12
 

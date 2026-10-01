@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ESTUDIOS_ADMIN, fmtCent, modulosHabilitados, totalMensualCent } from "../src/lib/comercial-demo";
+import { ESTUDIOS_ADMIN, fmtCent, modulosHabilitados, resumenCobroDemo, totalMensualCent } from "../src/lib/comercial-demo";
 
 describe("consola comercial demo", () => {
   it("calcula el total mensual como plan mas add-ons", () => {
@@ -15,5 +15,18 @@ describe("consola comercial demo", () => {
     expect(modulosHabilitados(estudio)).toContain("payroll_receipts");
     expect(modulosHabilitados(estudio)).toContain("automatic_receipt_email");
     expect(new Set(modulosHabilitados(estudio)).size).toBe(modulosHabilitados(estudio).length);
+  });
+
+  it("arma un resumen de cobro con notas y ajustes manuales", () => {
+    const estudio = ESTUDIOS_ADMIN.find((e) => e.id === "pereira")!;
+    const resumen = resumenCobroDemo(estudio, "2026-10", [{ descripcion: "Descuento piloto", importeCent: -150000, nota: "Primer mes" }]);
+
+    expect(resumen.totalCent).toBe(1650000);
+    expect(resumen.lineas).toMatchObject([
+      { tipo: "plan", totalCent: 1450000 },
+      { tipo: "addon", totalCent: 350000 },
+      { tipo: "ajuste", totalCent: -150000, nota: "Primer mes" },
+    ]);
+    expect(resumen.notasInternas).toContain("Piloto");
   });
 });
