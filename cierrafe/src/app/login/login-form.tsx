@@ -9,6 +9,7 @@ import { CierraLoadingOverlay } from "@/components/cierra-loading";
 import { ACCESOS_DESARROLLO, type DevAccess, type DevAccessId } from "@/lib/dev-session";
 
 const inicial: LoginState = { email: "", error: null, submitKey: 0 };
+const LOGIN_LOADER_DELAY_MS = 2800;
 const loginInputCls =
   "h-11 w-full rounded-[14px] border border-[#D8E1F0] bg-white px-3.5 text-sm text-[#102247] outline-none transition-colors placeholder:text-[#97A3BA] focus:border-[#2F6BFF] focus:ring-2 focus:ring-[#2F6BFF]/20";
 
@@ -72,7 +73,9 @@ function AccesosDesarrollo({
 
 export function LoginForm({ mostrarAccesosDesarrollo = false, devPassword = "CierraDemo123" }: { mostrarAccesosDesarrollo?: boolean; devPassword?: string }) {
   const [state, action, pending] = useActionState(iniciarSesion, inicial);
+  const formRef = useRef<HTMLFormElement>(null);
   const submitKeyInputRef = useRef<HTMLInputElement>(null);
+  const loaderReadyInputRef = useRef<HTMLInputElement>(null);
   const siguienteSubmitKeyRef = useRef(inicial.submitKey);
   const [email, setEmail] = useState(state.email);
   const [password, setPassword] = useState("");
@@ -84,18 +87,30 @@ export function LoginForm({ mostrarAccesosDesarrollo = false, devPassword = "Cie
     <div className="space-y-3">
       {mostrandoCarga && <CierraLoadingOverlay />}
       <form
+        ref={formRef}
         action={action}
         className="space-y-4"
         onSubmit={(event) => {
-          if (event.currentTarget.checkValidity()) {
-            const siguienteSubmitKey = siguienteSubmitKeyRef.current + 1;
-            siguienteSubmitKeyRef.current = siguienteSubmitKey;
-            if (submitKeyInputRef.current) submitKeyInputRef.current.value = String(siguienteSubmitKey);
-            flushSync(() => setSubmitKey(siguienteSubmitKey));
+          if (loaderReadyInputRef.current?.value === "1") {
+            loaderReadyInputRef.current.value = "0";
+            return;
           }
+          if (!event.currentTarget.checkValidity()) return;
+
+          event.preventDefault();
+          const siguienteSubmitKey = siguienteSubmitKeyRef.current + 1;
+          siguienteSubmitKeyRef.current = siguienteSubmitKey;
+          if (submitKeyInputRef.current) submitKeyInputRef.current.value = String(siguienteSubmitKey);
+          flushSync(() => setSubmitKey(siguienteSubmitKey));
+
+          window.setTimeout(() => {
+            if (loaderReadyInputRef.current) loaderReadyInputRef.current.value = "1";
+            formRef.current?.requestSubmit();
+          }, LOGIN_LOADER_DELAY_MS);
         }}
       >
         <input ref={submitKeyInputRef} type="hidden" name="submitKey" defaultValue={inicial.submitKey} />
+        <input ref={loaderReadyInputRef} type="hidden" name="loaderReady" defaultValue="0" />
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-[#1B315F]">Email</span>
           <input name="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required className={loginInputCls} placeholder="tu@email.com" />
