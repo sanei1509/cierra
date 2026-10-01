@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, FileText, Home, Search, Settings, ShieldCheck, Users, Eye, RotateCcw, Menu, X, CalendarDays, ListChecks, KeyRound, UserCog, BriefcaseBusiness, UserRound, Monitor, Moon, Sun } from "lucide-react";
+import { Building2, FileText, Home, Search, Settings, ShieldCheck, Users, Eye, RotateCcw, Menu, X, CalendarDays, ListChecks, KeyRound, UserCog, BriefcaseBusiness, UserRound, Monitor, Moon, Sun, LogIn } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { useHidratado, useStore, useUsuario } from "@/lib/store";
 import { USUARIOS, ESTUDIO } from "@/lib/seed";
@@ -262,6 +262,9 @@ export function Shell({ children }: { children: ReactNode }) {
             </span>
             <span className="hidden rounded-xl border border-linea bg-superficie px-4 py-2.5 text-sm text-apagado xl:block">{ESTUDIO.nombre}</span>
             {ok && <SelectorTema />}
+            <Link href="/login" className="hidden size-10 items-center justify-center rounded-xl border border-linea bg-superficie text-apagado hover:bg-hundido hover:text-tinta sm:inline-flex" aria-label="Cambiar acceso" title="Cambiar acceso">
+              <LogIn size={16} />
+            </Link>
             {ok && <Usuario />}
           </div>
         </header>

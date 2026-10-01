@@ -353,3 +353,31 @@
 - `cierrafe/src/app/admin/*`
 
 **Estimated scope:** Medium
+
+## Task 15: Login UI and Development Session Bridge
+**Description:** Add the shared login entry point for all roles and keep fast role access for development while real authentication is wired.
+
+**Acceptance criteria:**
+- [x] There is a `/login` screen for the mixed login flow.
+- [x] Login copy explains that every email must already be registered by a higher-level actor.
+- [x] The screen includes email/password fields for all roles.
+- [x] Google login is represented as a future option, without bypassing database validation.
+- [x] Development buttons exist for system admin, study admin, payroll operator, read-only study user, company and employee.
+- [x] Development access stores a server-side httpOnly cookie placeholder that can be replaced by real session resolution later.
+- [x] Existing role switcher inside the study shell still works for local testing.
+
+**Verification:**
+- [x] Unit tests for development access mapping.
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Dependencies:** Task 5, Task 12
+
+**Files likely touched:**
+- `cierrafe/src/app/login/*`
+- `cierrafe/src/lib/dev-session.ts`
+- `cierrafe/src/components/shell.tsx`
+
+**Estimated scope:** Small
