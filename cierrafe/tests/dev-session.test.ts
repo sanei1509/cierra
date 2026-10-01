@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACCESOS_DESARROLLO, buscarAccesoPorEmail, resolverDestinoPorEmail } from "../src/lib/dev-session";
+import { ACCESOS_DESARROLLO, buscarAccesoPorEmail, parsearSesionDev, resolverDestinoPorEmail, serializarSesionDev } from "../src/lib/dev-session";
 
 describe("sesion de desarrollo", () => {
   it("mantiene accesos para todos los actores del sistema", () => {
@@ -20,5 +20,13 @@ describe("sesion de desarrollo", () => {
       actor: "estudio",
       delegadoPor: { email: "admin@cierra.local" },
     });
+  });
+
+  it("parsea solo sesiones de desarrollo validas", () => {
+    const acceso = ACCESOS_DESARROLLO.find((a) => a.id === "company_owner")!;
+
+    expect(parsearSesionDev(serializarSesionDev(acceso))).toMatchObject({ accesoId: "company_owner", actor: "empresa" });
+    expect(parsearSesionDev("{mal json")).toBeNull();
+    expect(parsearSesionDev(JSON.stringify({ accesoId: "company_owner", email: "otro@example.com", actor: "empresa" }))).toBeNull();
   });
 });

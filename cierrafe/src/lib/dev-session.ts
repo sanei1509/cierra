@@ -15,6 +15,14 @@ export interface DevAccess {
   delegadoPor?: { email: string; motivo: string };
 }
 
+export interface DevSession {
+  accesoId: DevAccessId;
+  email: string;
+  usuarioId: string | null;
+  actor: DevAccess["actor"];
+  delegadoPor: DevAccess["delegadoPor"] | null;
+}
+
 export const ACCESOS_DESARROLLO: DevAccess[] = [
   {
     id: "system_admin",
@@ -93,4 +101,22 @@ export function resolverDestinoPorEmail(email: string) {
 
 export function serializarSesionDev(acceso: DevAccess) {
   return JSON.stringify({ accesoId: acceso.id, email: acceso.email, usuarioId: acceso.usuarioId ?? null, actor: acceso.actor, delegadoPor: acceso.delegadoPor ?? null });
+}
+
+export function parsearSesionDev(valor: string | undefined): DevSession | null {
+  if (!valor) return null;
+  try {
+    const raw = JSON.parse(valor) as Partial<DevSession>;
+    const acceso = ACCESOS_DESARROLLO.find((a) => a.id === raw.accesoId);
+    if (!acceso || raw.email !== acceso.email || raw.actor !== acceso.actor) return null;
+    return {
+      accesoId: acceso.id,
+      email: acceso.email,
+      usuarioId: acceso.usuarioId ?? null,
+      actor: acceso.actor,
+      delegadoPor: acceso.delegadoPor ?? null,
+    };
+  } catch {
+    return null;
+  }
 }

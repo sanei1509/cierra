@@ -411,3 +411,30 @@
 - `docs/accesos-marca-y-tenancy.md`
 
 **Estimated scope:** Small
+
+## Task 17: Development Route Protection
+**Description:** Use the development session cookie as the first frontend guard so protected areas no longer open without a selected actor.
+
+**Acceptance criteria:**
+- [x] Study dashboard routes require a study actor session.
+- [x] Admin routes require a system actor session.
+- [x] Company portal routes require company or delegated study access.
+- [x] Employee portal and receipt routes require an appropriate authenticated actor.
+- [x] Invalid or tampered development session cookies are rejected.
+- [x] Route guard is isolated so it can be replaced by real auth session resolution later.
+
+**Verification:**
+- [x] Unit tests for development session parsing.
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Dependencies:** Task 15, Task 16
+
+**Files likely touched:**
+- `cierrafe/src/lib/dev-auth.ts`
+- `cierrafe/src/lib/dev-session.ts`
+- `cierrafe/src/app/*/layout.tsx`
+
+**Estimated scope:** Small
