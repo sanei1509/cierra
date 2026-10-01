@@ -12,7 +12,6 @@ export function CierraLoadingOverlay({ className }: { className?: string }) {
       <div className="relative flex size-[22.5rem] items-center justify-center sm:size-[27rem]" aria-hidden>
         <span className="cierra-loader-symbol cierra-loader-symbol-base absolute size-[22.5rem] sm:size-[27rem]" />
         <span className="cierra-loader-symbol cierra-loader-symbol-fill absolute size-[22.5rem] sm:size-[27rem]" />
-        <span className="cierra-loader-tip-spark absolute right-[8%] top-[43%] size-8 sm:size-10" />
       </div>
     </div>
   );
