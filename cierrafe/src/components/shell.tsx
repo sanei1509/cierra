@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Building2, FileText, Home, Search, Settings, ShieldCheck, Users, Eye, RotateCcw, Menu, X, CalendarDays, ListChecks, KeyRound, UserCog, BriefcaseBusiness, UserRound, Monitor, Moon, Sun, LogIn } from "lucide-react";
@@ -22,13 +23,27 @@ const NAV = [
 
 const ROLES = { admin: "Administradora", liquidador: "Liquidador", lectura: "Solo lectura" };
 
-export function Logo({ claro = false }: { claro?: boolean }) {
+type LogoVariant = "auto" | "full" | "symbol" | "darkSurface";
+
+export function Logo({ claro = false, variant, className }: { claro?: boolean; variant?: LogoVariant; className?: string }) {
+  const modo: LogoVariant = variant ?? (claro ? "darkSurface" : "auto");
+  if (modo === "full") {
+    return <Image src="/brand/cierra-logo.png" alt="Cierra" width={174} height={58} priority className={clsx("h-auto w-[150px] object-contain", className)} />;
+  }
+  if (modo === "symbol") {
+    return <Image src="/brand/cierra-symbol.png" alt="Cierra" width={44} height={44} priority className={clsx("size-10 object-contain", className)} />;
+  }
+  const darkLogo = (
+    <span className={clsx("flex items-center gap-2.5", className)} aria-label="Cierra">
+      <Image src="/brand/cierra-symbol.png" alt="" width={40} height={40} priority className="size-9 shrink-0 object-contain" />
+      <span className="text-[20px] font-extrabold tracking-tight text-[#F5F8FF]">cierra</span>
+    </span>
+  );
+  if (modo === "darkSurface") return darkLogo;
   return (
-    <span className={clsx("flex items-center gap-2.5", claro ? "text-white" : "text-tinta")}>
-      <span className="relative flex size-9 items-center justify-center rounded-full bg-petroleo">
-        <span className="absolute inset-[7px] rounded-full border-[3px] border-sol border-r-transparent" />
-      </span>
-      <span className="text-[19px] font-extrabold tracking-tight">cierra</span>
+    <span className={clsx("inline-flex items-center", className)}>
+      <Image src="/brand/cierra-logo.png" alt="Cierra" width={174} height={58} priority className="cierra-logo-full h-auto w-[150px] object-contain" />
+      <span className="cierra-logo-dark hidden">{darkLogo}</span>
     </span>
   );
 }
@@ -37,7 +52,7 @@ function Sidebar({ onNav }: { onNav?: () => void }) {
   const path = usePathname();
   const reiniciar = useStore((s) => s.reiniciar);
   return (
-    <nav className="flex h-full flex-col rounded-[var(--radius-panel)] border border-linea bg-superficie p-4 shadow-[0_1px_2px_rgb(17_26_23/0.04)]" aria-label="Principal">
+    <nav className="flex h-full flex-col rounded-[var(--radius-panel)] border border-linea bg-superficie p-4 shadow-[var(--cierra-shadow-soft)]" aria-label="Principal">
       <div className="px-2 pt-1 pb-7">
         <Logo />
       </div>
@@ -51,7 +66,7 @@ function Sidebar({ onNav }: { onNav?: () => void }) {
                 onClick={onNav}
                 className={clsx(
                   "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors",
-                  activo ? "bg-hundido text-tinta" : "text-apagado hover:bg-hundido/70 hover:text-tinta",
+                  activo ? "bg-petroleo/10 text-tinta" : "text-apagado hover:bg-hundido/70 hover:text-tinta",
                 )}
               >
                 {activo && <span className="absolute -left-4 top-2 bottom-2 w-1 rounded-r-full bg-petroleo" />}
@@ -63,24 +78,24 @@ function Sidebar({ onNav }: { onNav?: () => void }) {
         })}
       </ul>
       <p className="mt-8 px-3 text-xs font-semibold uppercase tracking-[0.08em] text-apagado">Portales</p>
-      <Link href="/portales" onClick={onNav} className={clsx("mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium", path.startsWith("/portales") ? "bg-hundido text-tinta" : "text-apagado hover:bg-hundido/70 hover:text-tinta")}>
+      <Link href="/portales" onClick={onNav} className={clsx("mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium", path.startsWith("/portales") ? "bg-petroleo/10 text-tinta" : "text-apagado hover:bg-hundido/70 hover:text-tinta")}>
         <Eye size={19} strokeWidth={1.8} />
         Cliente y empleado
       </Link>
-      <Link href="/funciones" onClick={onNav} className={clsx("mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium", path.startsWith("/funciones") ? "bg-hundido text-tinta" : "text-apagado hover:bg-hundido/70 hover:text-tinta")}>
+      <Link href="/funciones" onClick={onNav} className={clsx("mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium", path.startsWith("/funciones") ? "bg-petroleo/10 text-tinta" : "text-apagado hover:bg-hundido/70 hover:text-tinta")}>
         <ListChecks size={19} strokeWidth={1.8} />
         Guía de funciones
       </Link>
 
-      <div className="mt-auto overflow-hidden rounded-2xl bg-petroleo p-4 text-white">
+      <div className="mt-auto overflow-hidden rounded-2xl bg-[linear-gradient(135deg,var(--cierra-navy),var(--cierra-blue))] p-4 text-white">
         <p className="text-sm font-bold">Datos de demostración</p>
-        <p className="mt-1 text-xs leading-relaxed text-white/72">Sirven para probar el flujo mientras armamos la base real.</p>
+        <p className="mt-1 text-xs leading-relaxed text-[#DCE9FF]">Sirven para probar el flujo mientras armamos la base real.</p>
         <button
           onClick={() => {
             reiniciar();
             onNav?.();
           }}
-          className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl bg-white/12 text-xs font-semibold hover:bg-white/20"
+          className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/12 text-xs font-semibold text-white hover:bg-white/20"
         >
           <RotateCcw size={13} /> Reiniciar datos de ejemplo
         </button>
@@ -208,26 +223,26 @@ function DevAccessBar() {
   };
 
   return (
-    <section className="flex flex-wrap items-center gap-2 rounded-[var(--radius-panel)] border border-dashed border-petroleo/35 bg-sol-suave/55 px-3 py-2" aria-label="Accesos rápidos de desarrollo">
-      <span className="flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-[0.08em] text-crema-t">
+    <section className="flex flex-wrap items-center gap-2 rounded-[var(--radius-panel)] border border-dashed border-petroleo/35 bg-cielo px-3 py-2" aria-label="Accesos rápidos de desarrollo">
+      <span className="flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-[0.08em] text-cielo-t">
         <KeyRound size={14} /> Dev roles
       </span>
-      <Link href="/admin" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-tinta px-3 text-xs font-semibold text-white hover:bg-tinta-2">
+      <Link href="/admin" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-transparent bg-petroleo px-3 text-xs font-semibold text-white hover:bg-petroleo-2">
         <UserCog size={13} /> Admin sistema
       </Link>
-      <button onClick={() => entrarEstudio("u1")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-tinta shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido">
+      <button onClick={() => entrarEstudio("u1")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
         <ShieldCheck size={13} /> Estudio admin
       </button>
-      <button onClick={() => entrarEstudio("u2")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-tinta shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido">
+      <button onClick={() => entrarEstudio("u2")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
         <BriefcaseBusiness size={13} /> Liquidador
       </button>
-      <button onClick={() => entrarEstudio("u3")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-tinta shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido">
+      <button onClick={() => entrarEstudio("u3")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
         <Eye size={13} /> Solo lectura
       </button>
-      <Link href="/cliente/colon" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-tinta shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido">
+      <Link href="/cliente/colon" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
         <Building2 size={13} /> Empresa
       </Link>
-      <Link href="/portal/espiga-3" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-tinta shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido">
+      <Link href="/portal/espiga-3" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
         <UserRound size={13} /> Empleado
       </Link>
     </section>
@@ -244,7 +259,7 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
       {menu && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <button className="absolute inset-0 bg-tinta/30" onClick={() => setMenu(false)} aria-label="Cerrar menú" />
+          <button className="absolute inset-0 bg-[#0B1220]/50" onClick={() => setMenu(false)} aria-label="Cerrar menú" />
           <div className="entra-drawer absolute inset-y-3 left-3 w-[260px]">
             <Sidebar onNav={() => setMenu(false)} />
           </div>

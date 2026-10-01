@@ -81,8 +81,8 @@ function Contenido({ id }: { id: string }) {
             );
           })}
         </ul>
-        <div className="sticky bottom-3 flex flex-col gap-2 rounded-[var(--radius-panel)] bg-tinta p-3 sm:flex-row">
-          <Boton tam="lg" className="flex-1 !bg-sol !text-tinta hover:!bg-white" disabled={!v.novedadesMes.length} onClick={() => s.enviarNovedadesCliente(p.id, autor, false)}>
+        <div className="sticky bottom-3 flex flex-col gap-2 rounded-[var(--radius-panel)] bg-[var(--cierra-navy)] p-3 sm:flex-row">
+          <Boton tam="lg" className="flex-1 !bg-sol !text-[#102247] hover:!bg-[#FFE9AD]" disabled={!v.novedadesMes.length} onClick={() => s.enviarNovedadesCliente(p.id, autor, false)}>
             <Check size={17} /> Enviar {v.novedadesMes.length || ""} {v.novedadesMes.length === 1 ? "novedad" : "novedades"}
           </Boton>
           <Boton tam="lg" variante="claro" className="!bg-white/10 !text-white hover:!bg-white/20" onClick={() => s.enviarNovedadesCliente(p.id, autor, true)} disabled={v.novedadesMes.length > 0}>
@@ -103,9 +103,9 @@ function Contenido({ id }: { id: string }) {
           <p className="mt-2 text-[15px] text-tinta-2">Revisá los montos. Si está todo bien, aprobalos y emitimos los recibos. Si algo no coincide, devolvelo con un comentario.</p>
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
             <div className="rounded-2xl bg-petroleo p-5 text-white">
-              <p className="text-sm text-white/70">Total a pagar a tu equipo</p>
+              <p className="text-sm text-[#DCE9FF]">Total a pagar a tu equipo</p>
               <p className="num mt-1 text-4xl font-extrabold tracking-tight">{fmt(t.liquido)}</p>
-              <p className="mt-1 text-xs text-white/60">{variacion >= 0 ? "+" : ""}{pct(variacion)} que el mes pasado</p>
+              <p className="mt-1 text-xs text-[#CFE4FF]">{variacion >= 0 ? "+" : ""}{pct(variacion)} que el mes pasado</p>
             </div>
             <div className="rounded-2xl bg-hundido p-5">
               <p className="text-sm text-apagado">Costo total con aportes</p>
@@ -150,8 +150,8 @@ function Contenido({ id }: { id: string }) {
             </div>
           </Panel>
         ) : (
-          <div className="sticky bottom-3 flex flex-col gap-2 rounded-[var(--radius-panel)] bg-tinta p-3 sm:flex-row">
-            <Boton tam="lg" className="flex-1 !bg-sol !text-tinta hover:!bg-white" onClick={() => s.responderAprobacion(p.id, true, "", autor)}><Check size={17} /> Aprobar sueldos</Boton>
+          <div className="sticky bottom-3 flex flex-col gap-2 rounded-[var(--radius-panel)] bg-[var(--cierra-navy)] p-3 sm:flex-row">
+            <Boton tam="lg" className="flex-1 !bg-sol !text-[#102247] hover:!bg-[#FFE9AD]" onClick={() => s.responderAprobacion(p.id, true, "", autor)}><Check size={17} /> Aprobar sueldos</Boton>
             <Boton tam="lg" variante="claro" className="!bg-white/10 !text-white hover:!bg-white/20" onClick={() => setDevolviendo(true)}>Devolver con un comentario</Boton>
           </div>
         )}

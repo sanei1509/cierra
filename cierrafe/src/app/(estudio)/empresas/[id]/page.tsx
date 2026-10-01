@@ -36,12 +36,12 @@ function Stepper({ v }: { v: Vista }) {
               className={clsx(
                 "flex h-10 flex-1 items-center gap-2 rounded-full px-3.5 text-[13px] font-semibold",
                 hecho && "bg-petroleo text-white",
-                activo && "bg-sol text-tinta",
+                activo && "bg-sol text-[#102247]",
                 !hecho && !activo && "rayado bg-hundido text-apagado",
               )}
               aria-current={activo ? "step" : undefined}
             >
-              <span className={clsx("flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]", hecho ? "bg-white/20" : activo ? "bg-tinta text-sol" : "bg-white")}>
+              <span className={clsx("flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]", hecho ? "bg-white/20" : activo ? "bg-[#102247] text-sol" : "bg-superficie text-tinta-2")}>
                 {hecho ? <Check size={12} strokeWidth={3} /> : i + 1}
               </span>
               {p}
@@ -64,7 +64,7 @@ function AlertaItem({ a, v, onVer }: { a: Alerta; v: Vista; onVer: (id: string) 
   const Icon = ICONO_ALERTA[a.nivel];
   const aceptada = v.periodo.advertenciasAceptadas[a.id];
   return (
-    <li className={clsx("rounded-3xl border border-linea p-4", aceptada && "opacity-60")}>
+    <li className={clsx("rounded-3xl border border-linea p-4", aceptada && "bg-hundido/55")}>
       <div className="flex gap-3">
         <span className={clsx("flex size-9 shrink-0 items-center justify-center rounded-full", TONO_ALERTA[a.nivel])}>
           <Icon size={17} />
@@ -184,7 +184,7 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
       titulo = "El cliente devolvió la liquidación";
       texto = (
         <>
-          <span className="mt-1 block rounded-2xl bg-white/70 px-4 py-3 text-tinta">
+          <span className="mt-1 block rounded-2xl bg-superficie/80 px-4 py-3 text-tinta">
             <MessageSquare size={14} className="mr-1.5 inline text-rosa-t" />“{p.aprobacion?.comentario}”
             <span className="mt-1 block text-xs text-apagado">{p.aprobacion?.por} · {p.aprobacion?.fecha && fechaHora(p.aprobacion.fecha)}</span>
           </span>
@@ -452,9 +452,9 @@ function TabLiquidacion({ v, empleados, verCalc }: { v: Vista; empleados: Emplea
           { k: "Costo empresa", v: t.costo, p: tp.costo },
         ].map((x) => (
           <Panel key={x.k} className={clsx("p-5", x.destacado && "!bg-petroleo text-white")}>
-            <p className={clsx("text-sm font-semibold", x.destacado ? "text-white/75" : "text-tinta-2")}>{x.k}</p>
+            <p className={clsx("text-sm font-semibold", x.destacado ? "text-[#DCE9FF]" : "text-tinta-2")}>{x.k}</p>
             <p className="num mt-2 text-[28px] font-extrabold leading-none tracking-tight">{fmt(x.v)}</p>
-            <p className={clsx("mt-2 text-xs", x.destacado ? "text-white/60" : "text-apagado")}>
+            <p className={clsx("mt-2 text-xs", x.destacado ? "text-[#CFE4FF]" : "text-apagado")}>
               {x.p ? `${x.v >= x.p ? "+" : ""}${pct((x.v - x.p) / x.p, 1)} vs. ${nombreMes(mesAnterior(v.periodo.mes)).split(" ")[0].toLowerCase()}` : ""}
             </p>
           </Panel>
@@ -696,7 +696,7 @@ function LogoEditable({ v }: { v: Vista }) {
       <MarcaEmpresa empresa={v.empresa} size={52} />
       {puede && (
         <>
-          <span className="absolute -right-1 -bottom-1 flex size-6 items-center justify-center rounded-full bg-tinta text-white ring-2 ring-superficie transition-transform group-hover:scale-110">
+          <span className="absolute -right-1 -bottom-1 flex size-6 items-center justify-center rounded-full bg-petroleo text-white ring-2 ring-superficie transition-transform group-hover:scale-110">
             <ImagePlus size={12} />
           </span>
           <input
@@ -781,7 +781,7 @@ function Contenido() {
               role="tab"
               aria-selected={tab === t.k}
               onClick={() => irA(t.k)}
-              className={clsx("flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold", tab === t.k ? "bg-tinta text-white" : "text-apagado hover:bg-hundido hover:text-tinta")}
+              className={clsx("flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold", tab === t.k ? "bg-petroleo text-white" : "text-apagado hover:bg-hundido hover:text-tinta")}
             >
               {t.l}
               {t.n !== undefined && <span className={clsx("num rounded-full px-1.5 text-xs", tab === t.k ? "bg-white/20" : "bg-hundido")}>{t.n}</span>}
@@ -819,4 +819,3 @@ export default function EmpresaPage() {
     </Suspense>
   );
 }
-

@@ -81,7 +81,7 @@ function Contenido() {
                             <Eye size={11} /> Visto {fecha(d.vistas[`${r.empleadoId}|${mes}`])}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-apagado">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-superficie px-2 py-0.5 text-[11px] font-semibold text-apagado">
                             <EyeOff size={11} /> Sin ver
                           </span>
                         ))}

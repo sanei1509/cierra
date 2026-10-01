@@ -36,12 +36,12 @@ function Hero({ vistas }: { vistas: Vista[] }) {
   return (
     <Panel className="relative flex flex-col overflow-hidden !border-petroleo/10 bg-petroleo p-6 text-white md:col-span-2 xl:col-span-2">
       <div className="flex items-start justify-between">
-        <p className="text-[15px] font-semibold text-white/80">Cierre de {nombreMes(MES_ACTUAL).toLowerCase()}</p>
+        <p className="text-[15px] font-semibold text-[#EAF2FF]">Cierre de {nombreMes(MES_ACTUAL).toLowerCase()}</p>
         <Chip tono="tinta" className="!bg-white/12">Objetivo 2 oct</Chip>
       </div>
       <p className="mt-3 flex items-baseline gap-2">
         <span className="num text-5xl font-extrabold tracking-tight sm:text-6xl">{cerradas}</span>
-        <span className="text-lg font-semibold text-white/70">de {vistas.length} empresas cerradas</span>
+        <span className="text-lg font-semibold text-[#DCE9FF]">de {vistas.length} empresas cerradas</span>
       </p>
       <div className="mt-5 flex h-9 gap-1" role="img" aria-label="Avance por empresa">
         {orden.map((v, i) => (
@@ -54,7 +54,7 @@ function Hero({ vistas }: { vistas: Vista[] }) {
           />
         ))}
       </div>
-      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/70">
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#DCE9FF]">
         <li className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-sol" /> Cerrada</li>
         <li className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-white/45" /> En curso</li>
         <li className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-rosa-t" /> Con alertas</li>
@@ -62,12 +62,12 @@ function Hero({ vistas }: { vistas: Vista[] }) {
       </ul>
       <div className="mt-auto grid grid-cols-2 gap-3 pt-6 text-sm">
         <div className="rounded-xl border border-white/10 bg-white/8 px-4 py-3">
-          <p className="text-white/60">Recibos publicados</p>
+          <p className="text-[#CFE4FF]">Recibos publicados</p>
           <p className="num mt-0.5 text-xl font-bold">{recibos}</p>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/8 px-4 py-3">
-          <p className="text-white/60">Nóminas BPS presentadas</p>
-          <p className="num mt-0.5 text-xl font-bold">{bps} <span className="text-sm font-medium text-white/50">/ {vistas.length}</span></p>
+          <p className="text-[#CFE4FF]">Nóminas BPS presentadas</p>
+          <p className="num mt-0.5 text-xl font-bold">{bps} <span className="text-sm font-medium text-[#CFE4FF]">/ {vistas.length}</span></p>
         </div>
       </div>
     </Panel>
@@ -83,7 +83,7 @@ function Tarjeta({ k, vistas, activo, onClick }: { k: Exclude<Filtro, "todas">; 
       aria-pressed={activo}
       className={clsx(
         "group flex flex-col rounded-[var(--radius-panel)] border border-linea p-5 text-left shadow-[0_1px_2px_rgb(17_26_23/0.04)] transition-colors",
-        activo ? "border-tinta bg-tinta text-white" : "bg-superficie hover:border-petroleo/30 hover:bg-white",
+        activo ? "border-petroleo bg-petroleo text-white" : "bg-superficie hover:border-petroleo/30 hover:bg-hundido",
       )}
     >
       <span className="flex w-full items-start justify-between">
@@ -97,11 +97,11 @@ function Tarjeta({ k, vistas, activo, onClick }: { k: Exclude<Filtro, "todas">; 
         {lista.slice(0, 3).map((v) => (
           <span key={v.empresa.id} className={clsx("flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 text-xs", activo ? "bg-white/10" : "bg-hundido")}>
             <span className="truncate font-semibold">{v.empresa.nombre}</span>
-            <span className={clsx("shrink-0", activo ? "text-white/60" : "text-apagado")}>{ESTADOS[v.estado].corto}</span>
+            <span className={clsx("shrink-0", activo ? "text-[#DCE9FF]" : "text-apagado")}>{ESTADOS[v.estado].corto}</span>
           </span>
         ))}
-        {lista.length > 3 && <span className={clsx("px-1 text-xs", activo ? "text-white/60" : "text-apagado")}>y {lista.length - 3} más</span>}
-        {lista.length === 0 && <span className={clsx("text-xs", activo ? "text-white/60" : "text-apagado")}>{g.detalle}</span>}
+        {lista.length > 3 && <span className={clsx("px-1 text-xs", activo ? "text-[#DCE9FF]" : "text-apagado")}>y {lista.length - 3} más</span>}
+        {lista.length === 0 && <span className={clsx("text-xs", activo ? "text-[#DCE9FF]" : "text-apagado")}>{g.detalle}</span>}
       </span>
     </button>
   );

@@ -151,7 +151,7 @@ export default function Empresas() {
                 <div className={clsx("rounded-[22px] p-4", TONOS[v.empresa.tono].bg)}>
                   <div className="flex items-start justify-between">
                     <MarcaEmpresa empresa={{ ...v.empresa, tono: "tinta" }} size={40} />
-                    <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold">Grupo {v.empresa.grupo}.{v.empresa.subgrupo}</span>
+                    <span className="rounded-full bg-superficie/80 px-2.5 py-1 text-xs font-semibold text-tinta">Grupo {v.empresa.grupo}.{v.empresa.subgrupo}</span>
                   </div>
                   <p className="mt-4 text-lg font-bold leading-tight tracking-tight">{v.empresa.nombre}</p>
                   <p className="text-[13px] text-tinta-2">{v.empresa.actividad}</p>

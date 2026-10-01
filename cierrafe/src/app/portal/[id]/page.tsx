@@ -50,9 +50,9 @@ function Contenido({ id }: { id: string }) {
       </div>
       {ultimo ? (
         <Panel className="overflow-hidden !border-petroleo/10 bg-petroleo p-6 text-white">
-          <p className="text-sm text-white/70">Último recibo · {nombreMes(ultimo.mes)}</p>
+          <p className="text-sm text-[#DCE9FF]">Último recibo · {nombreMes(ultimo.mes)}</p>
           <p className="num mt-2 text-5xl font-extrabold tracking-tighter">{fmt(ultimo.r.liquido)}</p>
-          <p className="mt-1 text-sm text-white/60">Líquido a cobrar</p>
+          <p className="mt-1 text-sm text-[#CFE4FF]">Líquido a cobrar</p>
           <div className="mt-6 grid grid-cols-2 gap-2">
             <Boton variante="claro" href={`/recibo/${id}/${ultimo.mes}?desde=portal`}><Eye size={15} /> Ver</Boton>
             <Boton variante="claro" className="!bg-white/12 !text-white hover:!bg-white/20" href={`/recibo/${id}/${ultimo.mes}?desde=portal&imprimir=1`}><Download size={15} /> Descargar</Boton>

@@ -30,7 +30,7 @@ function Item({ f }: { f: Funcion }) {
         <span className="flex-1">
           <span className={clsx("block text-sm font-semibold", f.estado === "no" && "text-apagado")}>
             {f.nombre}
-            {f.nueva && <span className="ml-2 rounded-full bg-sol px-1.5 py-0.5 text-[10px] font-bold text-tinta">Nuevo</span>}
+            {f.nueva && <span className="ml-2 rounded-full bg-sol px-1.5 py-0.5 text-[10px] font-bold text-[#102247]">Nuevo</span>}
           </span>
           {f.nota && <span className="mt-0.5 block text-[13px] text-apagado">{f.nota}</span>}
         </span>
@@ -96,21 +96,21 @@ export default function Funciones() {
                 key={f}
                 onClick={() => setFiltro(f)}
                 aria-pressed={filtro === f}
-                className={clsx("rounded-lg px-3.5 py-1.5 text-[13px] font-semibold", filtro === f ? "bg-tinta text-white" : "bg-hundido text-tinta-2 hover:bg-linea")}
+                className={clsx("rounded-lg px-3.5 py-1.5 text-[13px] font-semibold", filtro === f ? "bg-petroleo text-white" : "bg-hundido text-tinta-2 hover:bg-linea")}
               >
                 {f === "todas" ? `Todas · ${todas.length}` : `${COB[f].label} · ${cuenta[f]}`}
               </button>
             ))}
             <label className="relative ml-auto min-w-[220px]">
               <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-apagado" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar función" className="h-9 w-full rounded-xl border border-linea bg-white pl-9 pr-3 text-sm outline-none focus:border-petroleo-3 focus:ring-2 focus:ring-petroleo-3/15" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar función" className="h-9 w-full rounded-xl border border-linea bg-superficie pl-9 pr-3 text-sm text-tinta placeholder:text-apagado outline-none focus:border-petroleo-3 focus:ring-2 focus:ring-petroleo-3/15" />
             </label>
           </div>
         </Panel>
 
         <Panel className="bg-petroleo p-6 text-white">
           <h2 className="font-bold">Recorrido para una entrevista</h2>
-          <p className="mt-1 text-xs text-white/70">Pedile al contador cada tarea sin explicarle cómo. Antes, tocá “Reiniciar datos de ejemplo”.</p>
+          <p className="mt-1 text-xs text-[#DCE9FF]">Pedile al contador cada tarea sin explicarle cómo. Antes, tocá “Reiniciar datos de ejemplo”.</p>
           <ol className="mt-4 space-y-2">
             {RECORRIDO.map((r, i) => (
               <li key={r.t}>

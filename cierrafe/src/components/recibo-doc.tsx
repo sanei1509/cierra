@@ -6,7 +6,7 @@ import { MarcaEmpresa } from "./ui";
 
 function Fila({ c, d, i }: { c: string; d?: string; i: number }) {
   return (
-    <tr className="border-t border-linea">
+    <tr className="border-t border-linea text-tinta">
       <td className="py-1.5 pr-2">
         {c}
         {d && <span className="ml-1 text-xs text-apagado">{d}</span>}
@@ -22,14 +22,14 @@ export function ReciboDoc({ empresa, empleado: e, mes, r, periodo, huella }: { e
   const desc = r.lineas.filter((l) => l.tipo === "descuento");
   const datos = datosEmpresaRecibo(empresa);
   return (
-    <article className="rounded-[var(--radius-panel)] bg-white p-8 text-[13px] break-after-page print:rounded-none print:p-0">
-      <header className="flex flex-wrap justify-between gap-4 border-b-2 border-tinta pb-4">
+    <article className="document-surface break-after-page rounded-[var(--radius-panel)] border border-linea p-8 text-[13px] shadow-[0_8px_24px_rgb(16_34_71/0.08)] print:rounded-none print:border-0 print:p-0 print:shadow-none">
+      <header className="flex flex-wrap justify-between gap-4 border-b-2 border-tinta pb-4 text-tinta">
         <div className="flex items-start gap-3">
           <MarcaEmpresa empresa={empresa} size={48} />
           <div>
             <p className="text-lg font-extrabold">{datos.nombre}</p>
-            <p>{datos.razonSocial !== datos.nombre ? `${datos.razonSocial} · ` : ""}RUT {datos.rut} · BPS {datos.bps}</p>
-            {datos.direccion && <p>{datos.direccion}</p>}
+            <p className="text-tinta-2">{datos.razonSocial !== datos.nombre ? `${datos.razonSocial} · ` : ""}RUT {datos.rut} · BPS {datos.bps}</p>
+            {datos.direccion && <p className="text-tinta-2">{datos.direccion}</p>}
             <p className="text-apagado">{datos.actividad} · Grupo {datos.grupoSubgrupo}</p>
           </div>
         </div>
@@ -38,7 +38,7 @@ export function ReciboDoc({ empresa, empleado: e, mes, r, periodo, huella }: { e
           <p>{nombreMes(mes)}</p>
         </div>
       </header>
-      <section className="grid grid-cols-2 gap-x-6 gap-y-1 border-b border-linea py-4 sm:grid-cols-4">
+      <section className="grid grid-cols-2 gap-x-6 gap-y-2 border-b border-linea py-4 sm:grid-cols-4">
         {[
           ["Trabajador", `${e.apellido}, ${e.nombre}`],
           ["Cédula", e.ci],
@@ -51,31 +51,31 @@ export function ReciboDoc({ empresa, empleado: e, mes, r, periodo, huella }: { e
         ].map(([k, val]) => (
           <div key={k}>
             <p className="text-[11px] text-apagado">{k}</p>
-            <p className="font-semibold">{val}</p>
+            <p className="font-semibold text-tinta">{val}</p>
           </div>
         ))}
       </section>
       <section className="grid items-start gap-6 py-4 sm:grid-cols-2">
         <table className="w-full">
-          <thead>
+          <thead className="text-tinta">
             <tr><th className="pb-1 text-left">Haberes</th><th className="pb-1 text-right">Importe</th></tr>
           </thead>
           <tbody>
             {haberes.map((l) => (
               <Fila key={l.codigo} c={l.concepto} d={l.cantidad && l.codigo !== "001" ? `(${l.cantidad})` : undefined} i={l.importe} />
             ))}
-            <tr className="border-t-2 border-tinta font-bold"><td className="py-1.5">Total haberes</td><td className="num py-1.5 text-right">{fmt2(r.totalHaberes)}</td></tr>
+            <tr className="border-t-2 border-tinta font-bold text-tinta"><td className="py-1.5">Total haberes</td><td className="num py-1.5 text-right">{fmt2(r.totalHaberes)}</td></tr>
           </tbody>
         </table>
         <table className="w-full">
-          <thead>
+          <thead className="text-tinta">
             <tr><th className="pb-1 text-left">Descuentos</th><th className="pb-1 text-right">Importe</th></tr>
           </thead>
           <tbody>
             {desc.map((l) => (
               <Fila key={l.codigo} c={l.concepto} d={l.tasa ? `(${(l.tasa * 100).toLocaleString("es-UY")}%)` : undefined} i={l.importe} />
             ))}
-            <tr className="border-t-2 border-tinta font-bold"><td className="py-1.5">Total descuentos</td><td className="num py-1.5 text-right">{fmt2(r.descuentos)}</td></tr>
+            <tr className="border-t-2 border-tinta font-bold text-tinta"><td className="py-1.5">Total descuentos</td><td className="num py-1.5 text-right">{fmt2(r.descuentos)}</td></tr>
           </tbody>
         </table>
       </section>

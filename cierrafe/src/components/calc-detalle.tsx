@@ -32,7 +32,7 @@ function FilaLinea({ l }: { l: Linea }) {
           {l.parametros && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {l.parametros.map((p) => (
-                <span key={p} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-tinta-2">{p}</span>
+                <span key={p} className="rounded-full bg-superficie px-2 py-0.5 text-[11px] font-semibold text-tinta-2">{p}</span>
               ))}
             </div>
           )}
@@ -76,7 +76,7 @@ export function CalcDetalle({ r, version }: { r: ResultadoEmpleado; version?: Ve
           ["Líquido", r.liquido],
         ].map(([k, v], i) => (
           <div key={k as string} className={clsx("rounded-2xl px-3.5 py-3", i === 2 ? "bg-petroleo text-white" : "bg-hundido")}>
-            <p className={clsx("text-xs", i === 2 ? "text-white/70" : "text-apagado")}>{k}</p>
+            <p className={clsx("text-xs", i === 2 ? "text-[#DCE9FF]" : "text-apagado")}>{k}</p>
             <p className="num mt-0.5 text-lg font-extrabold tracking-tight">{fmt(v as number)}</p>
           </div>
         ))}

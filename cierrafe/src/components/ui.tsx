@@ -15,12 +15,12 @@ export const TONOS: Record<Tono | "tinta", { bg: string; fg: string; dot: string
   crema: { bg: "bg-crema", fg: "text-crema-t", dot: "bg-crema-t" },
   cielo: { bg: "bg-cielo", fg: "text-cielo-t", dot: "bg-cielo-t" },
   rosa: { bg: "bg-rosa", fg: "text-rosa-t", dot: "bg-rosa-t" },
-  tinta: { bg: "bg-tinta", fg: "text-white", dot: "bg-sol" },
+  tinta: { bg: "bg-petroleo", fg: "text-white", dot: "bg-sol" },
 };
 
 export function Panel({ className, children, ...p }: { className?: string; children: ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={clsx("rounded-[var(--radius-panel)] border border-linea/75 shadow-[0_1px_2px_rgb(17_26_23/0.04)]", !/(^|\s)!?bg-/.test(className ?? "") && "bg-superficie", className)} {...p}>
+    <div className={clsx("rounded-[var(--radius-panel)] border border-linea/80 shadow-[var(--cierra-shadow-soft)]", !/(^|\s)!?bg-/.test(className ?? "") && "bg-superficie", className)} {...p}>
       {children}
     </div>
   );
@@ -48,11 +48,11 @@ export function Chip({ tono = "menta", children, className }: { tono?: Tono | "t
 
 type BtnVariant = "primario" | "secundario" | "fantasma" | "peligro" | "claro";
 const BTN: Record<BtnVariant, string> = {
-  primario: "bg-petroleo text-white hover:bg-petroleo-2 disabled:bg-petroleo/40 shadow-[0_1px_1px_rgb(17_26_23/0.12)]",
-  secundario: "border border-linea bg-superficie text-tinta hover:border-petroleo/45 hover:bg-hundido disabled:opacity-50",
-  fantasma: "text-tinta-2 hover:bg-hundido hover:text-tinta disabled:opacity-50",
-  peligro: "bg-rosa text-rosa-t hover:bg-rosa-t hover:text-white disabled:opacity-50",
-  claro: "bg-superficie text-petroleo hover:bg-sol-suave disabled:opacity-60",
+  primario: "bg-petroleo text-white shadow-[0_8px_18px_rgb(47_107_255/0.22)] hover:bg-petroleo-2 disabled:bg-hundido disabled:text-apagado disabled:shadow-none disabled:hover:bg-hundido",
+  secundario: "border border-linea bg-superficie text-tinta hover:border-petroleo/45 hover:bg-hundido disabled:bg-hundido disabled:text-apagado disabled:hover:border-linea",
+  fantasma: "text-tinta-2 hover:bg-hundido hover:text-tinta disabled:text-apagado disabled:hover:bg-transparent",
+  peligro: "bg-rosa text-rosa-t hover:bg-rosa-t hover:text-white disabled:bg-hundido disabled:text-apagado",
+  claro: "bg-superficie text-petroleo hover:bg-sol-suave disabled:bg-hundido disabled:text-apagado",
 };
 
 export function Boton({
@@ -64,7 +64,7 @@ export function Boton({
   ...p
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variante?: BtnVariant; tam?: "sm" | "md" | "lg"; href?: string }) {
   const cls = clsx(
-    "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed",
+    "inline-flex items-center justify-center gap-2 rounded-[14px] font-semibold transition-colors duration-200 disabled:cursor-not-allowed",
     tam === "sm" && "h-8 px-3.5 text-[13px]",
     tam === "md" && "h-10 px-5 text-sm",
     tam === "lg" && "h-12 px-6 text-[15px]",
@@ -107,7 +107,7 @@ export function Drawer({ abierto, onCerrar, titulo, subtitulo, children, ancho =
   if (!abierto) return null;
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal>
-      <button className="entra-fade absolute inset-0 bg-tinta/25 backdrop-blur-[2px]" aria-label="Cerrar" onClick={onCerrar} />
+      <button className="entra-fade absolute inset-0 bg-[#0B1220]/45 backdrop-blur-[2px]" aria-label="Cerrar" onClick={onCerrar} />
       <div className="entra-drawer relative m-2 flex w-full flex-col overflow-hidden rounded-[var(--radius-panel)] border border-linea bg-superficie shadow-xl sm:m-3" style={{ maxWidth: ancho }}>
         <div className="flex items-start justify-between gap-4 border-b border-linea px-6 py-5">
           <div>
@@ -134,7 +134,7 @@ export function Modal({ abierto, onCerrar, titulo, children }: { abierto: boolea
   if (!abierto) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal>
-      <button className="entra-fade absolute inset-0 bg-tinta/30 backdrop-blur-[2px]" aria-label="Cerrar" onClick={onCerrar} />
+      <button className="entra-fade absolute inset-0 bg-[#0B1220]/50 backdrop-blur-[2px]" aria-label="Cerrar" onClick={onCerrar} />
       <div className="entra-fade relative w-full max-w-md rounded-[var(--radius-panel)] border border-linea bg-superficie p-6 shadow-xl">
         <h2 className="text-lg font-bold tracking-tight">{titulo}</h2>
         <div className="mt-3">{children}</div>
@@ -154,7 +154,7 @@ export function Campo({ label, children, ayuda }: { label: string; children: Rea
 }
 
 export const inputCls =
-  "h-11 w-full rounded-xl border border-linea bg-superficie px-3.5 text-sm text-tinta outline-none transition-colors placeholder:text-apagado focus:border-petroleo-3 focus:bg-superficie focus:ring-2 focus:ring-petroleo-3/20";
+  "h-11 w-full rounded-[14px] border border-linea bg-superficie px-3.5 text-sm text-tinta outline-none transition-colors placeholder:text-apagado focus:border-petroleo-3 focus:bg-superficie focus:ring-2 focus:ring-petroleo-3/20";
 
 export function Vacio({ titulo, children }: { titulo: string; children?: ReactNode }) {
   return (
