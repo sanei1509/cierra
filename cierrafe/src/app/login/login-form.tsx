@@ -1,13 +1,14 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Building2, BriefcaseBusiness, Eye, EyeOff, LogIn, ShieldCheck, UserCog, UserRound } from "lucide-react";
 import { iniciarSesion, type LoginState } from "./actions";
 import { Boton } from "@/components/ui";
 import { CierraLoadingOverlay } from "@/components/cierra-loading";
 import { ACCESOS_DESARROLLO, type DevAccess, type DevAccessId } from "@/lib/dev-session";
 
-const inicial: LoginState = { email: "", error: null };
+const inicial: LoginState = { email: "", error: null, submitKey: 0 };
 const loginInputCls =
   "h-11 w-full rounded-[14px] border border-[#D8E1F0] bg-white px-3.5 text-sm text-[#102247] outline-none transition-colors placeholder:text-[#97A3BA] focus:border-[#2F6BFF] focus:ring-2 focus:ring-[#2F6BFF]/20";
 
@@ -71,14 +72,30 @@ function AccesosDesarrollo({
 
 export function LoginForm({ mostrarAccesosDesarrollo = false, devPassword = "CierraDemo123" }: { mostrarAccesosDesarrollo?: boolean; devPassword?: string }) {
   const [state, action, pending] = useActionState(iniciarSesion, inicial);
+  const submitKeyInputRef = useRef<HTMLInputElement>(null);
+  const siguienteSubmitKeyRef = useRef(inicial.submitKey);
   const [email, setEmail] = useState(state.email);
   const [password, setPassword] = useState("");
   const [mostrarPassword, setMostrarPassword] = useState(false);
+  const [submitKey, setSubmitKey] = useState(inicial.submitKey);
+  const mostrandoCarga = pending || submitKey > state.submitKey;
 
   return (
     <div className="space-y-3">
-      {pending && <CierraLoadingOverlay />}
-      <form action={action} className="space-y-4">
+      {mostrandoCarga && <CierraLoadingOverlay />}
+      <form
+        action={action}
+        className="space-y-4"
+        onSubmit={(event) => {
+          if (event.currentTarget.checkValidity()) {
+            const siguienteSubmitKey = siguienteSubmitKeyRef.current + 1;
+            siguienteSubmitKeyRef.current = siguienteSubmitKey;
+            if (submitKeyInputRef.current) submitKeyInputRef.current.value = String(siguienteSubmitKey);
+            flushSync(() => setSubmitKey(siguienteSubmitKey));
+          }
+        }}
+      >
+        <input ref={submitKeyInputRef} type="hidden" name="submitKey" defaultValue={inicial.submitKey} />
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-[#1B315F]">Email</span>
           <input name="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required className={loginInputCls} placeholder="tu@email.com" />
@@ -99,8 +116,8 @@ export function LoginForm({ mostrarAccesosDesarrollo = false, devPassword = "Cie
           </span>
         </label>
         {state.error && <p className="rounded-[14px] border border-[#E25555]/30 bg-[#FDE7E7] px-3 py-2 text-sm font-semibold text-[#B43232]">{state.error}</p>}
-        <Boton type="submit" tam="lg" className="w-full !bg-[#2F6BFF] !text-white hover:!bg-[#2459E6]" disabled={pending}>
-          <LogIn size={17} /> {pending ? "Entrando..." : "Entrar"}
+        <Boton type="submit" tam="lg" className="w-full !bg-[#2F6BFF] !text-white hover:!bg-[#2459E6]" disabled={mostrandoCarga}>
+          <LogIn size={17} /> {mostrandoCarga ? "Entrando..." : "Entrar"}
         </Boton>
         <div className="flex items-center gap-3 py-0.5 text-xs font-semibold text-[#97A3BA]" aria-hidden>
           <span className="h-px flex-1 bg-[#D8E1F0]" />

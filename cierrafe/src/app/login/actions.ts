@@ -10,6 +10,7 @@ import { destinoSesionReal, puedeEmitirSesionReal, REAL_SESSION_COOKIE, serializ
 export interface LoginState {
   email: string;
   error: string | null;
+  submitKey: number;
 }
 
 const cookieOptions = {
@@ -58,27 +59,28 @@ async function iniciarSesionReal(email: string, password: string) {
 
 export async function iniciarSesion(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const inicio = Date.now();
+  const submitKey = Number(formData.get("submitKey") ?? 0) || 0;
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  if (!email || !password) return { email, error: "Completá email y contraseña para entrar." };
+  if (!email || !password) return { email, error: "Completá email y contraseña para entrar.", submitKey };
 
   if (process.env.DATABASE_URL) {
     let destinoReal: string | null = null;
     try {
       destinoReal = await iniciarSesionReal(email, password);
     } catch {
-      return { email, error: "Email o contraseña inválidos." };
+      return { email, error: "Email o contraseña inválidos.", submitKey };
     }
     if (destinoReal) {
       await esperarMarcaLogin(inicio);
       redirect(destinoReal);
     }
-    if (process.env.NODE_ENV === "production") return { email, error: "No pudimos iniciar sesión." };
+    if (process.env.NODE_ENV === "production") return { email, error: "No pudimos iniciar sesión.", submitKey };
   }
 
-  if (process.env.NODE_ENV === "production") return { email, error: "Email o contraseña inválidos." };
-  if (!buscarAccesoPorEmail(email)) return { email, error: "Ese mail todavía no fue cargado por un nivel superior." };
+  if (process.env.NODE_ENV === "production") return { email, error: "Email o contraseña inválidos.", submitKey };
+  if (!buscarAccesoPorEmail(email)) return { email, error: "Ese mail todavía no fue cargado por un nivel superior.", submitKey };
 
   const destino = resolverDestinoPorEmail(email);
   const acceso = ACCESOS_DESARROLLO.find((a) => a.email.toLowerCase() === email);

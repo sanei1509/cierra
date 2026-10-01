@@ -144,13 +144,17 @@ body {
   font-feature-settings: "cv11";
 }
 
-@property --cierra-loader-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
+.cierra-loader-mark {
+  filter: drop-shadow(0 20px 36px rgb(47 107 255 / 0.24));
 }
 
-.cierra-loader-pulse {
+.cierra-loader-stroke,
+.cierra-loader-cap {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.cierra-loader-cap {
   opacity: 0;
 }
 
@@ -217,13 +221,13 @@ body {
     animation: crece 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
     transform-origin: left;
   }
-  .cierra-loader-fill {
-    animation: cierra-loader-fill 2800ms cubic-bezier(0.3, 0, 0.15, 1) forwards;
-    mask-image: conic-gradient(from 205deg at 50% 50%, #000 0deg var(--cierra-loader-angle), transparent calc(var(--cierra-loader-angle) + 0.5deg) 360deg);
-    -webkit-mask-image: conic-gradient(from 205deg at 50% 50%, #000 0deg var(--cierra-loader-angle), transparent calc(var(--cierra-loader-angle) + 0.5deg) 360deg);
+  .cierra-loader-stroke {
+    animation: cierra-loader-stroke 2800ms cubic-bezier(0.3, 0, 0.15, 1) forwards;
   }
-  .cierra-loader-pulse {
-    animation: cierra-loader-pulse 900ms ease-in-out 2800ms infinite;
+  .cierra-loader-cap {
+    animation:
+      cierra-loader-cap-fill 2800ms cubic-bezier(0.3, 0, 0.15, 1) forwards,
+      cierra-loader-cap-pulse 900ms ease-in-out 2800ms infinite;
   }
 }
 @keyframes entra-drawer {
@@ -238,21 +242,35 @@ body {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
 }
-@keyframes cierra-loader-fill {
-  from { --cierra-loader-angle: 0deg; opacity: 0.78; }
-  to { --cierra-loader-angle: 360deg; opacity: 1; }
+@keyframes cierra-loader-stroke {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
 }
-@keyframes cierra-loader-pulse {
-  0%, 100% { opacity: 0.28; transform: scale(0.82); }
-  50% { opacity: 1; transform: scale(1); }
+@keyframes cierra-loader-cap-fill {
+  0%, 72% {
+    opacity: 0;
+    stroke-dashoffset: 1;
+  }
+  100% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes cierra-loader-cap-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    filter: drop-shadow(0 0 14px rgb(245 182 51 / 0.5));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 24px rgb(245 182 51 / 0.9));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cierra-loader-fill {
-    mask-image: none;
-    -webkit-mask-image: none;
-  }
-  .cierra-loader-pulse {
+  .cierra-loader-stroke,
+  .cierra-loader-cap {
+    stroke-dashoffset: 0;
     opacity: 1;
   }
 }
