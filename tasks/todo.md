@@ -381,3 +381,33 @@
 - `cierrafe/src/components/shell.tsx`
 
 **Estimated scope:** Small
+
+## Task 16: Admin Delegated Study Operation
+**Description:** Let system admins operate as a study for direct Cierra service or delegated support, while preserving audit identity.
+
+**Acceptance criteria:**
+- [x] Access context can represent a study session delegated by a system admin.
+- [x] Delegated study access preserves admin user, admin role, reason and start date.
+- [x] A delegated admin has the same operational permissions as a study admin for the target study.
+- [x] Support/delegation without system admin permission is rejected.
+- [x] Admin UI has an explicit "Funcionar como estudio contable" access.
+- [x] Login development shortcuts include admin-as-study access.
+- [x] Product docs describe direct service and delegated support behavior.
+
+**Verification:**
+- [x] Unit tests for delegated access permissions.
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Dependencies:** Task 15
+
+**Files likely touched:**
+- `cierrabe/src/datos/contexto.ts`
+- `cierrabe/src/permisos/*`
+- `cierrafe/src/app/admin/*`
+- `cierrafe/src/lib/dev-session.ts`
+- `docs/accesos-marca-y-tenancy.md`
+
+**Estimated scope:** Small

@@ -22,6 +22,8 @@ Puede:
 - Ver empleados, periodos, liquidaciones, recibos, errores y actividad.
 - Revisar auditoria global del sistema.
 - Entrar en modo soporte para ayudar, dejando registro de auditoria.
+- Funcionar como estudio contable propio si Cierra vende el servicio directo a empresas finales.
+- Entrar a un estudio particular en modo delegado para hacer lo mismo que el estudio puede hacer, por ejemplo cargar una empresa o un empleado cuando el estudio pide ayuda.
 - Configurar parametros globales, planes, limites y estado operativo.
 
 No debe:
@@ -132,6 +134,7 @@ Reglas:
 - La empresa es quien carga/crea sus empleados y les da acceso.
 - El estudio contable tambien puede cargar/crear empleados y operar sobre ellos dentro de sus empresas cliente. Esto permite que el contador sustituya completamente las planillas cuando la empresa delega esa tarea.
 - Soporte de Cierra puede asistir, pero toda accion debe quedar auditada con actor, motivo y fecha.
+- Cuando un administrador opera como estudio, los permisos efectivos son los del estudio, pero la auditoria debe conservar el usuario administrador original, el estudio objetivo, el motivo y la fecha de inicio de la delegacion.
 - Nadie puede darse acceso a si mismo a un nivel superior.
 - Las altas tambien deben respetar modulos contratados cuando corresponda.
 
@@ -276,6 +279,7 @@ Campos importantes:
 - `employee_id` cuando el dato pertenece a una persona.
 - `created_by_user_id` y `updated_by_user_id` en datos sensibles.
 - `created_by_actor_type` para distinguir altas hechas por admin, estudio, empresa o soporte.
+- `delegated_by_user_id`, `delegation_reason` y/o campos equivalentes cuando una accion se realiza en nombre de un estudio.
 
 ### Frontend
 El frontend debe:

@@ -16,6 +16,13 @@ export type RolEmpresa = "company_owner" | "company_operator" | "company_readonl
 export type RolEmpleado = "employee_self";
 export type RolAcceso = RolSistema | RolEstudio | RolEmpresa | RolEmpleado;
 
+export interface DelegacionSistema {
+  usuarioId: UsuarioId;
+  rol: RolSistema;
+  motivo: string;
+  iniciadaEn: Date;
+}
+
 export type AccessContext =
   | {
       actorTipo: "sistema";
@@ -28,6 +35,7 @@ export type AccessContext =
       estudioId: EstudioId;
       rol: RolEstudio;
       empresasPermitidas: EmpresaId[] | "todas";
+      delegadoPor?: DelegacionSistema;
     }
   | {
       actorTipo: "empresa";
@@ -50,6 +58,7 @@ export interface TenantContext {
   usuarioId: UsuarioId;
   rol: Rol;
   empresasPermitidas: EmpresaId[] | "todas";
+  delegadoPor?: DelegacionSistema;
 }
 
 export function puedeVerEmpresa(ctx: TenantContext, empresaId: EmpresaId) {
@@ -73,5 +82,5 @@ export function tenantContextDesdeAcceso(ctx: AccessContext): TenantContext | nu
     return { estudioId: ctx.estudioId, usuarioId: ctx.usuarioId, rol: "lectura", empresasPermitidas: [ctx.empresaId] };
   }
   const rol: Rol = ctx.rol === "studio_readonly" ? "lectura" : ctx.rol === "payroll_operator" ? "liquidador" : "admin";
-  return { estudioId: ctx.estudioId, usuarioId: ctx.usuarioId, rol, empresasPermitidas: ctx.empresasPermitidas };
+  return { estudioId: ctx.estudioId, usuarioId: ctx.usuarioId, rol, empresasPermitidas: ctx.empresasPermitidas, delegadoPor: ctx.delegadoPor };
 }

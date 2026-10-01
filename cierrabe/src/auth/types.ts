@@ -3,6 +3,7 @@ import type {
   EmpleadoId,
   EmpresaId,
   EstudioId,
+  DelegacionSistema,
   RolAcceso,
   UsuarioId,
 } from "../datos/contexto";
@@ -27,6 +28,7 @@ export type EspacioAcceso =
       estudioId: EstudioId;
       rol: Extract<RolAcceso, "studio_owner" | "studio_admin" | "payroll_operator" | "studio_readonly">;
       empresasPermitidas: EmpresaId[] | "todas";
+      delegadoPor?: DelegacionSistema;
     }
   | {
       actorTipo: "empresa";

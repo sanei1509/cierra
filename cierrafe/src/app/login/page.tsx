@@ -7,6 +7,7 @@ import { ACCESOS_DESARROLLO, type DevAccessId } from "@/lib/dev-session";
 
 const iconos = {
   system_admin: UserCog,
+  admin_as_study: ShieldCheck,
   studio_admin: ShieldCheck,
   payroll_operator: BriefcaseBusiness,
   studio_readonly: Eye,

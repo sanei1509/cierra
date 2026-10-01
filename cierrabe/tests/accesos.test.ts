@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { AccessContext, EmpleadoId, EmpresaId, EstudioId, UsuarioId } from "../src/datos/contexto";
 import { ErrorDominio } from "../src/datos/errores";
 import {
+  crearAccesoEstudioDelegado,
   exigirEmpleado,
   exigirEmpresa,
+  puedeActuarComoEstudio,
   puedeAccionEmpresa,
   puedeAdministrarComercial,
   puedeDarAltaEmpleado,
@@ -39,6 +41,46 @@ describe("politicas de acceso", () => {
 
   it("no permite a soporte administrar comercial", () => {
     expect(puedeAdministrarComercial(supportAdmin)).toBe(false);
+  });
+
+  it("permite al admin operar como un estudio dejando delegacion auditada", () => {
+    expect(puedeActuarComoEstudio(systemAdmin)).toBe(true);
+    expect(puedeActuarComoEstudio(studioAdmin)).toBe(false);
+
+    const delegado = crearAccesoEstudioDelegado(systemAdmin, {
+      estudioId: estudioB,
+      usuarioEstudioId: "usuario-estudio-b" as UsuarioId,
+      motivo: "Soporte solicitado por el estudio",
+      iniciadaEn: new Date("2026-10-01T10:00:00Z"),
+    });
+
+    expect(delegado).toMatchObject({
+      actorTipo: "estudio",
+      estudioId: estudioB,
+      rol: "studio_admin",
+      empresasPermitidas: "todas",
+      delegadoPor: { usuarioId: usuario, rol: "system_admin", motivo: "Soporte solicitado por el estudio" },
+    });
+    expect(puedeDarAltaEmpresa(delegado, { estudioId: estudioB })).toBe(true);
+    expect(puedeDarAltaEmpleado(delegado, { estudioId: estudioB, empresaId: empresaB })).toBe(true);
+  });
+
+  it("no permite actuar como estudio sin ser admin sistema ni sin motivo claro", () => {
+    expect(() =>
+      crearAccesoEstudioDelegado(supportAdmin, {
+        estudioId: estudioA,
+        usuarioEstudioId: usuario,
+        motivo: "Soporte solicitado por el estudio",
+      }),
+    ).toThrow(ErrorDominio);
+
+    expect(() =>
+      crearAccesoEstudioDelegado(systemAdmin, {
+        estudioId: estudioA,
+        usuarioEstudioId: usuario,
+        motivo: "x",
+      }),
+    ).toThrow(ErrorDominio);
   });
 
   it("respeta la cadena de altas de accesos", () => {

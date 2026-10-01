@@ -2,7 +2,7 @@ import { USUARIOS } from "./seed";
 
 export const DEV_SESSION_COOKIE = "cierra_dev_session";
 
-export type DevAccessId = "system_admin" | "studio_admin" | "payroll_operator" | "studio_readonly" | "company_owner" | "employee_self";
+export type DevAccessId = "system_admin" | "admin_as_study" | "studio_admin" | "payroll_operator" | "studio_readonly" | "company_owner" | "employee_self";
 
 export interface DevAccess {
   id: DevAccessId;
@@ -12,6 +12,7 @@ export interface DevAccess {
   actor: "sistema" | "estudio" | "empresa" | "empleado";
   usuarioId?: string;
   href: string;
+  delegadoPor?: { email: string; motivo: string };
 }
 
 export const ACCESOS_DESARROLLO: DevAccess[] = [
@@ -22,6 +23,16 @@ export const ACCESOS_DESARROLLO: DevAccess[] = [
     email: "admin@cierra.local",
     actor: "sistema",
     href: "/admin",
+  },
+  {
+    id: "admin_as_study",
+    label: "Funcionar como estudio",
+    detalle: "Opera empresas y empleados como estudio propio o soporte delegado.",
+    email: "admin+estudio@cierra.local",
+    actor: "estudio",
+    usuarioId: "u1",
+    href: "/",
+    delegadoPor: { email: "admin@cierra.local", motivo: "Servicio directo o soporte solicitado" },
   },
   {
     id: "studio_admin",
@@ -81,5 +92,5 @@ export function resolverDestinoPorEmail(email: string) {
 }
 
 export function serializarSesionDev(acceso: DevAccess) {
-  return JSON.stringify({ accesoId: acceso.id, email: acceso.email, usuarioId: acceso.usuarioId ?? null, actor: acceso.actor });
+  return JSON.stringify({ accesoId: acceso.id, email: acceso.email, usuarioId: acceso.usuarioId ?? null, actor: acceso.actor, delegadoPor: acceso.delegadoPor ?? null });
 }

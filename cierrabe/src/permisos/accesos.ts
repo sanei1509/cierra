@@ -1,4 +1,4 @@
-import type { AccessContext, EmpleadoId, EmpresaId, EstudioId } from "../datos/contexto";
+import type { AccessContext, EmpleadoId, EmpresaId, EstudioId, RolEstudio, UsuarioId } from "../datos/contexto";
 import { noAutenticado, noEncontrado, sinPermiso } from "../datos/errores";
 
 export type RecursoEstudio = { estudioId: EstudioId };
@@ -28,6 +28,28 @@ export function puedeAdministrarComercial(ctx: AccessContext) {
 
 export function puedeDarAltaEstudio(ctx: AccessContext) {
   return puedeAdministrarSistema(ctx);
+}
+
+export function puedeActuarComoEstudio(ctx: AccessContext) {
+  return ctx.actorTipo === "sistema" && ctx.rol === "system_admin";
+}
+
+export function crearAccesoEstudioDelegado(
+  ctx: AccessContext | null | undefined,
+  input: { estudioId: EstudioId; usuarioEstudioId: UsuarioId; rol?: RolEstudio; motivo: string; iniciadaEn?: Date },
+): AccessContext {
+  assertAutenticado(ctx);
+  if (ctx.actorTipo !== "sistema" || ctx.rol !== "system_admin") sinPermiso("Solo un administrador del sistema puede operar como estudio");
+  const motivo = input.motivo.trim();
+  if (motivo.length < 5) sinPermiso("Para operar como estudio tenes que indicar un motivo de soporte o servicio");
+  return {
+    actorTipo: "estudio",
+    usuarioId: input.usuarioEstudioId,
+    estudioId: input.estudioId,
+    rol: input.rol ?? "studio_admin",
+    empresasPermitidas: "todas",
+    delegadoPor: { usuarioId: ctx.usuarioId, rol: ctx.rol, motivo, iniciadaEn: input.iniciadaEn ?? new Date() },
+  };
 }
 
 export function puedeDarAltaEmpresa(ctx: AccessContext, recurso: RecursoEstudio) {

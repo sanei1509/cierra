@@ -129,6 +129,8 @@ Convenciones:
 - Un administrador del sistema puede activar/desactivar modulos por estudio.
 - Un administrador del sistema puede asignar paquete, add-ons y precios a un estudio.
 - Un administrador del sistema puede dar ingreso a un estudio y, en ese momento, definir su paquete inicial, modulos activos y precio fijo mensual.
+- Un administrador del sistema puede funcionar como estudio contable propio para atender empresas directas.
+- Un administrador del sistema puede operar dentro de un estudio cliente en modo delegado, con auditoria clara de quien lo hizo y por que.
 - Un estudio puede dar ingreso a sus empresas cliente.
 - Una empresa puede dar ingreso a sus empleados.
 - Un estudio puede operar empresas y empleados de sus clientes segun permisos.

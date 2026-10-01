@@ -17,6 +17,7 @@ export function resolverAccessContext(sesion: SesionAutenticada): AccessContext 
       estudioId: espacio.estudioId,
       rol: espacio.rol,
       empresasPermitidas: espacio.empresasPermitidas,
+      delegadoPor: espacio.delegadoPor,
     };
   }
   if (espacio.actorTipo === "empresa") {

@@ -14,6 +14,14 @@ const usuario = "usuario-1" as UsuarioId;
 
 const systemAdmin: AccessContext = { actorTipo: "sistema", usuarioId: usuario, rol: "system_admin" };
 const estudioAdmin: AccessContext = { actorTipo: "estudio", usuarioId: usuario, estudioId: estudioA, rol: "studio_admin", empresasPermitidas: "todas" };
+const adminDelegado: AccessContext = {
+  actorTipo: "estudio",
+  usuarioId: "usuario-estudio-a" as UsuarioId,
+  estudioId: estudioA,
+  rol: "studio_admin",
+  empresasPermitidas: "todas",
+  delegadoPor: { usuarioId: usuario, rol: "system_admin", motivo: "Servicio directo de recibos", iniciadaEn: new Date("2026-10-01T10:00:00Z") },
+};
 const liquidadorLimitado: AccessContext = { actorTipo: "estudio", usuarioId: usuario, estudioId: estudioA, rol: "payroll_operator", empresasPermitidas: [empresaA] };
 const empresaOwner: AccessContext = { actorTipo: "empresa", usuarioId: usuario, estudioId: estudioA, empresaId: empresaA, rol: "company_owner" };
 const empleadoSelf: AccessContext = { actorTipo: "empleado", usuarioId: usuario, estudioId: estudioA, empresaId: empresaA, empleadoId: empleadoA, rol: "employee_self" };
@@ -133,6 +141,21 @@ describe("acciones backend con guards", () => {
 
     expect(repo.crear).toHaveBeenCalledTimes(1);
     expect(repo.ctxs[0]).toMatchObject({ estudioId: estudioA, rol: "admin", empresasPermitidas: "todas" });
+  });
+
+  it("admin delegado como estudio crea empleados preservando la delegacion en el tenant", async () => {
+    const repo = empleadosRepoMock();
+    const input: CrearEmpleadoInput = { ...empleado(), id: undefined };
+
+    await crearEmpleado(adminDelegado, repo, { estudioId: estudioA, empresaId: empresaA }, input);
+
+    expect(repo.crear).toHaveBeenCalledTimes(1);
+    expect(repo.ctxs[0]).toMatchObject({
+      estudioId: estudioA,
+      rol: "admin",
+      empresasPermitidas: "todas",
+      delegadoPor: { usuarioId: usuario, rol: "system_admin", motivo: "Servicio directo de recibos" },
+    });
   });
 
   it("estudio no puede crear empleados en empresas fuera de su alcance", async () => {
