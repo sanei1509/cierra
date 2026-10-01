@@ -16,7 +16,7 @@ pnpm db:migrate
 pnpm db:seed:dev
 ```
 
-`pnpm db:seed:dev` crea/actualiza los usuarios y estudio UUID definidos en `.env.example` para que las Server Actions de desarrollo puedan escribir en PostgreSQL.
+`pnpm db:seed:dev` crea/actualiza los usuarios, el estudio UUID y el catalogo comercial base definido en `.env.example` para que las Server Actions de desarrollo puedan escribir en PostgreSQL.
 
 - Los datos son ficticios y se guardan en el navegador (localStorage). Botón "Reiniciar datos de ejemplo" en la barra lateral.
 - Cambiá de usuario (arriba a la derecha) para probar roles: Administradora, Liquidador, Solo lectura.

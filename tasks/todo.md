@@ -719,3 +719,31 @@
 - `cierrafe/src/app/admin/page.tsx`
 
 **Estimated scope:** Small
+
+## Task 27: Development Commercial Seed
+**Description:** Seed the base commercial module catalog and initial packages into PostgreSQL development environments.
+
+**Acceptance criteria:**
+- [x] Development seed inserts or updates all backend module catalog rows.
+- [x] Development seed inserts or updates the base packages `basico`, `profesional` and `full`.
+- [x] Plan-module relationships are recreated idempotently for those base packages.
+- [x] Seed output reports seeded commercial modules and plans.
+- [x] Plan definitions use stable UUIDs compatible with the admin demo console.
+
+**Verification:**
+- [x] Backend unit tests for plan definitions and module references.
+- [x] `npm run typecheck` in `cierrabe`
+- [x] `npm test` in `cierrabe`
+
+**Notes:**
+- [ ] Manual `pnpm db:seed:dev` against local PostgreSQL remains pending until PostgreSQL is available.
+
+**Dependencies:** Task 25, Task 26
+
+**Files touched:**
+- `cierrabe/src/dev/seed-comercial.ts`
+- `cierrabe/src/dev/seed-desarrollo.ts`
+- `cierrabe/tests/seed-comercial.test.ts`
+- `README.md`
+
+**Estimated scope:** Small
