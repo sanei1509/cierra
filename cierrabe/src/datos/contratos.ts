@@ -2,6 +2,7 @@ import type { AuditEvent, Empleado, Empresa, Novedad, Periodo, Usuario } from ".
 import type { AuditEventId, EmpleadoId, EmpresaId, EstudioId, NovedadId, PeriodoId, TenantContext, UsuarioId } from "./contexto";
 import type { CodigoModulo, ModuloCatalogo } from "../modulos";
 import type { AplicacionPago, CrearSuscripcionEstudioInput, EventoUsoFacturable, PagoEstudio, PlanComercial, ResumenCobroEstudio, SuscripcionEstudio } from "../facturacion";
+import type { RolAcceso } from "./contexto";
 
 export interface Estudio {
   id: EstudioId;
@@ -40,6 +41,35 @@ export interface CrearArchivoMarcaInput extends Omit<ArchivoMarca, "id" | "cread
   id?: string;
   creado?: string;
   creadoPorUsuarioId?: UsuarioId;
+}
+
+export interface CrearEstudioInput extends Omit<Estudio, "id" | "creado"> {
+  id?: EstudioId;
+  creado?: string;
+}
+
+export interface AccesoInicialInput {
+  nombre: string;
+  email: string;
+}
+
+export interface CrearUsuarioAccesoInput extends AccesoInicialInput {
+  rol: RolAcceso;
+  estudioId?: EstudioId;
+  empresaId?: EmpresaId;
+  empleadoId?: EmpleadoId;
+  creadoPorUsuarioId: UsuarioId;
+}
+
+export interface UsuarioAccesoCreado {
+  usuarioId: UsuarioId;
+  email: string;
+  nombre: string;
+  estado: "invitado";
+  rol: RolAcceso;
+  estudioId?: EstudioId;
+  empresaId?: EmpresaId;
+  empleadoId?: EmpleadoId;
 }
 
 export interface ActualizarPerfilEstudioInput {
@@ -93,12 +123,14 @@ export interface CrearAuditEventInput extends Omit<AuditEvent, "id" | "fecha" | 
 }
 
 export interface EstudiosRepo {
+  crear(input: CrearEstudioInput): Promise<Estudio>;
   obtener(ctx: Pick<TenantContext, "estudioId">): Promise<Estudio | null>;
   actualizarPerfil(ctx: TenantContext, input: ActualizarPerfilEstudioInput): Promise<Estudio>;
 }
 
 export interface UsuariosRepo {
   obtener(ctx: TenantContext, usuarioId: UsuarioId): Promise<Usuario | null>;
+  crearAcceso(input: CrearUsuarioAccesoInput): Promise<UsuarioAccesoCreado>;
 }
 
 export interface EmpresasRepo {

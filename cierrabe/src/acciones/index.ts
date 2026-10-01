@@ -1,4 +1,5 @@
 export * from "./auditoria";
+export * from "./altas";
 export * from "./comercial";
 export * from "./contexto";
 export * from "./empleados";

@@ -438,3 +438,35 @@
 - `cierrafe/src/app/*/layout.tsx`
 
 **Estimated scope:** Small
+
+## Task 18: Initial Access Provisioning Contracts
+**Description:** Define backend actions for creating each next-level actor with its initial login access, following the responsibility chain.
+
+**Acceptance criteria:**
+- [x] System admin can create a study with an invited `studio_owner`.
+- [x] Study admin or delegated admin can create a company with an invited `company_owner`.
+- [x] Company owner, study admin or delegated admin can create an employee with an invited `employee_self`.
+- [x] Inputs validate required names and emails before creating access.
+- [x] Employee creation rejects mismatched company ownership.
+- [x] Forbidden responsibility-chain jumps are rejected.
+- [x] Each provisioning action records an audit event.
+
+**Verification:**
+- [x] Unit tests for study, company and employee provisioning.
+- [x] Unit tests for invalid email, mismatched company and forbidden actors.
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Notes:**
+- [ ] Pending next: wire these provisioning actions to real repositories/routes and frontend forms.
+
+**Dependencies:** Task 16, Task 17
+
+**Files likely touched:**
+- `cierrabe/src/acciones/altas.ts`
+- `cierrabe/src/datos/contratos.ts`
+- `cierrabe/tests/altas.test.ts`
+
+**Estimated scope:** Medium
