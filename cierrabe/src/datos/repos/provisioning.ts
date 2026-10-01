@@ -13,11 +13,12 @@ import type {
   EmpresasRepo,
   Estudio,
   EstudiosRepo,
+  PeriodosRepo,
   UsuarioAccesoCreado,
   UsuariosRepo,
 } from "../contratos";
-import { empleadoVigencias, empleados, empresas, estudios, membresiaEmpresas, membresias, relacionesLaborales, usuarios } from "../schema";
-import type { Empleado, Empresa, Rol, Usuario } from "../../dominio/types";
+import { empleadoVigencias, empleados, empresas, estudios, membresiaEmpresas, membresias, periodos, relacionesLaborales, usuarios } from "../schema";
+import type { Empleado, Empresa, Periodo, Rol, Usuario } from "../../dominio/types";
 import { noEncontrado } from "../errores";
 
 type EstudioRow = typeof estudios.$inferSelect;
@@ -26,6 +27,7 @@ type EmpresaRow = typeof empresas.$inferSelect;
 type EmpleadoRow = typeof empleados.$inferSelect;
 type RelacionRow = typeof relacionesLaborales.$inferSelect;
 type VigenciaRow = typeof empleadoVigencias.$inferSelect;
+type PeriodoRow = typeof periodos.$inferSelect;
 
 const fecha = (valor: Date | string | null | undefined) => {
   if (!valor) return undefined;
@@ -111,6 +113,22 @@ function mapEmpleado(row: EmpleadoRow, relaciones: RelacionRow[], vigencias: Vig
     hijos: ultima?.hijos ?? 0,
     conyugeFonasa: ultima?.conyugeFonasa ?? false,
     cuenta: row.cuentaCobro ?? undefined,
+  };
+}
+
+function mapPeriodo(row: PeriodoRow): Periodo {
+  return {
+    id: row.id,
+    empresaId: row.empresaId,
+    mes: row.mes,
+    etapa: row.etapa,
+    fechaObjetivo: fecha(row.fechaObjetivo) ?? `${row.mes}-28`,
+    sinNovedades: row.sinNovedades,
+    versiones: [],
+    advertenciasAceptadas: {},
+    bps: row.bpsEstado,
+    rectificaciones: [],
+    notas: [],
   };
 }
 
@@ -395,6 +413,54 @@ export function crearEmpleadosRepo(db: Db): EmpleadosRepo {
         .returning();
       if (!row) noEncontrado("No encontramos el empleado para actualizar");
       return (await hidratar([row]))[0];
+    },
+  };
+}
+
+export function crearPeriodosRepo(db: Db): PeriodosRepo {
+  return {
+    async listarPorEmpresa(ctx, empresaId) {
+      if (ctx.empresasPermitidas !== "todas" && !ctx.empresasPermitidas.includes(empresaId)) return [];
+      const rows = await db
+        .select()
+        .from(periodos)
+        .where(and(eq(periodos.estudioId, ctx.estudioId), eq(periodos.empresaId, empresaId)))
+        .orderBy(desc(periodos.mes));
+      return rows.map(mapPeriodo);
+    },
+
+    async obtener(ctx, periodoId) {
+      const [row] = await db.select().from(periodos).where(and(eq(periodos.estudioId, ctx.estudioId), eq(periodos.id, periodoId))).limit(1);
+      if (!row) return null;
+      if (ctx.empresasPermitidas !== "todas" && !ctx.empresasPermitidas.includes(row.empresaId as EmpresaId)) return null;
+      return mapPeriodo(row);
+    },
+
+    async guardar(ctx, periodo) {
+      if (ctx.empresasPermitidas !== "todas" && !ctx.empresasPermitidas.includes(periodo.empresaId as EmpresaId)) noEncontrado("No encontramos la empresa del periodo");
+      const [row] = await db
+        .insert(periodos)
+        .values({
+          id: periodo.id,
+          estudioId: ctx.estudioId,
+          empresaId: periodo.empresaId as EmpresaId,
+          mes: periodo.mes,
+          etapa: periodo.etapa,
+          fechaObjetivo: fechaDb(periodo.fechaObjetivo)!,
+          sinNovedades: periodo.sinNovedades,
+          bpsEstado: periodo.bps,
+        })
+        .onConflictDoUpdate({
+          target: [periodos.empresaId, periodos.mes],
+          set: {
+            etapa: periodo.etapa,
+            fechaObjetivo: fechaDb(periodo.fechaObjetivo)!,
+            sinNovedades: periodo.sinNovedades,
+            bpsEstado: periodo.bps,
+          },
+        })
+        .returning();
+      return mapPeriodo(row);
     },
   };
 }

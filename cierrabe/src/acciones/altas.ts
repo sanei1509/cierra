@@ -8,8 +8,10 @@ import type {
   EmpleadosRepo,
   EmpresasRepo,
   EstudiosRepo,
+  PeriodosRepo,
   UsuariosRepo,
 } from "../datos/contratos";
+import type { Periodo } from "../dominio/types";
 import { validacion } from "../datos/errores";
 import { exigirAltaEmpleado, exigirAltaEmpresa, exigirAltaEstudio } from "../permisos";
 import { tenantParaEmpresa, tenantParaEstudio } from "./contexto";
@@ -24,6 +26,7 @@ export interface CrearEstudioConAccesoInput {
 export interface CrearEmpresaConAccesoInput {
   empresa: CrearEmpresaInput;
   usuarioEmpresa: AccesoInicialInput;
+  periodoInicial?: Omit<Periodo, "empresaId">;
 }
 
 export interface CrearEmpleadoConAccesoInput {
@@ -84,7 +87,7 @@ export async function crearEstudioConAccesoInicial(
 
 export async function crearEmpresaConAccesoInicial(
   ctx: AccessContext,
-  repos: { empresas: EmpresasRepo; usuarios: UsuariosRepo; auditoria: AuditoriaRepo },
+  repos: { empresas: EmpresasRepo; usuarios: UsuariosRepo; auditoria: AuditoriaRepo; periodos?: PeriodosRepo },
   estudioId: EstudioId,
   input: CrearEmpresaConAccesoInput,
 ) {
@@ -92,22 +95,29 @@ export async function crearEmpresaConAccesoInicial(
   const usuarioEmpresa = normalizarAcceso(input.usuarioEmpresa);
   const empresaInput = assertEmpresaCoherente(input.empresa);
   const empresa = await repos.empresas.crear(tenantParaEstudio(ctx, estudioId), empresaInput);
+  const empresaId = empresa.id as EmpresaId;
+  const periodo = input.periodoInicial
+    ? await repos.periodos?.guardar(tenantParaEmpresa(ctx, estudioId, empresaId), {
+        ...input.periodoInicial,
+        empresaId,
+      })
+    : undefined;
   const usuario = await repos.usuarios.crearAcceso({
     ...usuarioEmpresa,
     rol: "company_owner",
     estudioId,
-    empresaId: empresa.id as EmpresaId,
+    empresaId,
     creadoPorUsuarioId: ctx.usuarioId,
   });
-  await repos.auditoria.registrar(tenantParaEmpresa(ctx, estudioId, empresa.id as EmpresaId), {
+  await repos.auditoria.registrar(tenantParaEmpresa(ctx, estudioId, empresaId), {
     actor: ctx.usuarioId,
-    empresaId: empresa.id as EmpresaId,
+    empresaId,
     entidad: "Empresa",
     entidadId: empresa.id,
     accion: "empresa_alta_inicial",
-    detalle: `Alta de empresa con usuario responsable ${usuario.email}`,
+    detalle: periodo ? `Alta de empresa con usuario responsable ${usuario.email} y periodo inicial ${periodo.mes}` : `Alta de empresa con usuario responsable ${usuario.email}`,
   });
-  return { empresa, usuario };
+  return { empresa, usuario, periodo };
 }
 
 export async function crearEmpleadoConAccesoInicial(

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { crearEmpleadoConAccesoInicial, crearEmpresaConAccesoInicial } from "cierrabe/acciones";
 import type { AccessContext, EmpresaId, EstudioId, UsuarioId } from "cierrabe/datos/contexto";
-import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
+import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearPeriodosRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
+import { MES_ACTUAL } from "@/lib/format";
 import type { Modalidad, Tono } from "@/lib/types";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -74,6 +75,7 @@ export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Prom
       empresas: crearEmpresasRepo(db),
       usuarios: crearUsuariosRepo(db),
       auditoria: crearAuditoriaRepo(db),
+      periodos: crearPeriodosRepo(db),
     },
     ctx.estudioId,
     {
@@ -90,6 +92,18 @@ export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Prom
         tono: input.tono,
       },
       usuarioEmpresa: { nombre: input.contactoNombre, email: input.contactoEmail },
+      periodoInicial: {
+        id: crypto.randomUUID(),
+        mes: MES_ACTUAL,
+        etapa: "novedades",
+        fechaObjetivo: `${MES_ACTUAL}-28`,
+        sinNovedades: false,
+        versiones: [],
+        advertenciasAceptadas: {},
+        bps: "pendiente",
+        rectificaciones: [],
+        notas: [],
+      },
     },
   );
 
@@ -97,7 +111,9 @@ export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Prom
   return {
     ok: true,
     modo: "real",
-    mensaje: `Empresa guardada en backend con acceso inicial para ${res.usuario.email}.`,
+    mensaje: res.periodo
+      ? `Empresa guardada en backend con acceso inicial para ${res.usuario.email} y periodo ${res.periodo.mes}.`
+      : `Empresa guardada en backend con acceso inicial para ${res.usuario.email}.`,
     id: res.empresa.id,
   };
 }

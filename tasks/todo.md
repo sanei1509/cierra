@@ -588,3 +588,35 @@
 - `cierrafe/src/app/(estudio)/empleados/page.tsx`
 
 **Estimated scope:** Medium
+
+## Task 23: Initial Company Period Persistence
+**Description:** When a real company is provisioned, create the initial payroll period in PostgreSQL so the new company appears in the work queue immediately.
+
+**Acceptance criteria:**
+- [x] PostgreSQL `PeriodosRepo` implementation can list, read and save periods within tenant scope.
+- [x] Saving a period upserts by company and month.
+- [x] Company provisioning action accepts an optional initial period.
+- [x] Company provisioning action saves the initial period using the newly created company id.
+- [x] Study create-company Server Action sends the current demo month as the initial period when real backend mode is active.
+- [x] Audit detail mentions the initial period when one is created.
+
+**Verification:**
+- [x] Unit test for company provisioning with initial period.
+- [x] `corepack pnpm typecheck`
+- [x] `corepack pnpm test`
+- [x] `corepack pnpm lint`
+- [x] `corepack pnpm build`
+
+**Notes:**
+- [ ] Pending later: derive the operational month from real tenant settings instead of the reproducible demo month.
+- [ ] Pending later: persist period versions, approvals, notes and rectifications when liquidation workflow moves from demo store to backend.
+
+**Dependencies:** Task 21, Task 22
+
+**Files likely touched:**
+- `cierrabe/src/acciones/altas.ts`
+- `cierrabe/src/datos/repos/provisioning.ts`
+- `cierrabe/tests/altas.test.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+
+**Estimated scope:** Small

@@ -8,9 +8,10 @@ import type {
   EmpleadosRepo,
   EmpresasRepo,
   EstudiosRepo,
+  PeriodosRepo,
   UsuariosRepo,
 } from "../src/datos/contratos";
-import type { AuditEvent, Empleado, Empresa } from "../src/dominio/types";
+import type { AuditEvent, Empleado, Empresa, Periodo } from "../src/dominio/types";
 import { crearEmpleadoConAccesoInicial, crearEmpresaConAccesoInicial, crearEstudioConAccesoInicial } from "../src/acciones";
 
 const usuarioAdmin = "usuario-admin" as UsuarioId;
@@ -96,6 +97,29 @@ function empresasRepoMock(): EmpresasRepo {
   };
 }
 
+function periodoInicial(): Omit<Periodo, "empresaId"> {
+  return {
+    id: "periodo-a",
+    mes: "2026-09",
+    etapa: "novedades",
+    fechaObjetivo: "2026-09-28",
+    sinNovedades: false,
+    versiones: [],
+    advertenciasAceptadas: {},
+    bps: "pendiente",
+    rectificaciones: [],
+    notas: [],
+  };
+}
+
+function periodosRepoMock(): PeriodosRepo {
+  return {
+    listarPorEmpresa: vi.fn(async () => []),
+    obtener: vi.fn(async () => null),
+    guardar: vi.fn(async (_ctx, input) => input),
+  };
+}
+
 function empleadosRepoMock(): EmpleadosRepo {
   return {
     listarPorEmpresa: vi.fn(async () => []),
@@ -120,18 +144,21 @@ describe("altas con acceso inicial", () => {
   });
 
   it("estudio crea empresa con usuario company_owner", async () => {
-    const repos = { empresas: empresasRepoMock(), usuarios: usuariosRepoMock(), auditoria: auditoriaRepoMock() };
+    const repos = { empresas: empresasRepoMock(), usuarios: usuariosRepoMock(), auditoria: auditoriaRepoMock(), periodos: periodosRepoMock() };
 
-    await crearEmpresaConAccesoInicial(estudioAdmin, repos, estudioA, {
+    const res = await crearEmpresaConAccesoInicial(estudioAdmin, repos, estudioA, {
       empresa: empresaInput(),
       usuarioEmpresa: { nombre: "Responsable Empresa", email: "RESPONSABLE@EMPRESA.UY" },
+      periodoInicial: periodoInicial(),
     });
 
     expect(repos.empresas.crear).toHaveBeenCalledTimes(1);
+    expect(res.periodo?.empresaId).toBe(empresaA);
+    expect(repos.periodos.guardar).toHaveBeenCalledWith(expect.objectContaining({ estudioId: estudioA, empresasPermitidas: "todas" }), expect.objectContaining({ empresaId: empresaA, mes: "2026-09" }));
     expect(repos.usuarios.crearAcceso).toHaveBeenCalledWith(expect.objectContaining({ rol: "company_owner", estudioId: estudioA, empresaId: empresaA }));
     expect(repos.auditoria.registrar).toHaveBeenCalledWith(
       expect.objectContaining({ estudioId: estudioA }),
-      expect.objectContaining({ accion: "empresa_alta_inicial", empresaId: empresaA }),
+      expect.objectContaining({ accion: "empresa_alta_inicial", empresaId: empresaA, detalle: expect.stringContaining("periodo inicial 2026-09") }),
     );
   });
 
