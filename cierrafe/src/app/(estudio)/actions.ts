@@ -7,8 +7,10 @@ import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedad
 import { contextoEstudioDesarrollo, uuidValido } from "@/lib/backend-dev-context";
 import { contextoOperativoActual } from "@/lib/backend-operativo";
 import { obtenerSesionDev } from "@/lib/dev-auth";
+import { calcularEmpresa, hashDe } from "@/lib/engine";
 import { MES_ACTUAL } from "@/lib/format";
-import type { Adjunto, Modalidad, TipoNovedad, Tono } from "@/lib/types";
+import { MOTOR_VERSION, parametrosVigentes } from "@/lib/params";
+import type { Adjunto, Modalidad, Periodo, TipoNovedad, Tono, VersionLiquidacion } from "@/lib/types";
 
 export interface AltaRealResult {
   ok: boolean;
@@ -78,6 +80,69 @@ export interface EnviarNovedadesClienteRealInput {
   sinNovedades: boolean;
 }
 
+export interface PeriodoRealInput {
+  periodoId: string;
+  empresaId: string;
+  actor: string;
+}
+
+function ahoraIso() {
+  return new Date().toISOString();
+}
+
+function periodoInicial(empresaId: EmpresaId, mes: string): Periodo {
+  return {
+    id: crypto.randomUUID(),
+    empresaId,
+    mes,
+    etapa: "novedades",
+    fechaObjetivo: `${mes}-28`,
+    sinNovedades: false,
+    versiones: [],
+    advertenciasAceptadas: {},
+    bps: "pendiente",
+    rectificaciones: [],
+    notas: [],
+  };
+}
+
+async function guardarPeriodoReal(
+  input: PeriodoRealInput,
+  cambio: (actual: Periodo) => Promise<{ periodo: Periodo; auditoria: { accion: string; detalle?: string } }>,
+): Promise<AltaRealResult> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || ctx.actorTipo !== "estudio" || !process.env.DATABASE_URL || !uuidValido(input.periodoId) || !uuidValido(input.empresaId)) {
+    return { ok: true, modo: "demo", mensaje: "Accion simulada: falta sesion de estudio o backend real." };
+  }
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
+
+  const empresaId = input.empresaId as EmpresaId;
+  const { db } = await import("cierrabe/datos/db");
+  const periodosRepo = crearPeriodosRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  const periodo = await periodosRepo.obtener(tenant, input.periodoId as PeriodoId);
+  if (!periodo) return { ok: false, modo: "real", mensaje: "No encontramos el periodo." };
+
+  const { periodo: actualizado, auditoria } = await cambio(periodo as Periodo);
+  const guardado = await periodosRepo.guardar(tenant, actualizado);
+  await auditoriaRepo.registrar(tenant, {
+    actor: input.actor,
+    empresaId,
+    entidad: "Periodo",
+    entidadId: guardado.id as PeriodoId,
+    accion: auditoria.accion,
+    detalle: auditoria.detalle,
+  });
+
+  revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath(`/cliente/${input.empresaId}`);
+  revalidatePath(`/recibos/${input.empresaId}/${guardado.mes}`);
+  revalidatePath("/empresas");
+  return { ok: true, modo: "real", mensaje: "Periodo actualizado en backend.", id: guardado.id };
+}
+
 export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Promise<AltaRealResult> {
   const ctx = contextoEstudioDesarrollo(await obtenerSesionDev());
   if (!ctx) {
@@ -112,18 +177,7 @@ export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Prom
         tono: input.tono,
       },
       usuarioEmpresa: { nombre: input.contactoNombre, email: input.contactoEmail },
-      periodoInicial: {
-        id: crypto.randomUUID(),
-        mes: MES_ACTUAL,
-        etapa: "novedades",
-        fechaObjetivo: `${MES_ACTUAL}-28`,
-        sinNovedades: false,
-        versiones: [],
-        advertenciasAceptadas: {},
-        bps: "pendiente",
-        rectificaciones: [],
-        notas: [],
-      },
+      periodoInicial: periodoInicial("" as EmpresaId, MES_ACTUAL),
     },
   );
 
@@ -212,17 +266,8 @@ export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<Al
   const periodo =
     periodos.find((p) => p.mes === input.mes) ??
     (await periodosRepo.guardar(tenant, {
-      id: crypto.randomUUID(),
+      ...periodoInicial(empresaId, input.mes),
       empresaId,
-      mes: input.mes,
-      etapa: "novedades",
-      fechaObjetivo: `${input.mes}-28`,
-      sinNovedades: false,
-      versiones: [],
-      advertenciasAceptadas: {},
-      bps: "pendiente",
-      rectificaciones: [],
-      notas: [],
     }));
 
   const novedad = await novedadesRepo.crear(tenant, {
@@ -372,17 +417,8 @@ export async function enviarNovedadesClienteReal(input: EnviarNovedadesClienteRe
   const periodo =
     periodos.find((p) => p.mes === input.mes) ??
     (await periodosRepo.guardar(tenant, {
-      id: crypto.randomUUID(),
+      ...periodoInicial(empresaId, input.mes),
       empresaId,
-      mes: input.mes,
-      etapa: "novedades",
-      fechaObjetivo: `${input.mes}-28`,
-      sinNovedades: false,
-      versiones: [],
-      advertenciasAceptadas: {},
-      bps: "pendiente",
-      rectificaciones: [],
-      notas: [],
     }));
 
   await periodosRepo.guardar(tenant, {
@@ -413,4 +449,67 @@ export async function enviarNovedadesClienteReal(input: EnviarNovedadesClienteRe
     mensaje: input.sinNovedades ? "Mes confirmado sin novedades." : "Novedades enviadas al estudio.",
     id: periodo.id,
   };
+}
+
+export async function calcularLiquidacionReal(input: PeriodoRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => {
+    const tenant = tenantContextDesdeAcceso((await contextoOperativoActual())!);
+    if (!tenant) throw new Error("No pudimos resolver el contexto del estudio.");
+    const { db } = await import("cierrabe/datos/db");
+    const empresasRepo = crearEmpresasRepo(db);
+    const empleadosRepo = crearEmpleadosRepo(db);
+    const novedadesRepo = crearNovedadesRepo(db);
+    const empresa = await empresasRepo.obtener(tenant, input.empresaId as EmpresaId);
+    if (!empresa) throw new Error("No encontramos la empresa.");
+    const empleados = await empleadosRepo.listarPorEmpresa(tenant, input.empresaId as EmpresaId);
+    const novedades = (await novedadesRepo.listarPorPeriodo(tenant, periodo.id as PeriodoId)).map((n) => ({ ...n, mes: periodo.mes }));
+    const resultados = calcularEmpresa(empresa, empleados, periodo.mes, novedades);
+    const version: VersionLiquidacion = {
+      version: periodo.versiones.length + 1,
+      creada: ahoraIso(),
+      por: input.actor,
+      motor: MOTOR_VERSION,
+      parametros: parametrosVigentes(periodo.mes).id,
+      resultados,
+      hash: hashDe(resultados),
+    };
+    return {
+      periodo: { ...periodo, versiones: [...periodo.versiones, version], etapa: "borrador", aprobacion: undefined },
+      auditoria: { accion: `Calculo la version ${version.version}`, detalle: `${version.motor} - parametros ${version.parametros} - hash ${version.hash.slice(0, 8)}` },
+    };
+  });
+}
+
+export async function enviarAprobacionReal(input: PeriodoRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => {
+    const version = periodo.versiones.at(-1)?.version;
+    if (!version) throw new Error("Primero hay que calcular una version.");
+    return {
+      periodo: { ...periodo, etapa: "enviada", aprobacion: { version, estado: "pendiente", enviada: ahoraIso() } },
+      auditoria: { accion: `Envio la version ${version} a aprobacion` },
+    };
+  });
+}
+
+export async function aprobarInternoReal(input: PeriodoRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => {
+    const version = periodo.versiones.at(-1)?.version;
+    if (!version) throw new Error("Primero hay que calcular una version.");
+    return {
+      periodo: { ...periodo, etapa: "aprobada", aprobacion: { version, estado: "aprobada", enviada: ahoraIso(), fecha: ahoraIso(), por: input.actor } },
+      auditoria: { accion: `Aprobo internamente la version ${version}`, detalle: "Empresa sin aprobacion del cliente" },
+    };
+  });
+}
+
+export async function cerrarPeriodoReal(input: PeriodoRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => {
+    const version = periodo.aprobacion?.version ?? periodo.versiones.at(-1)?.version;
+    if (!version) throw new Error("Primero hay que calcular una version.");
+    const publicada = periodo.versiones.find((v) => v.version === version)?.resultados.filter((r) => !r.fueraDeAlcance).length ?? 0;
+    return {
+      periodo: { ...periodo, etapa: "cerrada", cerrado: { fecha: ahoraIso(), por: input.actor, version } },
+      auditoria: { accion: `Cerro el periodo y publico ${publicada} recibos`, detalle: `Version ${version} bloqueada` },
+    };
+  });
 }

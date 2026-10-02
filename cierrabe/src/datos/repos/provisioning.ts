@@ -123,12 +123,15 @@ function mapPeriodo(row: PeriodoRow): Periodo {
     mes: row.mes,
     etapa: row.etapa,
     fechaObjetivo: fecha(row.fechaObjetivo) ?? `${row.mes}-28`,
+    solicitud: row.solicitud ?? undefined,
     sinNovedades: row.sinNovedades,
-    versiones: [],
-    advertenciasAceptadas: {},
+    versiones: row.versiones,
+    aprobacion: row.aprobacion ?? undefined,
+    advertenciasAceptadas: row.advertenciasAceptadas,
+    cerrado: row.cerrado ?? undefined,
     bps: row.bpsEstado,
-    rectificaciones: [],
-    notas: [],
+    rectificaciones: row.rectificaciones,
+    notas: row.notas,
   };
 }
 
@@ -447,16 +450,30 @@ export function crearPeriodosRepo(db: Db): PeriodosRepo {
           mes: periodo.mes,
           etapa: periodo.etapa,
           fechaObjetivo: fechaDb(periodo.fechaObjetivo)!,
+          solicitud: periodo.solicitud,
           sinNovedades: periodo.sinNovedades,
+          versiones: periodo.versiones,
+          aprobacion: periodo.aprobacion,
+          advertenciasAceptadas: periodo.advertenciasAceptadas,
+          cerrado: periodo.cerrado,
           bpsEstado: periodo.bps,
+          rectificaciones: periodo.rectificaciones,
+          notas: periodo.notas,
         })
         .onConflictDoUpdate({
           target: [periodos.empresaId, periodos.mes],
           set: {
             etapa: periodo.etapa,
             fechaObjetivo: fechaDb(periodo.fechaObjetivo)!,
+            solicitud: periodo.solicitud,
             sinNovedades: periodo.sinNovedades,
+            versiones: periodo.versiones,
+            aprobacion: periodo.aprobacion,
+            advertenciasAceptadas: periodo.advertenciasAceptadas,
+            cerrado: periodo.cerrado,
             bpsEstado: periodo.bps,
+            rectificaciones: periodo.rectificaciones,
+            notas: periodo.notas,
           },
         })
         .returning();

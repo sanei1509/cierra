@@ -5,10 +5,16 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState, type MouseEvent } from "react";
 import {
+  aprobarInternoReal,
+  borrarNovedadReal,
+  calcularLiquidacionReal,
+  cerrarPeriodoReal,
+  enviarAprobacionReal,
+} from "@/app/(estudio)/actions";
+import {
   AlertOctagon, AlertTriangle, Info, Check, ChevronRight, Plus, X, Send, Calculator, FileDown, Lock, RefreshCw,
   ExternalLink, UserRound, Mail, Undo2, MessageSquare, Eye, Paperclip, ImagePlus, FileSpreadsheet, Files, Pencil,
 } from "lucide-react";
-import { borrarNovedadReal } from "@/app/(estudio)/actions";
 import { useStore, usePeriodoVista, useUsuario, type Vista } from "@/lib/store";
 import { PASOS, pasoActual } from "@/lib/status";
 import { TIPOS, valorNovedad, estadoNovedades } from "@/lib/labels";
@@ -107,19 +113,44 @@ function AlertaItem({ a, v, onVer }: { a: Alerta; v: Vista; onVer: (id: string) 
 
 function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
   const s = useStore();
+  const router = useRouter();
   const puede = s.puede("editar");
   const [confirmar, setConfirmar] = useState<null | "cerrar" | "rectificar">(null);
   const [motivo, setMotivo] = useState("");
+  const [procesando, setProcesando] = useState("");
+  const [error, setError] = useState("");
   const { periodo: p, empresa } = v;
   const ultima = p.versiones.at(-1);
   const empleados = s.empleados;
+  const periodoInput = { periodoId: p.id, empresaId: empresa.id, actor: useUsuario().nombre };
+  const ejecutar = async (clave: string, accionReal: () => Promise<{ ok: boolean; modo: "real" | "demo"; mensaje: string }>, accionLocal: () => void) => {
+    setError("");
+    setProcesando(clave);
+    try {
+      const res = await accionReal();
+      if (!res.ok) {
+        setError(res.mensaje);
+        return;
+      }
+      accionLocal();
+      if (res.modo === "real") router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos actualizar el periodo.");
+    } finally {
+      setProcesando("");
+    }
+  };
 
   let titulo = "";
   let texto: React.ReactNode = "";
   let acciones: React.ReactNode = null;
 
   const recalc = (
-    <Boton variante={v.desactualizada ? "primario" : "secundario"} disabled={!puede || v.pend.bloq.length > 0} onClick={() => s.calcular(p.id)}>
+    <Boton
+      variante={v.desactualizada ? "primario" : "secundario"}
+      disabled={!puede || v.pend.bloq.length > 0 || procesando === "calcular"}
+      onClick={() => void ejecutar("calcular", () => calcularLiquidacionReal(periodoInput), () => s.calcular(p.id))}
+    >
       <RefreshCw size={15} /> Recalcular (crea v{(ultima?.version ?? 0) + 1})
     </Boton>
   );
@@ -148,7 +179,14 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
     case "lista":
       titulo = "Todo listo para calcular";
       texto = `${v.novedadesMes.length} novedades cargadas y sin bloqueos. El cálculo crea la versión 1 con los parámetros vigentes de ${nombreMes(p.mes).toLowerCase()}.`;
-      acciones = <Boton disabled={!s.puede("calcular")} onClick={() => { s.calcular(p.id); irA("liquidacion"); }}><Calculator size={15} /> Calcular borrador</Boton>;
+      acciones = (
+        <Boton
+          disabled={!s.puede("calcular") || procesando === "calcular"}
+          onClick={() => void ejecutar("calcular", () => calcularLiquidacionReal(periodoInput), () => { s.calcular(p.id); irA("liquidacion"); })}
+        >
+          <Calculator size={15} /> Calcular borrador
+        </Boton>
+      );
       break;
     case "borrador":
     case "rectificacion":
@@ -163,9 +201,9 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
       ) : (
         <>
           {empresa.requiereAprobacion ? (
-            <Boton disabled={!puede} onClick={() => s.enviarAprobacion(p.id)}><Send size={15} /> Enviar a aprobación</Boton>
+            <Boton disabled={!puede || procesando === "enviar"} onClick={() => void ejecutar("enviar", () => enviarAprobacionReal(periodoInput), () => s.enviarAprobacion(p.id))}><Send size={15} /> Enviar a aprobación</Boton>
           ) : (
-            <Boton disabled={!puede} onClick={() => s.aprobarInterno(p.id)}><Check size={15} /> Aprobar internamente</Boton>
+            <Boton disabled={!puede || procesando === "aprobar"} onClick={() => void ejecutar("aprobar", () => aprobarInternoReal(periodoInput), () => s.aprobarInterno(p.id))}><Check size={15} /> Aprobar internamente</Boton>
           )}
           <Boton variante="secundario" onClick={() => irA("liquidacion")}>Ver liquidación</Boton>
         </>
@@ -245,7 +283,12 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <Boton variante="fantasma" onClick={() => setConfirmar(null)}>Cancelar</Boton>
-          <Boton onClick={() => { s.cerrar(p.id); setConfirmar(null); }}><Lock size={15} /> Cerrar y publicar</Boton>
+          <Boton
+            disabled={procesando === "cerrar"}
+            onClick={() => void ejecutar("cerrar", () => cerrarPeriodoReal(periodoInput), () => { s.cerrar(p.id); setConfirmar(null); })}
+          >
+            <Lock size={15} /> Cerrar y publicar
+          </Boton>
         </div>
       </Modal>
       <Modal abierto={confirmar === "rectificar"} onCerrar={() => setConfirmar(null)} titulo="Iniciar rectificación">
@@ -256,6 +299,7 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
           <Boton disabled={motivo.trim().length < 5} onClick={() => { s.rectificar(p.id, motivo.trim()); setConfirmar(null); setMotivo(""); }}>Rectificar</Boton>
         </div>
       </Modal>
+      {error && <p className="mt-4 rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}
     </Panel>
   );
 }

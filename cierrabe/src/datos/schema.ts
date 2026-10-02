@@ -13,6 +13,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import type { Aprobacion, Periodo, VersionLiquidacion } from "../dominio/types";
 import type { EventoUsoFacturable, LineaCobro } from "../facturacion";
 
 export const rolEnum = pgEnum("rol", ["admin", "liquidador", "lectura"]);
@@ -434,8 +435,15 @@ export const periodos = pgTable(
     mes: varchar("mes", { length: 7 }).notNull(),
     etapa: etapaPeriodoEnum("etapa").default("novedades").notNull(),
     fechaObjetivo: timestamp("fecha_objetivo", { withTimezone: false }).notNull(),
+    solicitud: jsonb("solicitud").$type<Periodo["solicitud"]>(),
     sinNovedades: boolean("sin_novedades").default(false).notNull(),
+    versiones: jsonb("versiones").$type<VersionLiquidacion[]>().default([]).notNull(),
+    aprobacion: jsonb("aprobacion").$type<Aprobacion>(),
+    advertenciasAceptadas: jsonb("advertencias_aceptadas").$type<Record<string, string>>().default({}).notNull(),
+    cerrado: jsonb("cerrado").$type<Periodo["cerrado"]>(),
     bpsEstado: bpsEstadoEnum("bps_estado").default("pendiente").notNull(),
+    rectificaciones: jsonb("rectificaciones").$type<Periodo["rectificaciones"]>().default([]).notNull(),
+    notas: jsonb("notas").$type<Periodo["notas"]>().default([]).notNull(),
     creado: timestamp("creado", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

@@ -1008,3 +1008,39 @@
 - `cierrafe/src/app/portal/[id]/portal-client.tsx`
 
 **Estimated scope:** Medium
+
+## Task 36: Persistent Payroll Period Snapshots
+**Description:** Persist the first operational payroll workflow states in PostgreSQL so calculated versions and closed periods survive reloads.
+
+**Acceptance criteria:**
+- [x] `periodos` stores request metadata, calculated versions, approval data, accepted warnings, closure data, notes and rectifications as JSON snapshots.
+- [x] Period repository maps those fields in both read and save paths.
+- [x] Drizzle migration adds the new period snapshot columns.
+- [x] Study UI persists calculate draft, send for approval, internal approval and close/publish actions through Server Actions.
+- [x] UI still updates immediately using the existing local workflow after the real write succeeds.
+- [x] Demo fallback remains available when the real backend/session is not applicable.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrabe db:generate`
+- [x] `corepack pnpm --filter cierrabe db:migrate`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: persist client approval/devolution from the real portal.
+- [ ] Pending later: persist BPS generated/presented and rectification actions.
+- [ ] Pending later: consider normalizing liquidation versions into a dedicated table if snapshots become too large.
+
+**Dependencies:** Task 33, Task 35
+
+**Files touched:**
+- `cierrabe/src/datos/schema.ts`
+- `cierrabe/src/datos/repos/provisioning.ts`
+- `cierrabe/drizzle/0007_groovy_marvel_apes.sql`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+
+**Estimated scope:** Medium
