@@ -5,7 +5,7 @@ import { crearEmpleadoConAccesoInicial, crearEmpresaConAccesoInicial } from "cie
 import { tenantContextDesdeAcceso, type EmpleadoId, type EmpresaId, type NovedadId, type PeriodoId } from "cierrabe/datos/contexto";
 import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
 import { contextoEstudioDesarrollo, uuidValido } from "@/lib/backend-dev-context";
-import { contextoEstudioActual } from "@/lib/backend-operativo";
+import { contextoOperativoActual } from "@/lib/backend-operativo";
 import { obtenerSesionDev } from "@/lib/dev-auth";
 import { MES_ACTUAL } from "@/lib/format";
 import type { Adjunto, Modalidad, TipoNovedad, Tono } from "@/lib/types";
@@ -69,6 +69,13 @@ export interface BorrarNovedadRealInput {
   tipo: TipoNovedad;
   autor: string;
   antes?: string;
+}
+
+export interface EnviarNovedadesClienteRealInput {
+  empresaId: string;
+  mes: string;
+  autor: string;
+  sinNovedades: boolean;
 }
 
 export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Promise<AltaRealResult> {
@@ -181,7 +188,7 @@ export async function crearEmpleadoInicial(input: CrearEmpleadoInicialInput): Pr
 }
 
 export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<AltaRealResult> {
-  const ctx = await contextoEstudioActual();
+  const ctx = await contextoOperativoActual();
   if (!ctx || !process.env.DATABASE_URL || !uuidValido(input.empresaId) || !uuidValido(input.empleadoId)) {
     return {
       ok: true,
@@ -252,7 +259,7 @@ export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<Al
 }
 
 export async function actualizarNovedadReal(input: ActualizarNovedadRealInput): Promise<AltaRealResult> {
-  const ctx = await contextoEstudioActual();
+  const ctx = await contextoOperativoActual();
   if (!ctx || !process.env.DATABASE_URL || !uuidValido(input.id) || !uuidValido(input.empresaId) || !uuidValido(input.empleadoId)) {
     return {
       ok: true,
@@ -304,7 +311,7 @@ export async function actualizarNovedadReal(input: ActualizarNovedadRealInput): 
 }
 
 export async function borrarNovedadReal(input: BorrarNovedadRealInput): Promise<AltaRealResult> {
-  const ctx = await contextoEstudioActual();
+  const ctx = await contextoOperativoActual();
   if (!ctx || !process.env.DATABASE_URL || !uuidValido(input.id) || !uuidValido(input.empresaId)) {
     return {
       ok: true,
@@ -339,5 +346,71 @@ export async function borrarNovedadReal(input: BorrarNovedadRealInput): Promise<
     modo: "real",
     mensaje: "Novedad eliminada en backend.",
     id: input.id,
+  };
+}
+
+export async function enviarNovedadesClienteReal(input: EnviarNovedadesClienteRealInput): Promise<AltaRealResult> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(input.empresaId)) {
+    return {
+      ok: true,
+      modo: "demo",
+      mensaje: "Envio simulado: falta backend real o empresa UUID.",
+    };
+  }
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) {
+    return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
+  }
+
+  const empresaId = input.empresaId as EmpresaId;
+  const { db } = await import("cierrabe/datos/db");
+  const periodosRepo = crearPeriodosRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  const periodos = await periodosRepo.listarPorEmpresa(tenant, empresaId);
+  const periodo =
+    periodos.find((p) => p.mes === input.mes) ??
+    (await periodosRepo.guardar(tenant, {
+      id: crypto.randomUUID(),
+      empresaId,
+      mes: input.mes,
+      etapa: "novedades",
+      fechaObjetivo: `${input.mes}-28`,
+      sinNovedades: false,
+      versiones: [],
+      advertenciasAceptadas: {},
+      bps: "pendiente",
+      rectificaciones: [],
+      notas: [],
+    }));
+
+  await periodosRepo.guardar(tenant, {
+    ...periodo,
+    etapa: periodo.etapa === "novedades" ? "recibidas" : periodo.etapa,
+    sinNovedades: input.sinNovedades,
+    solicitud: {
+      enviada: periodo.solicitud?.enviada ?? new Date().toISOString(),
+      abierta: periodo.solicitud?.abierta,
+      respondida: new Date().toISOString(),
+    },
+  });
+
+  await auditoriaRepo.registrar(tenant, {
+    actor: `${input.autor} (cliente)`,
+    empresaId,
+    entidad: "Novedades",
+    entidadId: periodo.id as PeriodoId,
+    accion: input.sinNovedades ? "Confirmo que no hay novedades" : "Envio novedades del mes",
+  });
+
+  revalidatePath(`/cliente/${input.empresaId}`);
+  revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath("/empresas");
+  return {
+    ok: true,
+    modo: "real",
+    mensaje: input.sinNovedades ? "Mes confirmado sin novedades." : "Novedades enviadas al estudio.",
+    id: periodo.id,
   };
 }

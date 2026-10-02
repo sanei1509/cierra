@@ -1,11 +1,22 @@
 import { cookies } from "next/headers";
 import { listarEmpleadosEmpresa, listarEmpresasEstudio } from "cierrabe/acciones";
-import { tenantContextDesdeAcceso, type AccessContext, type EmpresaId, type EstudioId, type PeriodoId, type UsuarioId } from "cierrabe/datos/contexto";
+import {
+  tenantContextDesdeAcceso,
+  type AccessContext,
+  type EmpleadoId,
+  type EmpresaId,
+  type EstudioId,
+  type PeriodoId,
+  type UsuarioId,
+} from "cierrabe/datos/contexto";
 import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo } from "cierrabe/datos/repos";
 import { parsearSesionReal, REAL_SESSION_COOKIE } from "./auth-session";
-import { contextoEstudioDesarrollo } from "./backend-dev-context";
+import { contextoEstudioDesarrollo, uuidValido } from "./backend-dev-context";
 import { obtenerSesionDev } from "./dev-auth";
 import type { AuditEvent, Empleado, Empresa, Novedad, Periodo } from "./types";
+
+const DEV_ESTUDIO_ID_DEFAULT = "00000000-0000-4000-8000-000000000002";
+const DEV_USUARIO_ID_DEFAULT = "00000000-0000-4000-8000-000000000003";
 
 export interface DatosOperativosIniciales {
   modo: "real" | "demo";
@@ -30,6 +41,25 @@ export async function contextoEstudioActual(): Promise<Extract<AccessContext, { 
   }
 
   return contextoEstudioDesarrollo(await obtenerSesionDev());
+}
+
+export async function contextoOperativoActual(): Promise<Exclude<AccessContext, { actorTipo: "sistema" }> | null> {
+  const sesionReal = parsearSesionReal((await cookies()).get(REAL_SESSION_COOKIE)?.value);
+  if (sesionReal && sesionReal.espacio.actorTipo !== "sistema") {
+    return { ...sesionReal.espacio, usuarioId: sesionReal.usuarioId } as Exclude<AccessContext, { actorTipo: "sistema" }>;
+  }
+
+  const contextoDev = contextoEstudioDesarrollo(await obtenerSesionDev());
+  if (contextoDev) return contextoDev;
+  if (process.env.NODE_ENV === "production") return null;
+
+  return {
+    actorTipo: "estudio",
+    usuarioId: (process.env.CIERRA_DEV_USUARIO_ID ?? DEV_USUARIO_ID_DEFAULT) as UsuarioId,
+    estudioId: (process.env.CIERRA_DEV_ESTUDIO_ID ?? DEV_ESTUDIO_ID_DEFAULT) as EstudioId,
+    rol: "studio_admin",
+    empresasPermitidas: "todas",
+  };
 }
 
 export async function cargarDatosOperativosIniciales(): Promise<DatosOperativosIniciales> {
@@ -71,4 +101,54 @@ export async function cargarDatosOperativosIniciales(): Promise<DatosOperativosI
     novedades: novedadesPorPeriodo.flat(),
     audit: auditPorEmpresa.flat() as AuditEvent[],
   };
+}
+
+export async function cargarDatosPortalEmpresa(empresaId: string): Promise<DatosOperativosIniciales> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empresaId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+
+  const { db } = await import("cierrabe/datos/db");
+  const empresasRepo = crearEmpresasRepo(db);
+  const empleadosRepo = crearEmpleadosRepo(db);
+  const periodosRepo = crearPeriodosRepo(db);
+  const novedadesRepo = crearNovedadesRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  const empresa = await empresasRepo.obtener(tenant, empresaId as EmpresaId);
+  if (!empresa) return { modo: "real", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+
+  const empleados = (await empleadosRepo.listarPorEmpresa(tenant, empresa.id as EmpresaId)) as Empleado[];
+  const periodos = (await periodosRepo.listarPorEmpresa(tenant, empresa.id as EmpresaId)) as Periodo[];
+  const novedadesPorPeriodo = await Promise.all(
+    periodos.map(async (periodo) => {
+      const novedades = (await novedadesRepo.listarPorPeriodo(tenant, periodo.id as PeriodoId)) as Novedad[];
+      return novedades.map((novedad) => ({ ...novedad, mes: periodo.mes }));
+    }),
+  );
+  const audit = (await auditoriaRepo.listar(tenant, { empresaId: empresa.id as EmpresaId, limite: 30 })) as AuditEvent[];
+
+  return {
+    modo: "real",
+    empresas: [empresa as Empresa],
+    empleados,
+    periodos,
+    novedades: novedadesPorPeriodo.flat(),
+    audit,
+  };
+}
+
+export async function cargarDatosPortalEmpleado(empleadoId: string): Promise<DatosOperativosIniciales> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empleadoId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+
+  const { db } = await import("cierrabe/datos/db");
+  const empleadosRepo = crearEmpleadosRepo(db);
+  const empleado = await empleadosRepo.obtener(tenant, empleadoId as EmpleadoId);
+  if (!empleado) return { modo: "real", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  return cargarDatosPortalEmpresa(empleado.empresaId);
 }

@@ -975,3 +975,36 @@
 - `cierrafe/src/lib/store.ts`
 
 **Estimated scope:** Small
+
+## Task 35: Real Company And Employee Portals
+**Description:** Connect the client/company and employee portals to PostgreSQL snapshots when their links use real UUID ids, while keeping demo links working.
+
+**Acceptance criteria:**
+- [x] Company portal route loads company, employees, periods, novedades and audit snapshot from PostgreSQL.
+- [x] Company portal keeps demo fallback for seeded string ids such as `colon`.
+- [x] Company portal can add novedades through the existing real Server Action and refresh from PostgreSQL.
+- [x] Company portal can delete persisted novedades and refresh from PostgreSQL.
+- [x] Company portal can mark novedades as sent or confirm no novedades in PostgreSQL.
+- [x] Employee portal route loads the employee's company snapshot from PostgreSQL when the employee id is a UUID.
+- [x] Employee portal keeps demo fallback for existing demo employee links.
+- [x] Production fallback does not expose the development tenant without a real session.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+
+**Notes:**
+- [ ] Pending later: persist client approval/devolution actions after the real liquidation workflow exists.
+- [ ] Pending later: connect receipt pages to real closed period versions once period version persistence is implemented.
+
+**Dependencies:** Task 33, Task 34
+
+**Files touched:**
+- `cierrafe/src/lib/backend-operativo.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/app/cliente/[id]/page.tsx`
+- `cierrafe/src/app/cliente/[id]/cliente-client.tsx`
+- `cierrafe/src/app/portal/[id]/page.tsx`
+- `cierrafe/src/app/portal/[id]/portal-client.tsx`
+
+**Estimated scope:** Medium
