@@ -9,6 +9,7 @@ import { crearEmpleadoInicial, type AltaRealResult } from "../actions";
 import { useStore } from "@/lib/store";
 import { activoEn } from "@/lib/engine";
 import { MES_ACTUAL, fmt } from "@/lib/format";
+import { DIAS_LABORALES, horarioDefault, normalizarHorario } from "@/lib/horarios";
 import { Avatar, Boton, Campo, Chip, Drawer, Panel, ResultadoAccion, inputCls } from "@/components/ui";
 import type { Empleado, Empresa, Modalidad } from "@/lib/types";
 
@@ -51,12 +52,31 @@ function NuevoEmpleadoDrawer({
     const ingreso = String(form.get("ingreso") ?? "").trim();
     const sueldo = Number(form.get("sueldo") ?? 0);
     const modalidad = String(form.get("modalidad") ?? "mensual") as Modalidad;
+    const horario = normalizarHorario(
+      {
+        aplicaDesde: ingreso,
+        horasSemanales: Number(String(form.get("horasSemanales") ?? "0").replace(",", ".")),
+        descripcion: String(form.get("horarioDescripcion") ?? "").trim(),
+        dias: DIAS_LABORALES.map(({ id }) => ({
+          dia: id,
+          trabaja: form.get(`trabaja-${id}`) === "on",
+          entrada: String(form.get(`entrada-${id}`) ?? ""),
+          salida: String(form.get(`salida-${id}`) ?? ""),
+          medioDia: form.get(`medio-${id}`) === "on",
+        })),
+      },
+      ingreso,
+    );
     if (!empresaId || !nombre || !apellido || !ci || !cargo || !categoria || !ingreso || !/^\S+@\S+\.\S+$/.test(email)) {
       setError("Completá empresa, datos personales, cargo, categoría, ingreso y email válido.");
       return;
     }
     if (modalidad === "mensual" && (!Number.isFinite(sueldo) || sueldo <= 0)) {
       setError("Para mensual necesitás cargar un sueldo base mayor a cero.");
+      return;
+    }
+    if (!horario.dias.some((dia) => dia.trabaja) || horario.horasSemanales <= 0) {
+      setError("Cargá al menos un día de trabajo y las horas semanales.");
       return;
     }
     const id = `${empresaId}-manual${Date.now().toString(36)}`;
@@ -71,6 +91,7 @@ function NuevoEmpleadoDrawer({
       categoria,
       modalidad,
       ingreso,
+      horario,
       sueldos: modalidad === "mensual" ? [{ desde: ingreso, monto: sueldo }] : [],
       hijos: Number(form.get("hijos") ?? 0) || 0,
       conyugeFonasa: false,
@@ -91,6 +112,7 @@ function NuevoEmpleadoDrawer({
           sueldo,
           hijos: empleado.hijos,
           telefono: empleado.telefono,
+          horario,
         });
         const empleadoCreado = { ...empleado, id: alta.id ?? empleado.id };
         agregarEmpleado(empleadoCreado, { nombre: `${nombre} ${apellido}`, email });
@@ -144,6 +166,36 @@ function NuevoEmpleadoDrawer({
           <Campo label="Hijos"><input name="hijos" type="number" min="0" step="1" className={inputCls} defaultValue={0} /></Campo>
         </div>
         <Campo label="Teléfono"><input name="telefono" className={inputCls} /></Campo>
+        <section className="rounded-2xl border border-linea bg-hundido p-4">
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="mr-auto">
+              <h3 className="text-sm font-bold">Horario laboral</h3>
+              <p className="mt-1 text-xs text-apagado">Se usa para proporcionales por jornada y control de feriados.</p>
+            </div>
+            <Campo label="Horas semanales">
+              <input name="horasSemanales" className={inputCls} inputMode="decimal" defaultValue="44" />
+            </Campo>
+          </div>
+          <Campo label="Descripción">
+            <input name="horarioDescripcion" className={inputCls} defaultValue="Lunes a viernes 9 a 18" />
+          </Campo>
+          <div className="mt-3 grid gap-2">
+            {horarioDefault(`${MES_ACTUAL}-01`).dias.map((dia) => (
+              <div key={dia.dia} className="grid items-center gap-2 rounded-xl border border-linea bg-superficie p-2 text-sm sm:grid-cols-[110px_1fr_1fr_90px]">
+                <label className="flex items-center gap-2 font-semibold">
+                  <input name={`trabaja-${dia.dia}`} type="checkbox" defaultChecked={dia.trabaja} className="size-4 accent-petroleo" />
+                  {DIAS_LABORALES.find((d) => d.id === dia.dia)?.label}
+                </label>
+                <input name={`entrada-${dia.dia}`} type="time" className={inputCls} defaultValue={dia.entrada} aria-label={`Entrada ${dia.dia}`} />
+                <input name={`salida-${dia.dia}`} type="time" className={inputCls} defaultValue={dia.salida} aria-label={`Salida ${dia.dia}`} />
+                <label className="flex items-center gap-2 text-xs text-apagado">
+                  <input name={`medio-${dia.dia}`} type="checkbox" className="size-4 accent-petroleo" />
+                  Medio día
+                </label>
+              </div>
+            ))}
+          </div>
+        </section>
         {error && <ResultadoAccion resultado={{ ok: false, mensaje: error }} />}
         <ResultadoAccion resultado={resultado && !resultado.ok ? resultado : null} />
         <Boton type="submit" tam="lg" className="w-full" disabled={pendiente}><Plus size={16} /> {pendiente ? "Creando..." : "Crear empleado"}</Boton>

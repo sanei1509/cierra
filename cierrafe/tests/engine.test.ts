@@ -364,4 +364,60 @@ describe("motor de liquidacion", () => {
     expect(agosto).toHaveLength(0);
     expect(septiembre.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", base: 60000, cantidad: 19, importe: 38000 }));
   });
+
+  it("puede calcular el mes parcial segun la jornada laboral del empleado", () => {
+    const empresaConJornada: Empresa = { ...empresaBase, reglasLiquidacion: { calculoMesParcial: "jornada_laboral" } };
+    const empleadoConHorario: Empleado = {
+      ...empleadoBase,
+      ingreso: "2026-09-12",
+      sueldos: [{ desde: "2026-09-12", monto: 60000 }],
+      horario: {
+        aplicaDesde: "2026-09-12",
+        horasSemanales: 44,
+        descripcion: "Lunes a viernes 9 a 18",
+        dias: [
+          { dia: "lunes", trabaja: true, entrada: "09:00", salida: "18:00" },
+          { dia: "martes", trabaja: true, entrada: "09:00", salida: "18:00" },
+          { dia: "miercoles", trabaja: true, entrada: "09:00", salida: "18:00" },
+          { dia: "jueves", trabaja: true, entrada: "09:00", salida: "18:00" },
+          { dia: "viernes", trabaja: true, entrada: "09:00", salida: "18:00" },
+          { dia: "sabado", trabaja: false },
+          { dia: "domingo", trabaja: false },
+        ],
+      },
+    };
+
+    const septiembre = calcularEmpleado(empresaConJornada, empleadoConHorario, "2026-09", []);
+
+    expect(septiembre.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", base: 60000, cantidad: 13, importe: 35454.55 }));
+  });
+
+  it("excluye feriados no laborables de Uruguay cuando la empresa calcula por jornada", () => {
+    const empresaConJornada: Empresa = {
+      ...empresaBase,
+      reglasLiquidacion: { calculoMesParcial: "jornada_laboral", feriadosUruguay: { considerarNoLaborables: true } },
+    };
+    const empleadoConHorario: Empleado = {
+      ...empleadoBase,
+      ingreso: "2026-08-20",
+      sueldos: [{ desde: "2026-08-20", monto: 46000 }],
+      horario: {
+        aplicaDesde: "2026-08-20",
+        horasSemanales: 44,
+        dias: [
+          { dia: "lunes", trabaja: true },
+          { dia: "martes", trabaja: true },
+          { dia: "miercoles", trabaja: true },
+          { dia: "jueves", trabaja: true },
+          { dia: "viernes", trabaja: true },
+          { dia: "sabado", trabaja: false },
+          { dia: "domingo", trabaja: false },
+        ],
+      },
+    };
+
+    const agosto = calcularEmpleado(empresaConJornada, empleadoConHorario, "2026-08", []);
+
+    expect(agosto.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", base: 46000, cantidad: 7, importe: 16100 }));
+  });
 });

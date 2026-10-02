@@ -1426,6 +1426,9 @@
 - [x] `corepack pnpm --filter cierrafe test -- engine.test.ts`
 - [x] `corepack pnpm --filter cierrafe typecheck`
 - [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+- [x] `corepack pnpm --filter cierrabe test`
 - [x] `corepack pnpm --filter cierrabe db:generate`
 - [x] `corepack pnpm --filter cierrabe db:migrate`
 - [x] `corepack pnpm --filter cierrafe lint`
@@ -1673,6 +1676,50 @@
 - `cierrafe/src/components/novedad-form.tsx`
 - `cierrafe/src/lib/engine.ts`
 - `cierrafe/src/lib/labels.ts`
+- `cierrafe/src/lib/types.ts`
+- `cierrafe/tests/engine.test.ts`
+- `tasks/todo.md`
+
+**Estimated scope:** Medium
+
+## Task 55: Employee Work Schedule And Partial-Month Rules
+
+**Status:** Done
+**Date:** 2026-10-02
+**Description:** Add structured employee work schedules and company-level partial-month rules so mid-month hires/exits can be calculated by the real programmed work days when configured.
+
+**Acceptance criteria:**
+- [x] Employee records expose a structured work schedule with days, entry/exit times, half-day flag, weekly hours and effective date.
+- [x] New employee creation asks for work days, daily times, half-day flags and weekly hours.
+- [x] Employee ficha lets the studio edit the structured schedule after the employee already exists.
+- [x] Backend persistence reuses `empleado_vigencias.horario` and keeps the schedule when salary/category vigencias are rewritten.
+- [x] Company payroll rules can keep the legacy 30-day monthly proration or opt into work-schedule proration.
+- [x] Work-schedule proration can exclude fixed non-working Uruguay holidays from the denominator/numerator.
+- [x] The payroll engine has regression tests for schedule-based partial months and fixed Uruguay non-working holidays.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe test -- engine.test.ts`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+- [x] `corepack pnpm --filter cierrabe test`
+
+**Notes:**
+- Default behavior remains `sueldo / 30` so existing companies do not change calculation until the rule is switched.
+- Uruguay holiday support currently covers fixed non-working holidays: 01/01, 01/05, 18/07, 25/08 and 25/12. Movable holidays and company-specific laborable/non-laborable calendars are still pending.
+
+**Dependencies:** Task 54
+
+**Files touched:**
+- `cierrabe/src/datos/repos/provisioning.ts`
+- `cierrabe/src/dominio/types.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/app/(estudio)/empleados/empleados-client.tsx`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+- `cierrafe/src/lib/engine.ts`
+- `cierrafe/src/lib/funciones.ts`
+- `cierrafe/src/lib/horarios.ts`
 - `cierrafe/src/lib/types.ts`
 - `cierrafe/tests/engine.test.ts`
 - `tasks/todo.md`

@@ -30,6 +30,7 @@ import { PASOS, pasoActual } from "@/lib/status";
 import { TIPOS, valorNovedad, estadoNovedades } from "@/lib/labels";
 import { MES_ACTUAL, fecha, fechaHora, fmt, fmt2, mesAnterior, nombreMes, pct } from "@/lib/format";
 import { activoEn, calcularEmpresa, totales } from "@/lib/engine";
+import { DIAS_LABORALES, horarioDefault, normalizarHorario, resumenHorario } from "@/lib/horarios";
 import { categoriasDe, laudoDe } from "@/lib/params";
 import { archivoNomina, descargar } from "@/lib/bps";
 import type { Alerta, AuditEvent, CondicionPresentismo, Empleado, Empresa, Novedad, Periodo } from "@/lib/types";
@@ -688,7 +689,15 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
     novedadesHistoricas.forEach((n) => grupos.set(n.mes, [...(grupos.get(n.mes) ?? []), n]));
     return [...grupos.entries()];
   }, [novedadesHistoricas]);
-  const [f, setF] = useState({ ci: e.ci, email: e.email, categoria: e.categoria, sueldo: String(actual?.monto ?? ""), hijos: String(e.hijos), conyuge: e.conyugeFonasa });
+  const [f, setF] = useState({
+    ci: e.ci,
+    email: e.email,
+    categoria: e.categoria,
+    sueldo: String(actual?.monto ?? ""),
+    hijos: String(e.hijos),
+    conyuge: e.conyugeFonasa,
+    horario: e.horario ?? horarioDefault(e.ingreso),
+  });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const cats = categoriasDe(v.empresa.grupo, v.empresa.subgrupo);
@@ -751,7 +760,8 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
 
   const guardar = async () => {
     const monto = Number(f.sueldo);
-    const cambios: Partial<Empleado> = { ci: f.ci, email: f.email, categoria: f.categoria, hijos: Number(f.hijos), conyugeFonasa: f.conyuge };
+    const horario = normalizarHorario(f.horario, e.ingreso);
+    const cambios: Partial<Empleado> = { ci: f.ci, email: f.email, categoria: f.categoria, hijos: Number(f.hijos), conyugeFonasa: f.conyuge, horario };
     const res: string[] = [];
     if (f.ci !== e.ci) res.push(`CI ${e.ci || "vacía"} → ${f.ci}`);
     if (f.categoria !== e.categoria) res.push(`categoría ${e.categoria} → ${f.categoria}`);
@@ -761,6 +771,7 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
       res.push(`sueldo ${fmt(actual?.monto ?? 0)} → ${fmt(monto)} desde ${desde}`);
     }
     if (Number(f.hijos) !== e.hijos) res.push(`hijos ${e.hijos} → ${f.hijos}`);
+    if (JSON.stringify(horario) !== JSON.stringify(e.horario)) res.push(`horario ${resumenHorario(e.horario)} → ${resumenHorario(horario)}`);
     const resumen = res.join("; ") || "sin cambios de cálculo";
     setError("");
     setGuardando(true);
@@ -797,13 +808,66 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
         <label className="mt-7 flex items-center gap-2 text-sm"><input type="checkbox" checked={f.conyuge} onChange={(x) => setF({ ...f, conyuge: x.target.checked })} disabled={!puede} className="size-4 accent-petroleo" /> Cónyuge a cargo en FONASA</label>
       </div>
       <section className="rounded-3xl bg-hundido px-4 py-3">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="mr-auto">
+            <h3 className="text-sm font-bold">Horario laboral</h3>
+            <p className="mt-1 text-xs text-apagado">{resumenHorario(f.horario)}</p>
+          </div>
+          <Campo label="Horas semanales">
+            <input
+              className={inputCls}
+              inputMode="decimal"
+              value={String(f.horario.horasSemanales)}
+              onChange={(x) => setF({ ...f, horario: { ...f.horario, horasSemanales: Number(x.target.value.replace(",", ".")) || 0 } })}
+              disabled={!puede}
+            />
+          </Campo>
+        </div>
+        <Campo label="Descripción">
+          <input
+            className={inputCls}
+            value={f.horario.descripcion ?? ""}
+            onChange={(x) => setF({ ...f, horario: { ...f.horario, descripcion: x.target.value } })}
+            disabled={!puede}
+            placeholder="Ej.: lunes a viernes 9 a 18"
+          />
+        </Campo>
+        <div className="mt-3 grid gap-2">
+          {DIAS_LABORALES.map((dia) => {
+            const valor = f.horario.dias.find((d) => d.dia === dia.id) ?? { dia: dia.id, trabaja: false };
+            const actualizarDia = (cambios: Partial<typeof valor>) =>
+              setF({
+                ...f,
+                horario: {
+                  ...f.horario,
+                  dias: DIAS_LABORALES.map(({ id }) => (id === dia.id ? { ...valor, ...cambios } : f.horario.dias.find((d) => d.dia === id) ?? { dia: id, trabaja: false })),
+                },
+              });
+            return (
+              <div key={dia.id} className="grid items-center gap-2 rounded-xl border border-linea bg-superficie p-2 text-sm sm:grid-cols-[110px_1fr_1fr_90px]">
+                <label className="flex items-center gap-2 font-semibold">
+                  <input type="checkbox" checked={valor.trabaja} onChange={(x) => actualizarDia({ trabaja: x.target.checked })} disabled={!puede} className="size-4 accent-petroleo" />
+                  {dia.label}
+                </label>
+                <input type="time" className={inputCls} value={valor.entrada ?? ""} onChange={(x) => actualizarDia({ entrada: x.target.value })} disabled={!puede || !valor.trabaja} aria-label={`Entrada ${dia.label}`} />
+                <input type="time" className={inputCls} value={valor.salida ?? ""} onChange={(x) => actualizarDia({ salida: x.target.value })} disabled={!puede || !valor.trabaja} aria-label={`Salida ${dia.label}`} />
+                <label className="flex items-center gap-2 text-xs text-apagado">
+                  <input type="checkbox" checked={Boolean(valor.medioDia)} onChange={(x) => actualizarDia({ medioDia: x.target.checked })} disabled={!puede || !valor.trabaja} className="size-4 accent-petroleo" />
+                  Medio día
+                </label>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+      <section className="rounded-3xl bg-hundido px-4 py-3">
         <h3 className="text-sm font-bold">Historia de sueldo</h3>
         <ul className="mt-2 space-y-1 text-sm">
           {[...e.sueldos].sort((a, b) => b.desde.localeCompare(a.desde)).map((x) => (
             <li key={x.desde} className="flex justify-between"><span className="text-apagado">Desde {x.desde}</span><span className="num font-semibold">{fmt(x.monto)}</span></li>
           ))}
         </ul>
-        <p className="mt-2 text-xs text-apagado">Ingreso {e.ingreso}{e.egreso ? ` · egreso ${e.egreso}` : ""} · {e.cuenta}</p>
+        <p className="mt-2 text-xs text-apagado">Ingreso {e.ingreso}{e.egreso ? ` · egreso ${e.egreso}` : ""} · {e.cuenta} · {resumenHorario(e.horario)}</p>
       </section>
       {(e.area || e.tipoContrato || e.telefono || e.direccion || e.licenciaDisponible !== undefined || e.licenciaTomada !== undefined) && (
         <section className="rounded-3xl bg-hundido px-4 py-3">
@@ -1041,6 +1105,8 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
   const presentismo = reglas?.presentismo;
   const [horasExtraFactor, setHorasExtraFactor] = useState(String(reglas?.horasExtraFactor ?? 2));
   const [feriadoFactor, setFeriadoFactor] = useState(String(reglas?.feriadoFactor ?? 2));
+  const [calculoMesParcial, setCalculoMesParcial] = useState<NonNullable<Empresa["reglasLiquidacion"]>["calculoMesParcial"]>(reglas?.calculoMesParcial ?? "treinta_dias");
+  const [considerarFeriadosNoLaborables, setConsiderarFeriadosNoLaborables] = useState(reglas?.feriadosUruguay?.considerarNoLaborables ?? true);
   const [presentismoActivo, setPresentismoActivo] = useState(Boolean(presentismo?.habilitado));
   const [presentismoTipo, setPresentismoTipo] = useState<PresentismoRegla["tipoCalculo"]>(presentismo?.tipoCalculo ?? "monto_fijo");
   const [presentismoValor, setPresentismoValor] = useState(String(presentismo?.valor ?? presentismo?.monto ?? ""));
@@ -1089,6 +1155,8 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
       reglasLiquidacion: {
         horasExtraFactor: he,
         feriadoFactor: fer,
+        calculoMesParcial,
+        feriadosUruguay: { considerarNoLaborables: considerarFeriadosNoLaborables },
         presentismo: {
           habilitado: presentismoActivo,
           tipoCalculo: presentismoTipo,
@@ -1137,6 +1205,22 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
         <Campo label="Feriado trabajado" ayuda="Factor aplicado sobre jornal">
           <input className={inputCls} inputMode="decimal" value={feriadoFactor} onChange={(e) => setFeriadoFactor(e.target.value)} disabled={!puede} />
         </Campo>
+        <Campo label="Ingreso/egreso parcial" ayuda="Regla para pagar meses incompletos">
+          <select className={inputCls} value={calculoMesParcial} onChange={(e) => setCalculoMesParcial(e.target.value as typeof calculoMesParcial)} disabled={!puede}>
+            <option value="treinta_dias">Sueldo / 30 días</option>
+            <option value="jornada_laboral">Según jornada laboral</option>
+          </select>
+        </Campo>
+        <label className="mt-7 flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={considerarFeriadosNoLaborables}
+            onChange={(e) => setConsiderarFeriadosNoLaborables(e.target.checked)}
+            disabled={!puede || calculoMesParcial !== "jornada_laboral"}
+            className="size-4 accent-petroleo"
+          />
+          Excluir feriados no laborables de Uruguay
+        </label>
       </div>
       <section className="mt-5 rounded-2xl bg-hundido p-4">
         <div className="flex flex-wrap items-start gap-3">

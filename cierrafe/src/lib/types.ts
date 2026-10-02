@@ -30,6 +30,10 @@ export interface Empresa {
 export interface ReglasLiquidacionEmpresa {
   horasExtraFactor?: number;
   feriadoFactor?: number;
+  calculoMesParcial?: "treinta_dias" | "jornada_laboral";
+  feriadosUruguay?: {
+    considerarNoLaborables?: boolean;
+  };
   presentismo?: {
     habilitado: boolean;
     tipoCalculo?: "monto_fijo" | "porcentaje_sueldo_base" | "porcentaje_liquido_estimado";
@@ -51,6 +55,23 @@ export type Tono = "menta" | "lila" | "crema" | "cielo" | "rosa";
 
 export type Modalidad = "mensual" | "jornalero";
 
+export type DiaSemana = "lunes" | "martes" | "miercoles" | "jueves" | "viernes" | "sabado" | "domingo";
+
+export interface DiaHorarioLaboral {
+  dia: DiaSemana;
+  trabaja: boolean;
+  entrada?: string;
+  salida?: string;
+  medioDia?: boolean;
+}
+
+export interface HorarioLaboral {
+  aplicaDesde: string;
+  dias: DiaHorarioLaboral[];
+  horasSemanales: number;
+  descripcion?: string;
+}
+
 export interface Empleado {
   id: string;
   empresaId: string;
@@ -69,6 +90,7 @@ export interface Empleado {
   direccion?: string;
   licenciaDisponible?: number;
   licenciaTomada?: number;
+  horario?: HorarioLaboral;
   /** Historia de sueldo base con vigencia (RF-021) */
   sueldos: { desde: string; monto: number; categoria?: string }[];
   hijos: number;

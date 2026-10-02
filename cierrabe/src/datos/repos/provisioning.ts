@@ -37,6 +37,20 @@ const fecha = (valor: Date | string | null | undefined) => {
 const fechaDb = (valor: string | undefined) => (valor ? new Date(`${valor}T00:00:00`) : undefined);
 const pesosACent = (valor: number) => Math.round(valor * 100);
 const centAPesos = (valor: number) => Math.round(valor / 100);
+const parseHorario = (valor: string | null | undefined): Empleado["horario"] => {
+  if (!valor) return undefined;
+  try {
+    return JSON.parse(valor) as Empleado["horario"];
+  } catch {
+    return {
+      aplicaDesde: "",
+      dias: [],
+      horasSemanales: 0,
+      descripcion: valor,
+    };
+  }
+};
+const horarioDb = (valor: Empleado["horario"] | undefined) => (valor ? JSON.stringify(valor) : undefined);
 
 export function rolLegacyProvisioning(rol: RolAcceso): Rol {
   if (rol === "payroll_operator" || rol === "company_operator") return "liquidador";
@@ -111,6 +125,7 @@ function mapEmpleado(row: EmpleadoRow, relaciones: RelacionRow[], vigencias: Vig
     direccion: row.direccion ?? undefined,
     licenciaDisponible: ultima?.licenciaDisponible ?? undefined,
     licenciaTomada: ultima?.licenciaTomada ?? undefined,
+    horario: parseHorario(ultima?.horario),
     sueldos: propias.map((v) => ({ desde: fecha(v.desde)!, monto: centAPesos(v.sueldoBaseCent), categoria: v.categoria })),
     hijos: ultima?.hijos ?? 0,
     conyugeFonasa: ultima?.conyugeFonasa ?? false,
@@ -378,6 +393,7 @@ export function crearEmpleadosRepo(db: Db): EmpleadosRepo {
             conyugeFonasa: input.conyugeFonasa,
             licenciaDisponible: input.licenciaDisponible,
             licenciaTomada: input.licenciaTomada,
+            horario: horarioDb(input.horario),
           })),
         );
 
@@ -391,7 +407,7 @@ export function crearEmpleadosRepo(db: Db): EmpleadosRepo {
             desde: fechaDb(sueldo.desde)!,
             sueldoBaseCent: pesosACent(sueldo.monto),
             categoria: input.categoria,
-            horario: null,
+            horario: horarioDb(input.horario) ?? null,
             hijos: input.hijos,
             conyugeFonasa: input.conyugeFonasa,
             licenciaDisponible: input.licenciaDisponible ?? null,
@@ -441,26 +457,33 @@ export function crearEmpleadosRepo(db: Db): EmpleadosRepo {
         }
 
         if (input.sueldos?.length) {
+          const vigenciasPrevias = await tx.select().from(empleadoVigencias).where(and(eq(empleadoVigencias.estudioId, ctx.estudioId), eq(empleadoVigencias.empleadoId, empleadoId)));
+          const ultimaVigencia = vigenciasPrevias.sort((a, b) => b.desde.getTime() - a.desde.getTime())[0];
           await tx.delete(empleadoVigencias).where(and(eq(empleadoVigencias.estudioId, ctx.estudioId), eq(empleadoVigencias.empleadoId, empleadoId)));
           await tx.insert(empleadoVigencias).values(
-            input.sueldos.map((sueldo) => ({
-              estudioId: ctx.estudioId,
-              empleadoId,
-              desde: fechaDb(sueldo.desde)!,
-              sueldoBaseCent: pesosACent(sueldo.monto),
-              categoria: sueldo.categoria ?? input.categoria ?? actualizado.categoria,
-              hijos: input.hijos ?? 0,
-              conyugeFonasa: input.conyugeFonasa ?? false,
-              licenciaDisponible: input.licenciaDisponible,
-              licenciaTomada: input.licenciaTomada,
-            })),
+            input.sueldos.map((sueldo) => {
+              const previa = vigenciasPrevias.find((v) => fecha(v.desde) === sueldo.desde);
+              return {
+                estudioId: ctx.estudioId,
+                empleadoId,
+                desde: fechaDb(sueldo.desde)!,
+                sueldoBaseCent: pesosACent(sueldo.monto),
+                categoria: sueldo.categoria ?? input.categoria ?? previa?.categoria ?? actualizado.categoria,
+                hijos: input.hijos ?? previa?.hijos ?? ultimaVigencia?.hijos ?? 0,
+                conyugeFonasa: input.conyugeFonasa ?? previa?.conyugeFonasa ?? ultimaVigencia?.conyugeFonasa ?? false,
+                licenciaDisponible: input.licenciaDisponible ?? previa?.licenciaDisponible ?? ultimaVigencia?.licenciaDisponible,
+                licenciaTomada: input.licenciaTomada ?? previa?.licenciaTomada ?? ultimaVigencia?.licenciaTomada,
+                horario: input.horario !== undefined ? horarioDb(input.horario) : previa?.horario ?? ultimaVigencia?.horario,
+              };
+            }),
           );
         } else if (
           input.categoria !== undefined ||
           input.hijos !== undefined ||
           input.conyugeFonasa !== undefined ||
           input.licenciaDisponible !== undefined ||
-          input.licenciaTomada !== undefined
+          input.licenciaTomada !== undefined ||
+          input.horario !== undefined
         ) {
           const vigencias = await tx.select().from(empleadoVigencias).where(and(eq(empleadoVigencias.estudioId, ctx.estudioId), eq(empleadoVigencias.empleadoId, empleadoId)));
           const vigente = vigencias.sort((a, b) => b.desde.getTime() - a.desde.getTime())[0];
@@ -473,6 +496,7 @@ export function crearEmpleadosRepo(db: Db): EmpleadosRepo {
                 conyugeFonasa: input.conyugeFonasa,
                 licenciaDisponible: input.licenciaDisponible,
                 licenciaTomada: input.licenciaTomada,
+                horario: horarioDb(input.horario),
               })
               .where(eq(empleadoVigencias.id, vigente.id));
           }

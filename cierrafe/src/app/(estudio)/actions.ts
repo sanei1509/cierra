@@ -16,7 +16,7 @@ import { obtenerSesionDev } from "@/lib/dev-auth";
 import { calcularEmpresa, hashDe } from "@/lib/engine";
 import { MES_ACTUAL } from "@/lib/format";
 import { MOTOR_VERSION, parametrosVigentes } from "@/lib/params";
-import type { Adjunto, Empleado, Empresa, Modalidad, Novedad, Periodo, TipoNovedad, Tono, VersionLiquidacion } from "@/lib/types";
+import type { Adjunto, Empleado, Empresa, HorarioLaboral, Modalidad, Novedad, Periodo, TipoNovedad, Tono, VersionLiquidacion } from "@/lib/types";
 
 export interface AltaRealResult {
   ok: boolean;
@@ -50,6 +50,7 @@ export interface CrearEmpleadoInicialInput {
   sueldo: number;
   hijos: number;
   telefono?: string;
+  horario?: HorarioLaboral;
 }
 
 export interface ImportarEmpleadoRealItem {
@@ -534,6 +535,7 @@ export async function crearEmpleadoInicial(input: CrearEmpleadoInicialInput): Pr
         hijos: input.hijos,
         conyugeFonasa: false,
         telefono: input.telefono,
+        horario: input.horario,
       },
     },
   );

@@ -77,7 +77,7 @@ export const FUNCIONES: GrupoFunciones[] = [
         estado: "parcial",
         nota: "Cédula, email, cargo, categoría, sueldo, ingreso, hijos, cónyuge FONASA y cuenta de cobro.",
       },
-      { nombre: "Cargo, categoría, sueldo y fecha de ingreso", estado: "si", nota: "Falta el horario." },
+      { nombre: "Cargo, categoría, sueldo, fecha de ingreso y horario", estado: "si", nota: "La ficha permite cargar días, horario, medio día y horas semanales." },
       {
         nombre: "Historial salarial",
         estado: "si",
@@ -107,7 +107,7 @@ export const FUNCIONES: GrupoFunciones[] = [
       {
         nombre: "Sueldos mensuales",
         estado: "si",
-        nota: "Mes completo o proporcional si ingresó o egresó en el mes.",
+        nota: "Mes completo o proporcional si ingresó o egresó en el mes. Por empresa se puede usar regla de 30 días o jornada laboral.",
         pasos: ["Entrá a una empresa lista para liquidar y tocá “Calcular borrador”.", "En la pestaña “Liquidación” ves totales y el detalle por persona."],
         probar: { href: "/empresas/pocitos", label: "Calcular Clínica Pocitos" },
       },
@@ -115,7 +115,7 @@ export const FUNCIONES: GrupoFunciones[] = [
       { nombre: "Horas extra", estado: "si", nota: "Valor hora = sueldo ÷ 200, con recargo del 100%." },
       { nombre: "Faltas", estado: "si" },
       { nombre: "Llegadas tarde", estado: "si", nueva: true, nota: "Se cargan en minutos y se descuentan a valor hora." },
-      { nombre: "Feriados trabajados", estado: "si", nueva: true, nota: "Regla de ejemplo (jornal × 2 por feriado pago trabajado). Validar con el contador asesor." },
+      { nombre: "Feriados trabajados", estado: "si", nueva: true, nota: "Regla configurable por empresa. El cálculo por jornada puede excluir feriados no laborables fijos de Uruguay; faltan feriados móviles." },
       { nombre: "Certificaciones médicas", estado: "si", nueva: true, nota: "Descuenta los días certificados (los cubre el subsidio). Avisa si falta el comprobante." },
       { nombre: "Nocturnidad", estado: "no" },
       { nombre: "Comisiones, primas y partidas especiales", estado: "parcial", nota: "Un solo tipo, “Bono o comisión”, con comentario libre." },

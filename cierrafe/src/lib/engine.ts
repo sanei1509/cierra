@@ -124,6 +124,84 @@ function diasTrabajados(emp: Empleado, mes: string) {
   return Math.max(0, hasta - desde + 1);
 }
 
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"] as const;
+const FERIADOS_NO_LABORABLES_URUGUAY = new Set(["01-01", "05-01", "07-18", "08-25", "12-25"]);
+
+function rangoMes(mes: string) {
+  const [anio, mesNumero] = mes.split("-").map(Number);
+  const dias = new Date(anio, mesNumero, 0).getDate();
+  return Array.from({ length: dias }, (_, i) => new Date(Date.UTC(anio, mesNumero - 1, i + 1)));
+}
+
+function fechaIso(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function esFeriadoNoLaborableUruguay(date: Date) {
+  return FERIADOS_NO_LABORABLES_URUGUAY.has(fechaIso(date).slice(5));
+}
+
+function valorDiaJornada(emp: Empleado, date: Date, excluirFeriadosNoLaborables: boolean) {
+  if (excluirFeriadosNoLaborables && esFeriadoNoLaborableUruguay(date)) return 0;
+  const nombreDia = DIAS_SEMANA[date.getUTCDay()];
+  const dia = emp.horario?.dias.find((d) => d.dia === nombreDia);
+  if (!dia?.trabaja) return 0;
+  return dia.medioDia ? 0.5 : 1;
+}
+
+function diasJornadaMes(emp: Empleado, mes: string, desde?: string, hasta?: string, excluirFeriadosNoLaborables = false) {
+  return rangoMes(mes)
+    .filter((date) => {
+      const iso = fechaIso(date);
+      return (!desde || iso >= desde) && (!hasta || iso <= hasta);
+    })
+    .reduce((s, date) => s + valorDiaJornada(emp, date, excluirFeriadosNoLaborables), 0);
+}
+
+function sueldoBasicoProporcional(empresa: Empresa, emp: Empleado, mes: string, base: number) {
+  const dias30 = diasTrabajados(emp, mes);
+  if (empresa.reglasLiquidacion?.calculoMesParcial !== "jornada_laboral" || !emp.horario?.dias.some((d) => d.trabaja)) {
+    const sueldo = dias30 >= 30 ? base : (base / 30) * dias30;
+    return {
+      sueldo,
+      cantidad: dias30,
+      formula:
+        dias30 >= 30
+          ? `Sueldo mensual completo: ${fmt(base)}.`
+          : `Mes parcial: ${fmt(base)} ÷ 30 × ${dias30} días trabajados = ${fmt(sueldo)}.`,
+      parametros: ["Cálculo parcial por regla de 30 días"],
+    };
+  }
+
+  const excluirFeriadosNoLaborables = empresa.reglasLiquidacion?.feriadosUruguay?.considerarNoLaborables ?? true;
+  const desde = emp.ingreso.slice(0, 7) === mes ? emp.ingreso : undefined;
+  const hasta = emp.egreso?.slice(0, 7) === mes ? emp.egreso : undefined;
+  const totalProgramado = diasJornadaMes(emp, mes, undefined, undefined, excluirFeriadosNoLaborables);
+  const trabajadoProgramado = diasJornadaMes(emp, mes, desde, hasta, excluirFeriadosNoLaborables);
+  if (totalProgramado <= 0) {
+    const sueldo = dias30 >= 30 ? base : (base / 30) * dias30;
+    return {
+      sueldo,
+      cantidad: dias30,
+      formula: `Mes parcial: ${fmt(base)} ÷ 30 × ${dias30} días trabajados = ${fmt(sueldo)}. No hay jornada programada válida para calcular proporcional exacto.`,
+      parametros: ["Cálculo parcial por regla de 30 días"],
+    };
+  }
+  const sueldo = base * (trabajadoProgramado / totalProgramado);
+  return {
+    sueldo,
+    cantidad: trabajadoProgramado,
+    formula:
+      trabajadoProgramado >= totalProgramado
+        ? `Sueldo mensual completo según jornada laboral: ${fmt(base)}.`
+        : `Mes parcial por jornada: ${fmt(base)} × ${trabajadoProgramado}/${totalProgramado} días programados = ${fmt(sueldo)}.`,
+    parametros: [
+      `Jornada ${emp.horario.horasSemanales} h semanales`,
+      excluirFeriadosNoLaborables ? "Feriados no laborables de Uruguay excluidos" : "Feriados no laborables incluidos",
+    ],
+  };
+}
+
 function mesesSemestre(mes: string) {
   const [y, m] = mes.split("-").map(Number);
   const inicio = m <= 6 ? 1 : 7;
@@ -161,10 +239,11 @@ export function calcularEmpleado(
   // Sueldo básico
   const { monto: base, origen } = sueldoVigente(emp, mes, novs);
   const jornal = base / 30;
-  const dias = diasTrabajados(emp, mes);
+  const parcial = sueldoBasicoProporcional(empresa, emp, mes, base);
+  const dias = parcial.cantidad;
   const horasExtraFactor = empresa.reglasLiquidacion?.horasExtraFactor ?? 1 + P.horas.recargoExtra;
   const feriadoFactor = empresa.reglasLiquidacion?.feriadoFactor ?? P.feriadoFactor;
-  const sueldo = dias >= 30 ? base : jornal * dias;
+  const sueldo = parcial.sueldo;
   L.push({
     codigo: "001",
     concepto: "Sueldo básico",
@@ -173,10 +252,8 @@ export function calcularEmpleado(
     base,
     cantidad: dias,
     importe: r2(sueldo),
-    formula:
-      dias >= 30
-        ? `Sueldo mensual completo: ${fmt(base)} (${origen}).`
-        : `Mes parcial: ${fmt(base)} ÷ 30 × ${dias} días trabajados = ${fmt(sueldo)}.`,
+    formula: `${parcial.formula} ${origen}.`,
+    parametros: parcial.parametros,
   });
 
   // Faltas
@@ -416,7 +493,7 @@ export function calcularEmpleado(
     const meses = mesesSemestre(mes).filter((x) => activoEn(emp, x));
     const acumulado = meses.reduce((s, x) => {
       const b = sueldoVigente(emp, x).monto;
-      return s + (diasTrabajados(emp, x) >= 30 ? b : (b / 30) * diasTrabajados(emp, x));
+      return s + sueldoBasicoProporcional(empresa, emp, x, b).sueldo;
     }, 0);
     L.push({
       codigo: "040",
