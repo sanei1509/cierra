@@ -1107,3 +1107,38 @@
 - `cierrafe/src/app/recibo/[id]/[mes]/recibo-client.tsx`
 
 **Estimated scope:** Small
+
+## Task 39: Persistent Company Branding And Employee Edits
+**Description:** Persist company logo changes and employee ficha edits in PostgreSQL instead of leaving them only in the browser store.
+
+**Acceptance criteria:**
+- [x] `empresas` stores the current MVP logo data URL in `logo_data_url`.
+- [x] Company repository maps `Empresa.logo` from and to PostgreSQL.
+- [x] Employee repository persists edited base fields and current salary/category/dependent data.
+- [x] Study UI saves logo changes through a Server Action and refreshes real data after success.
+- [x] Study UI saves employee ficha edits through a Server Action and refreshes real data after success.
+- [x] Demo fallback remains available when real backend/session IDs are not applicable.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrabe db:generate`
+- [x] `corepack pnpm --filter cierrabe db:migrate`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: replace `logo_data_url` with real file storage via `archivos_marca.logoArchivoId` before production if logos grow beyond MVP/dev needs.
+- [ ] Pending later: model salary/category changes as append-only vigencias with effective-date UI instead of replacing the imported salary history.
+
+**Dependencies:** Task 33, Task 36
+
+**Files touched:**
+- `cierrabe/src/datos/schema.ts`
+- `cierrabe/src/datos/repos/provisioning.ts`
+- `cierrabe/drizzle/0009_wealthy_butterfly.sql`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+
+**Estimated scope:** Medium

@@ -325,6 +325,7 @@ export const empresas = pgTable(
     contactoTelefono: text("contacto_telefono"),
     direccion: text("direccion"),
     logoArchivoId: uuid("logo_archivo_id"),
+    logoDataUrl: text("logo_data_url"),
     activa: boolean("activa").default(true).notNull(),
     creada: timestamp("creada", { withTimezone: true }).defaultNow().notNull(),
   },

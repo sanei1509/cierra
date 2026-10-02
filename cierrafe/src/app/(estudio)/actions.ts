@@ -1,7 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { crearEmpleadoConAccesoInicial, crearEmpresaConAccesoInicial } from "cierrabe/acciones";
+import {
+  actualizarEmpleado as actualizarEmpleadoBackend,
+  actualizarEmpresa as actualizarEmpresaBackend,
+  crearEmpleadoConAccesoInicial,
+  crearEmpresaConAccesoInicial,
+} from "cierrabe/acciones";
 import { tenantContextDesdeAcceso, type EmpleadoId, type EmpresaId, type NovedadId, type PeriodoId } from "cierrabe/datos/contexto";
 import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo, crearReciboVistasRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
 import { contextoEstudioDesarrollo, uuidValido } from "@/lib/backend-dev-context";
@@ -10,7 +15,7 @@ import { obtenerSesionDev } from "@/lib/dev-auth";
 import { calcularEmpresa, hashDe } from "@/lib/engine";
 import { MES_ACTUAL } from "@/lib/format";
 import { MOTOR_VERSION, parametrosVigentes } from "@/lib/params";
-import type { Adjunto, Modalidad, Periodo, TipoNovedad, Tono, VersionLiquidacion } from "@/lib/types";
+import type { Adjunto, Empleado, Empresa, Modalidad, Periodo, TipoNovedad, Tono, VersionLiquidacion } from "@/lib/types";
 
 export interface AltaRealResult {
   ok: boolean;
@@ -99,6 +104,21 @@ export interface MarcarReciboVistoRealInput {
   empleadoId: string;
   empresaId: string;
   mes: string;
+}
+
+export interface ActualizarEmpresaRealInput {
+  empresaId: string;
+  cambios: Partial<Empresa>;
+  resumen: string;
+  actor: string;
+}
+
+export interface ActualizarEmpleadoRealInput {
+  empleadoId: string;
+  empresaId: string;
+  cambios: Partial<Empleado>;
+  resumen: string;
+  actor: string;
 }
 
 function ahoraIso() {
@@ -255,6 +275,61 @@ export async function crearEmpleadoInicial(input: CrearEmpleadoInicialInput): Pr
     mensaje: `Empleado guardado en backend con acceso inicial para ${res.usuario.email}.`,
     id: res.empleado.id,
   };
+}
+
+export async function actualizarEmpresaReal(input: ActualizarEmpresaRealInput): Promise<AltaRealResult> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || ctx.actorTipo !== "estudio" || !process.env.DATABASE_URL || !uuidValido(input.empresaId)) {
+    return { ok: true, modo: "demo", mensaje: "Empresa actualizada solo en demo: falta sesion de estudio o backend real." };
+  }
+
+  const { db } = await import("cierrabe/datos/db");
+  const empresaId = input.empresaId as EmpresaId;
+  const empresasRepo = crearEmpresasRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  const empresa = await actualizarEmpresaBackend(ctx, empresasRepo, { estudioId: ctx.estudioId, empresaId }, { ...input.cambios, resumen: input.resumen });
+
+  await auditoriaRepo.registrar(tenantContextDesdeAcceso(ctx)!, {
+    actor: input.actor,
+    empresaId,
+    entidad: "Empresa",
+    entidadId: empresa.id as EmpresaId,
+    accion: input.resumen,
+  });
+
+  revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath(`/cliente/${input.empresaId}`);
+  revalidatePath("/empresas");
+  return { ok: true, modo: "real", mensaje: "Empresa actualizada en backend.", id: empresa.id };
+}
+
+export async function actualizarEmpleadoReal(input: ActualizarEmpleadoRealInput): Promise<AltaRealResult> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || ctx.actorTipo !== "estudio" || !process.env.DATABASE_URL || !uuidValido(input.empresaId) || !uuidValido(input.empleadoId)) {
+    return { ok: true, modo: "demo", mensaje: "Empleado actualizado solo en demo: falta sesion de estudio o backend real." };
+  }
+
+  const { db } = await import("cierrabe/datos/db");
+  const empresaId = input.empresaId as EmpresaId;
+  const empleadoId = input.empleadoId as EmpleadoId;
+  const empleadosRepo = crearEmpleadosRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  const empleado = await actualizarEmpleadoBackend(ctx, empleadosRepo, { estudioId: ctx.estudioId, empresaId, empleadoId }, { ...input.cambios, resumen: input.resumen });
+
+  await auditoriaRepo.registrar(tenantContextDesdeAcceso(ctx)!, {
+    actor: input.actor,
+    empresaId,
+    entidad: "Empleado",
+    entidadId: empleado.id as EmpleadoId,
+    accion: `Edito ficha de ${empleado.nombre} ${empleado.apellido}`,
+    detalle: input.resumen,
+  });
+
+  revalidatePath("/empleados");
+  revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath(`/portal/${input.empleadoId}`);
+  revalidatePath("/empresas");
+  return { ok: true, modo: "real", mensaje: "Empleado actualizado en backend.", id: empleado.id };
 }
 
 export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<AltaRealResult> {

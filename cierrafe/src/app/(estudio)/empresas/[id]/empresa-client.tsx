@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState, type MouseEvent } from "react";
 import {
+  actualizarEmpleadoReal,
+  actualizarEmpresaReal,
   aprobarInternoReal,
   borrarNovedadReal,
   calcularLiquidacionReal,
@@ -612,12 +614,16 @@ function TabLiquidacion({ v, empleados, verCalc }: { v: Vista; empleados: Emplea
 
 function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: () => void }) {
   const s = useStore();
+  const router = useRouter();
+  const usuario = useUsuario();
   const puede = s.puede("editar");
   const actual = [...e.sueldos].sort((a, b) => b.desde.localeCompare(a.desde))[0];
   const [f, setF] = useState({ ci: e.ci, email: e.email, categoria: e.categoria, sueldo: String(actual?.monto ?? ""), hijos: String(e.hijos), conyuge: e.conyugeFonasa });
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
   const cats = categoriasDe(v.empresa.grupo, v.empresa.subgrupo);
   const laudo = laudoDe(v.empresa.grupo, v.empresa.subgrupo, f.categoria);
-  const guardar = () => {
+  const guardar = async () => {
     const monto = Number(f.sueldo);
     const cambios: Partial<Empleado> = { ci: f.ci, email: f.email, categoria: f.categoria, hijos: Number(f.hijos), conyugeFonasa: f.conyuge };
     const res: string[] = [];
@@ -629,8 +635,23 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
       res.push(`sueldo ${fmt(actual?.monto ?? 0)} → ${fmt(monto)} desde ${desde}`);
     }
     if (Number(f.hijos) !== e.hijos) res.push(`hijos ${e.hijos} → ${f.hijos}`);
-    s.actualizarEmpleado(e.id, cambios, res.join("; ") || "sin cambios de cálculo");
-    onCerrar();
+    const resumen = res.join("; ") || "sin cambios de cálculo";
+    setError("");
+    setGuardando(true);
+    try {
+      const resultado = await actualizarEmpleadoReal({ empleadoId: e.id, empresaId: e.empresaId, cambios, resumen, actor: usuario.nombre });
+      if (!resultado.ok) {
+        setError(resultado.mensaje);
+        return;
+      }
+      s.actualizarEmpleado(e.id, cambios, resumen);
+      if (resultado.modo === "real") router.refresh();
+      onCerrar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos guardar la ficha.");
+    } finally {
+      setGuardando(false);
+    }
   };
   return (
     <div className="space-y-4">
@@ -678,7 +699,8 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
           </dl>
         </section>
       )}
-      {puede && <Boton className="w-full" tam="lg" onClick={guardar}>Guardar cambios</Boton>}
+      {error && <p className="rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}
+      {puede && <Boton className="w-full" tam="lg" onClick={() => void guardar()} disabled={guardando}>{guardando ? "Guardando..." : "Guardar cambios"}</Boton>}
     </div>
   );
 }
@@ -768,6 +790,8 @@ function TabActividad({ v }: { v: Vista }) {
 
 function LogoEditable({ v }: { v: Vista }) {
   const s = useStore();
+  const router = useRouter();
+  const usuario = useUsuario();
   const puede = s.puede("editar");
   return (
     <label className={clsx("group relative", puede && "cursor-pointer")} title={puede ? "Cambiar logo (aparece en recibos y portales)" : undefined}>
@@ -786,7 +810,15 @@ function LogoEditable({ v }: { v: Vista }) {
               const f = e.target.files?.[0];
               if (!f) return;
               const logo = await imagenADataUrl(f);
+              const res = await actualizarEmpresaReal({
+                empresaId: v.empresa.id,
+                cambios: { logo },
+                resumen: "Actualizó el logo de la empresa",
+                actor: usuario.nombre,
+              });
+              if (!res.ok) return;
               s.actualizarEmpresa(v.empresa.id, { logo }, "Actualizó el logo de la empresa");
+              if (res.modo === "real") router.refresh();
             }}
           />
         </>
@@ -805,6 +837,7 @@ function Contenido({
     periodos: Periodo[];
     novedades: Novedad[];
     audit: AuditEvent[];
+    vistas: Record<string, string>;
   };
 }) {
   const { id } = useParams<{ id: string }>();
@@ -818,6 +851,7 @@ function Contenido({
       periodos: datosIniciales.periodos,
       novedades: datosIniciales.novedades,
       audit: datosIniciales.audit,
+      vistas: datosIniciales.vistas,
     }));
   }
   const tab = (sp.get("tab") as Tab) ?? "resumen";
@@ -837,6 +871,7 @@ function Contenido({
       periodos: datosIniciales.periodos,
       novedades: datosIniciales.novedades,
       audit: datosIniciales.audit,
+      vistas: datosIniciales.vistas,
     }));
   }, [datosIniciales]);
 
@@ -933,6 +968,7 @@ export default function EmpresaClient({
     periodos: Periodo[];
     novedades: Novedad[];
     audit: AuditEvent[];
+    vistas: Record<string, string>;
   };
 }) {
   return (

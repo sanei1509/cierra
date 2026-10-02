@@ -82,6 +82,7 @@ function mapEmpresa(row: EmpresaRow): Empresa {
     requiereAprobacion: row.requiereAprobacion,
     contacto: { nombre: row.contactoNombre, email: row.contactoEmail },
     tono: "menta",
+    logo: row.logoDataUrl ?? undefined,
   };
 }
 
@@ -277,6 +278,7 @@ export function crearEmpresasRepo(db: Db): EmpresasRepo {
           requiereAprobacion: input.requiereAprobacion,
           contactoNombre: input.contacto.nombre,
           contactoEmail: input.contacto.email,
+          logoDataUrl: input.logo,
         })
         .returning();
       return mapEmpresa(row);
@@ -296,6 +298,7 @@ export function crearEmpresasRepo(db: Db): EmpresasRepo {
           requiereAprobacion: input.requiereAprobacion,
           contactoNombre: input.contacto?.nombre,
           contactoEmail: input.contacto?.email,
+          logoDataUrl: input.logo,
         })
         .where(and(eq(empresas.estudioId, ctx.estudioId), eq(empresas.id, empresaId)))
         .returning();
@@ -396,25 +399,67 @@ export function crearEmpleadosRepo(db: Db): EmpleadosRepo {
     },
 
     async actualizar(ctx, empleadoId, input: ActualizarEmpleadoInput) {
-      const [row] = await db
-        .update(empleados)
-        .set({
-          nombre: input.nombre,
-          apellido: input.apellido,
-          ci: input.ci,
-          email: input.email,
-          telefono: input.telefono,
-          direccion: input.direccion,
-          cargo: input.cargo,
-          area: input.area,
-          categoria: input.categoria,
-          modalidad: input.modalidad,
-          tipoContrato: input.tipoContrato,
-          cuentaCobro: input.cuenta,
-        })
-        .where(and(eq(empleados.estudioId, ctx.estudioId), eq(empleados.id, empleadoId)))
-        .returning();
-      if (!row) noEncontrado("No encontramos el empleado para actualizar");
+      const row = await db.transaction(async (tx) => {
+        const [actualizado] = await tx
+          .update(empleados)
+          .set({
+            nombre: input.nombre,
+            apellido: input.apellido,
+            ci: input.ci,
+            email: input.email,
+            telefono: input.telefono,
+            direccion: input.direccion,
+            cargo: input.cargo,
+            area: input.area,
+            categoria: input.categoria,
+            modalidad: input.modalidad,
+            tipoContrato: input.tipoContrato,
+            cuentaCobro: input.cuenta,
+          })
+          .where(and(eq(empleados.estudioId, ctx.estudioId), eq(empleados.id, empleadoId)))
+          .returning();
+        if (!actualizado) noEncontrado("No encontramos el empleado para actualizar");
+
+        if (input.sueldos?.length) {
+          await tx.delete(empleadoVigencias).where(and(eq(empleadoVigencias.estudioId, ctx.estudioId), eq(empleadoVigencias.empleadoId, empleadoId)));
+          await tx.insert(empleadoVigencias).values(
+            input.sueldos.map((sueldo) => ({
+              estudioId: ctx.estudioId,
+              empleadoId,
+              desde: fechaDb(sueldo.desde)!,
+              sueldoBaseCent: pesosACent(sueldo.monto),
+              categoria: input.categoria ?? actualizado.categoria,
+              hijos: input.hijos ?? 0,
+              conyugeFonasa: input.conyugeFonasa ?? false,
+              licenciaDisponible: input.licenciaDisponible,
+              licenciaTomada: input.licenciaTomada,
+            })),
+          );
+        } else if (
+          input.categoria !== undefined ||
+          input.hijos !== undefined ||
+          input.conyugeFonasa !== undefined ||
+          input.licenciaDisponible !== undefined ||
+          input.licenciaTomada !== undefined
+        ) {
+          const vigencias = await tx.select().from(empleadoVigencias).where(and(eq(empleadoVigencias.estudioId, ctx.estudioId), eq(empleadoVigencias.empleadoId, empleadoId)));
+          const vigente = vigencias.sort((a, b) => b.desde.getTime() - a.desde.getTime())[0];
+          if (vigente) {
+            await tx
+              .update(empleadoVigencias)
+              .set({
+                categoria: input.categoria,
+                hijos: input.hijos,
+                conyugeFonasa: input.conyugeFonasa,
+                licenciaDisponible: input.licenciaDisponible,
+                licenciaTomada: input.licenciaTomada,
+              })
+              .where(eq(empleadoVigencias.id, vigente.id));
+          }
+        }
+
+        return actualizado;
+      });
       return (await hidratar([row]))[0];
     },
   };
