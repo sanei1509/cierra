@@ -38,6 +38,8 @@ export const valorNovedad = (n: Novedad) => {
   if (n.tipo === "egreso" && n.datos?.egresoFecha) return n.datos.egresoFecha;
   if (n.tipo === "ingreso_mes" && n.datos?.ingresoFecha) return n.datos.ingresoFecha;
   if (n.tipo === "seguro_paro" && n.datos?.seguroParoDesde && n.datos?.seguroParoHasta) return `${n.datos.seguroParoDesde} a ${n.datos.seguroParoHasta}`;
+  if (n.tipo === "cambio_horario" && n.datos?.cambioHorarioAplicaDesde) return n.datos.cambioHorarioAplicaDesde;
+  if (n.tipo === "cambio_categoria" && n.datos?.categoriaAplicaDesde) return `${n.datos.categoriaNueva ?? "nueva categoria"} desde ${n.datos.categoriaAplicaDesde}`;
   if (t.unidad === "$") return fmt(n.importe ?? 0);
   if (t.unidad === "horas") return `${n.cantidad} h`;
   if (t.unidad === "minutos") return `${n.cantidad} min`;

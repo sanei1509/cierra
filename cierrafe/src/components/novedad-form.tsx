@@ -38,7 +38,7 @@ function diasInclusivos(desde: string, hasta: string) {
   return Math.floor((d2 - d1) / 86_400_000) + 1;
 }
 
-const SIN_VALOR_GENERICO = new Set<TipoNovedad>(["egreso", "ingreso_mes", "seguro_paro"]);
+const SIN_VALOR_GENERICO = new Set<TipoNovedad>(["egreso", "ingreso_mes", "seguro_paro", "cambio_horario", "cambio_categoria"]);
 
 export function NovedadForm({
   empresaId,
@@ -72,7 +72,6 @@ export function NovedadForm({
   const [nota, setNota] = useState(novedadInicial?.nota ?? "");
   const [adjunto, setAdjunto] = useState<Adjunto | undefined>(novedadInicial?.adjunto);
   const [ausenciaDescuenta, setAusenciaDescuenta] = useState(Boolean(novedadInicial?.datos?.ausenciaDescuenta));
-  const [nuevaCategoria, setNuevaCategoria] = useState(novedadInicial?.datos?.nuevaCategoria ?? "");
   const [egresoFecha, setEgresoFecha] = useState(novedadInicial?.datos?.egresoFecha ?? "");
   const [egresoCausal, setEgresoCausal] = useState(novedadInicial?.datos?.egresoCausal ?? "");
   const [egresoLicenciaDias, setEgresoLicenciaDias] = useState(String(novedadInicial?.datos?.egresoLicenciaNoGozadaDias ?? ""));
@@ -80,8 +79,14 @@ export function NovedadForm({
   const [egresoPagaAguinaldo, setEgresoPagaAguinaldo] = useState(Boolean(novedadInicial?.datos?.egresoPagaAguinaldo));
   const [egresoObservaciones, setEgresoObservaciones] = useState(novedadInicial?.datos?.egresoObservaciones ?? "");
   const empleadoActual = empleados.find((e) => e.id === empleadoId);
+  const sueldoActual = empleadoActual?.sueldos.at(-1)?.monto;
+  const [categoriaAnterior, setCategoriaAnterior] = useState(novedadInicial?.datos?.categoriaAnterior ?? empleadoActual?.categoria ?? "");
+  const [categoriaNueva, setCategoriaNueva] = useState(novedadInicial?.datos?.categoriaNueva ?? novedadInicial?.datos?.nuevaCategoria ?? "");
+  const [sueldoAnterior, setSueldoAnterior] = useState(String(novedadInicial?.datos?.sueldoAnterior ?? sueldoActual ?? ""));
+  const [sueldoNuevo, setSueldoNuevo] = useState(String(novedadInicial?.datos?.sueldoNuevo ?? novedadInicial?.datos?.nuevoSueldo ?? novedadInicial?.importe ?? sueldoActual ?? ""));
+  const [categoriaAplicaDesde, setCategoriaAplicaDesde] = useState(novedadInicial?.datos?.categoriaAplicaDesde ?? novedadInicial?.datos?.aplicaDesde ?? `${mes}-01`);
   const [ingresoFecha, setIngresoFecha] = useState(novedadInicial?.datos?.ingresoFecha ?? empleadoActual?.ingreso ?? `${mes}-01`);
-  const [ingresoSueldo, setIngresoSueldo] = useState(String(novedadInicial?.datos?.ingresoSueldoInicial ?? empleadoActual?.sueldos.at(-1)?.monto ?? ""));
+  const [ingresoSueldo, setIngresoSueldo] = useState(String(novedadInicial?.datos?.ingresoSueldoInicial ?? sueldoActual ?? ""));
   const [ingresoCategoria, setIngresoCategoria] = useState(novedadInicial?.datos?.ingresoCategoria ?? empleadoActual?.categoria ?? "");
   const [ingresoModalidad, setIngresoModalidad] = useState<Modalidad>(novedadInicial?.datos?.ingresoModalidad ?? empleadoActual?.modalidad ?? "mensual");
   const [ingresoHorario, setIngresoHorario] = useState(novedadInicial?.datos?.ingresoHorario ?? "");
@@ -92,13 +97,23 @@ export function NovedadForm({
   const [seguroParoReduccionHoraria, setSeguroParoReduccionHoraria] = useState(novedadInicial?.datos?.seguroParoReduccionHoraria ?? "");
   const [seguroParoAfectaPresentismo, setSeguroParoAfectaPresentismo] = useState(novedadInicial?.datos?.seguroParoAfectaPresentismo ?? true);
   const [seguroParoPagaBps, setSeguroParoPagaBps] = useState(novedadInicial?.datos?.seguroParoPagaBps ?? true);
+  const [horarioAnterior, setHorarioAnterior] = useState(novedadInicial?.datos?.horarioAnterior ?? "");
+  const [horarioNuevo, setHorarioNuevo] = useState(novedadInicial?.datos?.horarioNuevo ?? "");
+  const [horasSemanalesNuevas, setHorasSemanalesNuevas] = useState(String(novedadInicial?.datos?.horasSemanalesNuevas ?? ""));
+  const [cambioHorarioAplicaDesde, setCambioHorarioAplicaDesde] = useState(novedadInicial?.datos?.cambioHorarioAplicaDesde ?? `${mes}-01`);
+  const [cambioHorarioCambiaSueldo, setCambioHorarioCambiaSueldo] = useState(Boolean(novedadInicial?.datos?.cambioHorarioCambiaSueldo));
+  const [cambioHorarioNuevoSueldo, setCambioHorarioNuevoSueldo] = useState(String(novedadInicial?.datos?.cambioHorarioNuevoSueldo ?? sueldoActual ?? ""));
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   const t = TIPOS[tipo];
   const v = numeroDecimal(valor);
+  const sueldoAnteriorValor = numeroDecimal(sueldoAnterior);
+  const sueldoNuevoValor = numeroDecimal(sueldoNuevo);
   const ingresoSueldoValor = numeroDecimal(ingresoSueldo);
   const seguroParoDias = diasInclusivos(seguroParoDesde, seguroParoHasta);
   const seguroParoReduccionValor = Number(seguroParoReduccionPorcentaje.replace(/\D/g, ""));
+  const horasSemanalesValor = numeroDecimal(horasSemanalesNuevas);
+  const cambioHorarioSueldoValor = numeroDecimal(cambioHorarioNuevoSueldo);
   const requiereValor = !SIN_VALOR_GENERICO.has(tipo);
   const egresoValido = tipo !== "egreso" || /^\d{4}-\d{2}-\d{2}$/.test(egresoFecha);
   const ingresoValido =
@@ -106,16 +121,34 @@ export function NovedadForm({
     (/^\d{4}-\d{2}-\d{2}$/.test(ingresoFecha) && ingresoCategoria.trim().length > 0 && ingresoSueldoValor > 0 && ["mensual", "jornalero"].includes(ingresoModalidad));
   const seguroParoValido =
     tipo !== "seguro_paro" || (seguroParoDias > 0 && (seguroParoTipo === "total" || (seguroParoReduccionValor > 0 && seguroParoReduccionValor <= 100)));
-  const valido = Boolean(empleadoId && egresoValido && ingresoValido && seguroParoValido && (!requiereValor || v > 0));
+  const cambioHorarioValido =
+    tipo !== "cambio_horario" ||
+    (horarioAnterior.trim().length > 0 &&
+      horarioNuevo.trim().length > 0 &&
+      horasSemanalesValor > 0 &&
+      /^\d{4}-\d{2}-\d{2}$/.test(cambioHorarioAplicaDesde) &&
+      (!cambioHorarioCambiaSueldo || cambioHorarioSueldoValor > 0));
+  const cambioCategoriaValido =
+    tipo !== "cambio_categoria" ||
+    (categoriaAnterior.trim().length > 0 && categoriaNueva.trim().length > 0 && sueldoAnteriorValor > 0 && sueldoNuevoValor > 0 && /^\d{4}-\d{2}-\d{2}$/.test(categoriaAplicaDesde));
+  const valido = Boolean(empleadoId && egresoValido && ingresoValido && seguroParoValido && cambioHorarioValido && cambioCategoriaValido && (!requiereValor || v > 0));
   const editando = !!novedadInicial;
   const seleccionarEmpleado = (id: string) => {
     setEmpleadoId(id);
     if (editando) return;
     const empleado = empleados.find((e) => e.id === id);
     setIngresoFecha(empleado?.ingreso ?? `${mes}-01`);
-    setIngresoSueldo(String(empleado?.sueldos.at(-1)?.monto ?? ""));
+    const sueldo = empleado?.sueldos.at(-1)?.monto;
+    setIngresoSueldo(String(sueldo ?? ""));
     setIngresoCategoria(empleado?.categoria ?? "");
     setIngresoModalidad(empleado?.modalidad ?? "mensual");
+    setCategoriaAnterior(empleado?.categoria ?? "");
+    setCategoriaNueva("");
+    setSueldoAnterior(String(sueldo ?? ""));
+    setSueldoNuevo(String(sueldo ?? ""));
+    setCategoriaAplicaDesde(`${mes}-01`);
+    setCambioHorarioAplicaDesde(`${mes}-01`);
+    setCambioHorarioNuevoSueldo(String(sueldo ?? ""));
   };
 
   if (empleados.length === 0) {
@@ -138,7 +171,18 @@ export function NovedadForm({
         const licenciaDias = Number(egresoLicenciaDias.replace(/\D/g, ""));
         const datos = {
           ...(tipo === "ausencia_justificada" ? { ausenciaDescuenta } : {}),
-          ...(tipo === "cambio_categoria" ? { nuevaCategoria: nuevaCategoria.trim() || undefined, nuevoSueldo: v, aplicaDesde: `${mes}-01` } : {}),
+          ...(tipo === "cambio_categoria"
+            ? {
+                categoriaAnterior: categoriaAnterior.trim(),
+                categoriaNueva: categoriaNueva.trim(),
+                sueldoAnterior: sueldoAnteriorValor,
+                sueldoNuevo: sueldoNuevoValor,
+                categoriaAplicaDesde,
+                nuevaCategoria: categoriaNueva.trim(),
+                nuevoSueldo: sueldoNuevoValor,
+                aplicaDesde: categoriaAplicaDesde,
+              }
+            : {}),
           ...(tipo === "ingreso_mes"
             ? {
                 ingresoFecha,
@@ -159,6 +203,16 @@ export function NovedadForm({
                 seguroParoPagaBps,
               }
             : {}),
+          ...(tipo === "cambio_horario"
+            ? {
+                horarioAnterior: horarioAnterior.trim(),
+                horarioNuevo: horarioNuevo.trim(),
+                horasSemanalesNuevas: horasSemanalesValor,
+                cambioHorarioAplicaDesde,
+                cambioHorarioCambiaSueldo,
+                cambioHorarioNuevoSueldo: cambioHorarioCambiaSueldo ? cambioHorarioSueldoValor : undefined,
+              }
+            : {}),
           ...(tipo === "egreso"
             ? {
                 egresoFecha,
@@ -175,7 +229,7 @@ export function NovedadForm({
           mes,
           empleadoId: empleadoId!,
           tipo,
-          ...(tipo === "seguro_paro" ? { cantidad: seguroParoDias } : SIN_VALOR_GENERICO.has(tipo) ? {} : t.unidad === "$" ? { importe: v } : { cantidad: v }),
+          ...(tipo === "seguro_paro" ? { cantidad: seguroParoDias } : tipo === "cambio_horario" ? { cantidad: horasSemanalesValor } : SIN_VALOR_GENERICO.has(tipo) ? {} : t.unidad === "$" ? { importe: v } : { cantidad: v }),
           nota: nota || undefined,
           adjunto,
           datos: Object.keys(datos).length ? datos : undefined,
@@ -191,7 +245,11 @@ export function NovedadForm({
                 ? `${TIPOS[tipo].corto} ${ingresoFecha}`
                 : tipo === "seguro_paro"
                   ? `${TIPOS[tipo].corto} ${seguroParoDesde} a ${seguroParoHasta}`
-                  : `${TIPOS[tipo].corto} ${t.unidad === "$" ? `$ ${v}` : v}`;
+                  : tipo === "cambio_horario"
+                    ? `${TIPOS[tipo].corto} ${cambioHorarioAplicaDesde}`
+                    : tipo === "cambio_categoria"
+                      ? `${TIPOS[tipo].corto} ${categoriaNueva} desde ${categoriaAplicaDesde}`
+                    : `${TIPOS[tipo].corto} ${t.unidad === "$" ? `$ ${v}` : v}`;
           const res = editando
             ? await actualizarNovedadReal({ ...novedad, id: novedadInicial.id, antes, despues })
             : await crearNovedadReal(novedad);
@@ -210,11 +268,29 @@ export function NovedadForm({
           }
           if (tipo === "ingreso_mes" && origen === "estudio") {
             const empleado = empleados.find((e) => e.id === empleadoId);
-            const sueldos = [...(empleado?.sueldos ?? []).filter((sueldo) => sueldo.desde !== ingresoFecha), { desde: ingresoFecha, monto: ingresoSueldoValor }].sort((a, b) => a.desde.localeCompare(b.desde));
+            const sueldos = [...(empleado?.sueldos ?? []).filter((sueldo) => sueldo.desde !== ingresoFecha), { desde: ingresoFecha, monto: ingresoSueldoValor, categoria: ingresoCategoria.trim() }].sort((a, b) => a.desde.localeCompare(b.desde));
             actualizarEmpleado(
               empleadoId!,
               { ingreso: ingresoFecha, categoria: ingresoCategoria.trim(), modalidad: ingresoModalidad, sueldos },
               `ingreso ${empleado?.ingreso ?? "sin fecha"} → ${ingresoFecha}`,
+            );
+          }
+          if (tipo === "cambio_horario" && origen === "estudio" && cambioHorarioCambiaSueldo) {
+            const empleado = empleados.find((e) => e.id === empleadoId);
+            const sueldos = [...(empleado?.sueldos ?? []).filter((sueldo) => sueldo.desde !== cambioHorarioAplicaDesde), { desde: cambioHorarioAplicaDesde, monto: cambioHorarioSueldoValor, categoria: empleado?.categoria }].sort((a, b) => a.desde.localeCompare(b.desde));
+            actualizarEmpleado(
+              empleadoId!,
+              { sueldos },
+              `cambio de horario desde ${cambioHorarioAplicaDesde} con sueldo ${cambioHorarioSueldoValor}`,
+            );
+          }
+          if (tipo === "cambio_categoria" && origen === "estudio") {
+            const empleado = empleados.find((e) => e.id === empleadoId);
+            const sueldos = [...(empleado?.sueldos ?? []).filter((sueldo) => sueldo.desde !== categoriaAplicaDesde), { desde: categoriaAplicaDesde, monto: sueldoNuevoValor, categoria: categoriaNueva.trim() }].sort((a, b) => a.desde.localeCompare(b.desde));
+            actualizarEmpleado(
+              empleadoId!,
+              { categoria: categoriaNueva.trim(), sueldos },
+              `cambio de categoría ${categoriaAnterior.trim()} → ${categoriaNueva.trim()} desde ${categoriaAplicaDesde}`,
             );
           }
           onListo();
@@ -265,9 +341,33 @@ export function NovedadForm({
         </label>
       )}
       {tipo === "cambio_categoria" && (
-        <Campo label="Nueva categoría (opcional)" ayuda="El importe de arriba se toma como nuevo sueldo base desde este mes">
-          <input className={inputCls} value={nuevaCategoria} onChange={(e) => setNuevaCategoria(e.target.value)} placeholder="Ej.: Encargado" />
-        </Campo>
+        <section className="space-y-3 rounded-2xl bg-hundido px-3.5 py-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo label="Categoría anterior">
+              <input className={inputCls} value={categoriaAnterior} onChange={(e) => setCategoriaAnterior(e.target.value)} placeholder="Ej.: Oficial" />
+            </Campo>
+            <Campo label="Categoría nueva">
+              <input className={inputCls} value={categoriaNueva} onChange={(e) => setCategoriaNueva(e.target.value)} placeholder="Ej.: Encargado" />
+            </Campo>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo label="Sueldo anterior">
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-apagado">$</span>
+                <input className={clsx(inputCls, "pl-8")} inputMode="decimal" value={sueldoAnterior} onChange={(e) => setSueldoAnterior(e.target.value.replace(/[^\d,.]/g, ""))} placeholder="0" />
+              </div>
+            </Campo>
+            <Campo label="Sueldo nuevo">
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-apagado">$</span>
+                <input className={clsx(inputCls, "pl-8")} inputMode="decimal" value={sueldoNuevo} onChange={(e) => setSueldoNuevo(e.target.value.replace(/[^\d,.]/g, ""))} placeholder="0" />
+              </div>
+            </Campo>
+          </div>
+          <Campo label="Fecha de vigencia">
+            <input type="date" className={inputCls} value={categoriaAplicaDesde} onChange={(e) => setCategoriaAplicaDesde(e.target.value)} />
+          </Campo>
+        </section>
       )}
       {tipo === "egreso" && (
         <section className="space-y-3 rounded-2xl bg-hundido px-3.5 py-3">
@@ -361,6 +461,34 @@ export function NovedadForm({
             <input type="checkbox" checked={seguroParoAfectaPresentismo} onChange={(e) => setSeguroParoAfectaPresentismo(e.target.checked)} className="size-4 accent-petroleo" />
             Afecta presentismo
           </label>
+        </section>
+      )}
+      {tipo === "cambio_horario" && (
+        <section className="space-y-3 rounded-2xl bg-hundido px-3.5 py-3">
+          <Campo label="Horario anterior">
+            <input className={inputCls} value={horarioAnterior} onChange={(e) => setHorarioAnterior(e.target.value)} placeholder="Ej.: lunes a viernes 9 a 17" />
+          </Campo>
+          <Campo label="Horario nuevo">
+            <input className={inputCls} value={horarioNuevo} onChange={(e) => setHorarioNuevo(e.target.value)} placeholder="Ej.: lunes a viernes 8 a 16" />
+          </Campo>
+          <Campo label="Horas semanales nuevas">
+            <input className={inputCls} inputMode="decimal" value={horasSemanalesNuevas} onChange={(e) => setHorasSemanalesNuevas(e.target.value.replace(/[^\d,.]/g, ""))} placeholder="44" />
+          </Campo>
+          <Campo label="Aplica desde">
+            <input type="date" className={inputCls} value={cambioHorarioAplicaDesde} onChange={(e) => setCambioHorarioAplicaDesde(e.target.value)} />
+          </Campo>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={cambioHorarioCambiaSueldo} onChange={(e) => setCambioHorarioCambiaSueldo(e.target.checked)} className="size-4 accent-petroleo" />
+            Cambia sueldo proporcional
+          </label>
+          {cambioHorarioCambiaSueldo && (
+            <Campo label="Nuevo sueldo base">
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-apagado">$</span>
+                <input className={clsx(inputCls, "pl-8")} inputMode="decimal" value={cambioHorarioNuevoSueldo} onChange={(e) => setCambioHorarioNuevoSueldo(e.target.value.replace(/[^\d,.]/g, ""))} placeholder="0" />
+              </div>
+            </Campo>
+          )}
         </section>
       )}
       <Campo label="Comentario (opcional)">

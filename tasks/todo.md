@@ -1558,8 +1558,8 @@
 
 ## Task 52: Specialized Monthly Hire Novelty
 
-**Status:** Done  
-**Date:** 2026-10-02  
+**Status:** Done
+**Date:** 2026-10-02
 **Description:** Replace the generic ingreso en el mes input with a hire-specific form and use studio-entered hires to correct the employee ficha for partial-month liquidation.
 
 **Acceptance criteria:**
@@ -1625,6 +1625,50 @@
 
 **Files touched:**
 - `cierrabe/src/dominio/types.ts`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+- `cierrafe/src/components/novedad-form.tsx`
+- `cierrafe/src/lib/engine.ts`
+- `cierrafe/src/lib/labels.ts`
+- `cierrafe/src/lib/types.ts`
+- `cierrafe/tests/engine.test.ts`
+- `tasks/todo.md`
+
+**Estimated scope:** Medium
+
+## Task 54: Specialized Category Change Novelty
+
+**Status:** Done
+**Date:** 2026-10-02
+**Description:** Replace the generic cambio de categoría input with a category-change form that creates a real employee salary/category vigencia for future payrolls.
+
+**Acceptance criteria:**
+- [x] The cambio de categoría novelty asks for previous category, new category, previous salary, new salary and effective date.
+- [x] The generic amount field is hidden for cambio de categoría.
+- [x] The novelty stores explicit previous/new category and previous/new salary data while keeping legacy fields for compatibility.
+- [x] When the studio creates or edits the novelty in real backend mode, the employee ficha is updated with the new category and a salary vigencia.
+- [x] Employee salary vigencias can preserve their own category instead of rewriting every historical vigencia to the latest category.
+- [x] The local/demo store updates the employee category and salary history immediately.
+- [x] Employee novelty history shows previous/new category, previous/new salary and effective date.
+- [x] The liquidation engine has regression coverage for both month novelty calculation and future ficha vigencias.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe test -- engine.test.ts`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+- [x] `corepack pnpm --filter cierrabe test`
+
+**Notes:**
+- This uses the existing `empleado_vigencias` table. No new migration was needed because the database already stores `categoria` per vigencia.
+- Company-submitted category changes remain novelty data for studio review and do not auto-update the ficha.
+
+**Dependencies:** Task 48, Task 52
+
+**Files touched:**
+- `cierrabe/src/datos/repos/provisioning.ts`
+- `cierrabe/src/dominio/types.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
 - `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
 - `cierrafe/src/components/novedad-form.tsx`
 - `cierrafe/src/lib/engine.ts`

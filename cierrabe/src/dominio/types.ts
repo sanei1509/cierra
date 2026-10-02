@@ -67,7 +67,7 @@ export interface Empleado {
   licenciaDisponible?: number;
   licenciaTomada?: number;
   /** Historia de sueldo base con vigencia (RF-021) */
-  sueldos: { desde: string; monto: number }[];
+  sueldos: { desde: string; monto: number; categoria?: string }[];
   hijos: number;
   conyugeFonasa: boolean;
   cuenta?: string;
@@ -116,6 +116,11 @@ export interface NovedadDatos {
   nuevaCategoria?: string;
   nuevoSueldo?: number;
   aplicaDesde?: string;
+  categoriaAnterior?: string;
+  categoriaNueva?: string;
+  sueldoAnterior?: number;
+  sueldoNuevo?: number;
+  categoriaAplicaDesde?: string;
   ingresoFecha?: string;
   ingresoSueldoInicial?: number;
   ingresoCategoria?: string;
@@ -134,6 +139,12 @@ export interface NovedadDatos {
   egresoPagaSalarioVacacional?: boolean;
   egresoPagaAguinaldo?: boolean;
   egresoObservaciones?: string;
+  horarioAnterior?: string;
+  horarioNuevo?: string;
+  horasSemanalesNuevas?: number;
+  cambioHorarioAplicaDesde?: string;
+  cambioHorarioCambiaSueldo?: boolean;
+  cambioHorarioNuevoSueldo?: number;
 }
 
 export interface Novedad {

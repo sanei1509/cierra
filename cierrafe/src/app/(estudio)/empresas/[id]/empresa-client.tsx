@@ -852,10 +852,14 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
                       {n.datos?.ausenciaDescuenta !== undefined && (
                         <p className="mt-1 text-xs text-apagado">{n.datos.ausenciaDescuenta ? "Descuenta jornal" : "No descuenta jornal"}</p>
                       )}
-                      {(n.datos?.nuevaCategoria || n.datos?.nuevoSueldo) && (
+                      {(n.datos?.categoriaNueva || n.datos?.nuevaCategoria || n.datos?.sueldoNuevo || n.datos?.nuevoSueldo) && (
                         <p className="mt-1 text-xs text-apagado">
-                          {n.datos.nuevaCategoria ? `Nueva categoría: ${n.datos.nuevaCategoria}` : "Cambio de categoría"}
-                          {n.datos.nuevoSueldo ? ` · sueldo base ${fmt(n.datos.nuevoSueldo)}` : ""}
+                          Cambio de categoría
+                          {n.datos.categoriaAnterior ? ` · anterior: ${n.datos.categoriaAnterior}` : ""}
+                          {n.datos.categoriaNueva || n.datos.nuevaCategoria ? ` · nueva: ${n.datos.categoriaNueva ?? n.datos.nuevaCategoria}` : ""}
+                          {n.datos.sueldoAnterior ? ` · sueldo anterior ${fmt(n.datos.sueldoAnterior)}` : ""}
+                          {n.datos.sueldoNuevo || n.datos.nuevoSueldo ? ` · sueldo nuevo ${fmt(n.datos.sueldoNuevo ?? n.datos.nuevoSueldo ?? 0)}` : ""}
+                          {n.datos.categoriaAplicaDesde || n.datos.aplicaDesde ? ` · desde ${n.datos.categoriaAplicaDesde ?? n.datos.aplicaDesde}` : ""}
                         </p>
                       )}
                       {n.datos?.egresoFecha && (
@@ -882,6 +886,15 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
                           {n.datos.seguroParoReduccionHoraria ? ` · ${n.datos.seguroParoReduccionHoraria}` : ""}
                           {n.datos.seguroParoPagaBps === false ? " · no descuenta pago empresa" : " · paga BPS"}
                           {n.datos.seguroParoAfectaPresentismo === false ? " · no afecta presentismo" : ""}
+                        </p>
+                      )}
+                      {n.datos?.cambioHorarioAplicaDesde && (
+                        <p className="mt-1 text-xs text-apagado">
+                          Cambio de horario desde {n.datos.cambioHorarioAplicaDesde}
+                          {n.datos.horarioAnterior ? ` - anterior: ${n.datos.horarioAnterior}` : ""}
+                          {n.datos.horarioNuevo ? ` - nuevo: ${n.datos.horarioNuevo}` : ""}
+                          {n.datos.horasSemanalesNuevas ? ` - ${n.datos.horasSemanalesNuevas} h semanales` : ""}
+                          {n.datos.cambioHorarioNuevoSueldo ? ` - sueldo base ${fmt(n.datos.cambioHorarioNuevoSueldo)}` : ""}
                         </p>
                       )}
                     </li>

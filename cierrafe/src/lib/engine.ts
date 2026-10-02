@@ -55,11 +55,12 @@ function conceptoDinero(tipo: Novedad["tipo"]) {
 export function sueldoVigente(emp: Empleado, mes: string, novs: Novedad[] = []): { monto: number; origen: string } {
   const cambio = novs.find((n) => n.empleadoId === emp.id && n.tipo === "cambio_salarial" && n.importe);
   if (cambio) return { monto: cambio.importe!, origen: `novedad de cambio salarial (${mes})` };
-  const cambioCategoria = novs.find((n) => n.empleadoId === emp.id && n.tipo === "cambio_categoria" && (n.datos?.nuevoSueldo || n.importe));
+  const cambioCategoria = novs.find((n) => n.empleadoId === emp.id && n.tipo === "cambio_categoria" && (n.datos?.sueldoNuevo || n.datos?.nuevoSueldo || n.importe));
   if (cambioCategoria) {
+    const categoria = cambioCategoria.datos?.categoriaNueva ?? cambioCategoria.datos?.nuevaCategoria;
     return {
-      monto: cambioCategoria.datos?.nuevoSueldo ?? cambioCategoria.importe!,
-      origen: cambioCategoria.datos?.nuevaCategoria ? `cambio de categoría a ${cambioCategoria.datos.nuevaCategoria} (${mes})` : `cambio de categoría (${mes})`,
+      monto: cambioCategoria.datos?.sueldoNuevo ?? cambioCategoria.datos?.nuevoSueldo ?? cambioCategoria.importe!,
+      origen: categoria ? `cambio de categoría a ${categoria} (${mes})` : `cambio de categoría (${mes})`,
     };
   }
   const vig = [...emp.sueldos].filter((s) => s.desde.slice(0, 7) <= mes).sort((a, b) => b.desde.localeCompare(a.desde))[0];

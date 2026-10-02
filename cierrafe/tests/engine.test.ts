@@ -308,8 +308,16 @@ describe("motor de liquidacion", () => {
         mes: "2026-09",
         empleadoId: empleadoBase.id,
         tipo: "cambio_categoria",
-        importe: 60000,
-        datos: { nuevaCategoria: "Encargado", nuevoSueldo: 60000, aplicaDesde: "2026-09-01" },
+        datos: {
+          categoriaAnterior: "Vendedor",
+          categoriaNueva: "Encargado",
+          sueldoAnterior: 50000,
+          sueldoNuevo: 60000,
+          categoriaAplicaDesde: "2026-09-01",
+          nuevaCategoria: "Encargado",
+          nuevoSueldo: 60000,
+          aplicaDesde: "2026-09-01",
+        },
         origen: "estudio",
         autor: "Estudio",
         fecha: "2026-09-20T10:00:00",
@@ -318,6 +326,23 @@ describe("motor de liquidacion", () => {
 
     expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", base: 60000, importe: 60000 }));
     expect(resultado.lineas.some((linea) => linea.concepto.startsWith("Cambio de categoría") && linea.importe > 0)).toBe(false);
+  });
+
+  it("usa la vigencia historica de categoria para liquidaciones futuras sin repetir la novedad", () => {
+    const empleadoConVigencia: Empleado = {
+      ...empleadoBase,
+      categoria: "Encargado",
+      sueldos: [
+        { desde: "2026-07-01", monto: 50000, categoria: "Vendedor" },
+        { desde: "2026-10-01", monto: 62000, categoria: "Encargado" },
+      ],
+    };
+
+    const septiembre = calcularEmpleado(empresaBase, empleadoConVigencia, "2026-09", []);
+    const octubre = calcularEmpleado(empresaBase, empleadoConVigencia, "2026-10", []);
+
+    expect(septiembre.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", base: 50000, importe: 50000 }));
+    expect(octubre.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", base: 62000, importe: 62000 }));
   });
 
   it("calcula mes parcial y excluye meses posteriores cuando hay fecha de egreso en ficha", () => {

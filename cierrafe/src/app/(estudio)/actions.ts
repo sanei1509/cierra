@@ -234,8 +234,8 @@ async function actualizarFichaPorEgreso({
   });
 }
 
-function fusionarSueldo(sueldos: Empleado["sueldos"], desde: string, monto: number) {
-  return [...sueldos.filter((sueldo) => sueldo.desde !== desde), { desde, monto }].sort((a, b) => a.desde.localeCompare(b.desde));
+function fusionarSueldo(sueldos: Empleado["sueldos"], desde: string, monto: number, categoria?: string) {
+  return [...sueldos.filter((sueldo) => sueldo.desde !== desde), { desde, monto, categoria }].sort((a, b) => a.desde.localeCompare(b.desde));
 }
 
 async function actualizarFichaPorIngresoMes({
@@ -279,7 +279,7 @@ async function actualizarFichaPorIngresoMes({
       ingreso,
       categoria,
       modalidad,
-      sueldos: fusionarSueldo(actual.sueldos, ingreso, sueldo),
+      sueldos: fusionarSueldo(actual.sueldos, ingreso, sueldo, categoria),
       resumen: `Ingreso informado por novedad: ${ingreso}`,
     },
   );
@@ -290,6 +290,109 @@ async function actualizarFichaPorIngresoMes({
     entidadId: empleado.id as EmpleadoId,
     accion: `Actualizo ingreso de ${empleado.nombre} ${empleado.apellido}`,
     detalle: `${ingreso} · ${categoria} · ${modalidad} · sueldo ${sueldo}${input.datos?.ingresoHorario ? ` · horario ${input.datos.ingresoHorario}` : ""}`,
+  });
+}
+
+async function actualizarFichaPorCambioHorario({
+  ctx,
+  tenant,
+  empresaId,
+  input,
+  auditoriaRepo,
+}: {
+  ctx: NonNullable<Awaited<ReturnType<typeof contextoOperativoActual>>>;
+  tenant: NonNullable<ReturnType<typeof tenantContextDesdeAcceso>>;
+  empresaId: EmpresaId;
+  input: CrearNovedadRealInput;
+  auditoriaRepo: ReturnType<typeof crearAuditoriaRepo>;
+}) {
+  const datos = input.datos;
+  const aplicaDesde = fechaIsoSimple(input.datos?.cambioHorarioAplicaDesde);
+  const nuevoSueldo = input.datos?.cambioHorarioNuevoSueldo;
+  if (
+    ctx.actorTipo !== "estudio" ||
+    input.tipo !== "cambio_horario" ||
+    input.origen !== "estudio" ||
+    !datos?.cambioHorarioCambiaSueldo ||
+    !aplicaDesde ||
+    !nuevoSueldo ||
+    nuevoSueldo <= 0
+  ) {
+    return;
+  }
+  const { db } = await import("cierrabe/datos/db");
+  const empleadosRepo = crearEmpleadosRepo(db);
+  const actual = await empleadosRepo.obtener(tenant, input.empleadoId as EmpleadoId);
+  if (!actual || actual.empresaId !== empresaId) return;
+  const empleado = await actualizarEmpleadoBackend(
+    ctx,
+    empleadosRepo,
+    { estudioId: ctx.estudioId, empresaId, empleadoId: input.empleadoId as EmpleadoId },
+    {
+      sueldos: fusionarSueldo(actual.sueldos, aplicaDesde, nuevoSueldo),
+      resumen: `Cambio de horario con sueldo proporcional desde ${aplicaDesde}`,
+    },
+  );
+  await auditoriaRepo.registrar(tenant, {
+    actor: input.autor,
+    empresaId,
+    entidad: "Empleado",
+    entidadId: empleado.id as EmpleadoId,
+    accion: `Actualizo sueldo por cambio de horario de ${empleado.nombre} ${empleado.apellido}`,
+    detalle: `${aplicaDesde} - ${datos.horarioAnterior ?? "horario anterior sin dato"} -> ${datos.horarioNuevo ?? "horario nuevo sin dato"} - sueldo ${nuevoSueldo}`,
+  });
+}
+
+async function actualizarFichaPorCambioCategoria({
+  ctx,
+  tenant,
+  empresaId,
+  input,
+  auditoriaRepo,
+}: {
+  ctx: NonNullable<Awaited<ReturnType<typeof contextoOperativoActual>>>;
+  tenant: NonNullable<ReturnType<typeof tenantContextDesdeAcceso>>;
+  empresaId: EmpresaId;
+  input: CrearNovedadRealInput;
+  auditoriaRepo: ReturnType<typeof crearAuditoriaRepo>;
+}) {
+  const aplicaDesde = fechaIsoSimple(input.datos?.categoriaAplicaDesde ?? input.datos?.aplicaDesde);
+  const categoriaNueva = (input.datos?.categoriaNueva ?? input.datos?.nuevaCategoria)?.trim();
+  const categoriaAnterior = input.datos?.categoriaAnterior?.trim();
+  const sueldoNuevo = input.datos?.sueldoNuevo ?? input.datos?.nuevoSueldo ?? input.importe;
+  const sueldoAnterior = input.datos?.sueldoAnterior;
+  if (
+    ctx.actorTipo !== "estudio" ||
+    input.tipo !== "cambio_categoria" ||
+    input.origen !== "estudio" ||
+    !aplicaDesde ||
+    !categoriaNueva ||
+    !sueldoNuevo ||
+    sueldoNuevo <= 0
+  ) {
+    return;
+  }
+  const { db } = await import("cierrabe/datos/db");
+  const empleadosRepo = crearEmpleadosRepo(db);
+  const actual = await empleadosRepo.obtener(tenant, input.empleadoId as EmpleadoId);
+  if (!actual || actual.empresaId !== empresaId) return;
+  const empleado = await actualizarEmpleadoBackend(
+    ctx,
+    empleadosRepo,
+    { estudioId: ctx.estudioId, empresaId, empleadoId: input.empleadoId as EmpleadoId },
+    {
+      categoria: categoriaNueva,
+      sueldos: fusionarSueldo(actual.sueldos, aplicaDesde, sueldoNuevo, categoriaNueva),
+      resumen: `Cambio de categoría desde ${aplicaDesde}: ${categoriaAnterior ?? actual.categoria} -> ${categoriaNueva}`,
+    },
+  );
+  await auditoriaRepo.registrar(tenant, {
+    actor: input.autor,
+    empresaId,
+    entidad: "Empleado",
+    entidadId: empleado.id as EmpleadoId,
+    accion: `Actualizo categoria de ${empleado.nombre} ${empleado.apellido}`,
+    detalle: `${aplicaDesde} · ${categoriaAnterior ?? actual.categoria} -> ${categoriaNueva} · sueldo ${sueldoAnterior ?? "s/d"} -> ${sueldoNuevo}`,
   });
 }
 
@@ -640,6 +743,8 @@ export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<Al
   });
   await actualizarFichaPorEgreso({ ctx, tenant, empresaId, input, auditoriaRepo });
   await actualizarFichaPorIngresoMes({ ctx, tenant, empresaId, input, auditoriaRepo });
+  await actualizarFichaPorCambioHorario({ ctx, tenant, empresaId, input, auditoriaRepo });
+  await actualizarFichaPorCambioCategoria({ ctx, tenant, empresaId, input, auditoriaRepo });
 
   revalidatePath(`/empresas/${input.empresaId}`);
   revalidatePath(`/portal/${input.empleadoId}`);
@@ -695,6 +800,8 @@ export async function actualizarNovedadReal(input: ActualizarNovedadRealInput): 
   });
   await actualizarFichaPorEgreso({ ctx, tenant, empresaId: input.empresaId as EmpresaId, input, auditoriaRepo });
   await actualizarFichaPorIngresoMes({ ctx, tenant, empresaId: input.empresaId as EmpresaId, input, auditoriaRepo });
+  await actualizarFichaPorCambioHorario({ ctx, tenant, empresaId: input.empresaId as EmpresaId, input, auditoriaRepo });
+  await actualizarFichaPorCambioCategoria({ ctx, tenant, empresaId: input.empresaId as EmpresaId, input, auditoriaRepo });
 
   revalidatePath(`/empresas/${input.empresaId}`);
   revalidatePath(`/cliente/${input.empresaId}`);
