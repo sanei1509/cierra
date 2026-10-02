@@ -1142,3 +1142,33 @@
 - `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
 
 **Estimated scope:** Medium
+
+## Task 40: Persistent Employee Excel Imports
+**Description:** Persist employees imported from Excel/CSV in PostgreSQL from the company employee tab.
+
+**Acceptance criteria:**
+- [x] The Excel import flow sends valid rows to a real Server Action before updating local state.
+- [x] The Server Action creates imported employees in PostgreSQL for the selected company.
+- [x] The import checks existing employee CIs server-side before creating rows.
+- [x] A single audit event records how many employees were imported and from which file.
+- [x] Real imported IDs are used in the local UI after success.
+- [x] Demo fallback remains available when real backend/session IDs are not applicable.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: make the batch import transactional end-to-end if partial imports become unacceptable.
+- [ ] Pending later: optionally create employee portal access only for imported rows with valid email.
+
+**Dependencies:** Task 33, Task 39
+
+**Files touched:**
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/components/importar-empleados.tsx`
+
+**Estimated scope:** Small

@@ -1,14 +1,16 @@
 "use client";
 
 import clsx from "clsx";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AlertOctagon, AlertTriangle, CheckCircle2, FileDown, FileSpreadsheet, Upload } from "lucide-react";
+import { importarEmpleadosReal, type AltaRealResult } from "@/app/(estudio)/actions";
 import type { Empleado, Empresa } from "@/lib/types";
 import { categoriasDe, laudoDe } from "@/lib/params";
 import { MES_ACTUAL, fmt } from "@/lib/format";
 import { descargar } from "@/lib/bps";
-import { useStore } from "@/lib/store";
-import { Boton } from "./ui";
+import { useStore, useUsuario } from "@/lib/store";
+import { Boton, ResultadoAccion } from "./ui";
 
 const COLUMNAS = ["nombre", "apellido", "cedula", "email", "cargo", "categoria", "sueldo", "ingreso", "hijos"] as const;
 type Col = (typeof COLUMNAS)[number];
@@ -79,16 +81,21 @@ function ejemplo(empresa: Empresa): Fila[] {
 }
 
 export function ImportarEmpleados({ empresa, onListo }: { empresa: Empresa; onListo: () => void }) {
+  const router = useRouter();
+  const usuario = useUsuario();
   const empleados = useStore((s) => s.empleados);
   const agregar = useStore((s) => s.agregarEmpleados);
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [archivo, setArchivo] = useState("");
   const [error, setError] = useState("");
+  const [resultado, setResultado] = useState<AltaRealResult | null>(null);
+  const [importando, setImportando] = useState(false);
   const revisadas = useMemo(() => (filas ? revisar(filas, empresa, empleados) : []), [filas, empresa, empleados]);
   const validas = revisadas.filter((r) => !r.errores.length);
 
   const leer = async (f: File) => {
     setError("");
+    setResultado(null);
     try {
       const XLSX = await import("xlsx");
       const wb = XLSX.read(await f.arrayBuffer(), { cellDates: true });
@@ -111,7 +118,7 @@ export function ImportarEmpleados({ empresa, onListo }: { empresa: Empresa; onLi
     }
   };
 
-  const importar = () => {
+  const importar = async () => {
     const nuevos: Empleado[] = validas.map((r, i) => ({
       id: `${empresa.id}-imp${Date.now().toString(36)}${i}`,
       empresaId: empresa.id,
@@ -127,8 +134,44 @@ export function ImportarEmpleados({ empresa, onListo }: { empresa: Empresa; onLi
       hijos: Number(r.datos.hijos) || 0,
       conyugeFonasa: false,
     }));
-    agregar(nuevos, empresa.id);
-    onListo();
+    setError("");
+    setResultado(null);
+    setImportando(true);
+    try {
+      const res = await importarEmpleadosReal({
+        empresaId: empresa.id,
+        actor: usuario.nombre,
+        archivo,
+        empleados: nuevos.map((empleado) => ({
+          nombre: empleado.nombre,
+          apellido: empleado.apellido,
+          ci: empleado.ci,
+          email: empleado.email,
+          cargo: empleado.cargo,
+          categoria: empleado.categoria,
+          ingreso: empleado.ingreso,
+          sueldo: empleado.sueldos[0]?.monto ?? 0,
+          hijos: empleado.hijos,
+        })),
+      });
+      if (!res.ok) {
+        setResultado(res);
+        return;
+      }
+      const conIdsReales = nuevos.map((empleado, i) => ({ ...empleado, id: res.ids?.[i] ?? empleado.id }));
+      agregar(conIdsReales, empresa.id);
+      setResultado(res);
+      if (res.modo === "real") router.refresh();
+      onListo();
+    } catch (err) {
+      setResultado({
+        ok: false,
+        modo: "real",
+        mensaje: err instanceof Error ? err.message : "No pudimos importar los empleados.",
+      });
+    } finally {
+      setImportando(false);
+    }
   };
 
   if (!filas)
@@ -173,6 +216,7 @@ export function ImportarEmpleados({ empresa, onListo }: { empresa: Empresa; onLi
         <b>{validas.length}</b> {validas.length === 1 ? "fila lista" : "filas listas"} para importar
         {revisadas.length - validas.length > 0 && <> · <b className="text-rosa-t">{revisadas.length - validas.length} con errores</b> (no se importan)</>}
       </p>
+      <ResultadoAccion resultado={resultado} />
       <ul className="space-y-2">
         {revisadas.map((r) => (
           <li key={r.n} className={clsx("rounded-2xl border px-4 py-3 text-sm", r.errores.length ? "border-rosa bg-rosa/40" : "border-linea")}>
@@ -187,8 +231,8 @@ export function ImportarEmpleados({ empresa, onListo }: { empresa: Empresa; onLi
           </li>
         ))}
       </ul>
-      <Boton className="w-full" tam="lg" disabled={!validas.length} onClick={importar}>
-        Importar {validas.length} {validas.length === 1 ? "persona" : "personas"}
+      <Boton className="w-full" tam="lg" disabled={!validas.length || importando} onClick={() => void importar()}>
+        {importando ? "Importando..." : <>Importar {validas.length} {validas.length === 1 ? "persona" : "personas"}</>}
       </Boton>
     </div>
   );

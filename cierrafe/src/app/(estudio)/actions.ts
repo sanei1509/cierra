@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   actualizarEmpleado as actualizarEmpleadoBackend,
   actualizarEmpresa as actualizarEmpresaBackend,
+  crearEmpleado as crearEmpleadoBackend,
   crearEmpleadoConAccesoInicial,
   crearEmpresaConAccesoInicial,
 } from "cierrabe/acciones";
@@ -49,6 +50,25 @@ export interface CrearEmpleadoInicialInput {
   sueldo: number;
   hijos: number;
   telefono?: string;
+}
+
+export interface ImportarEmpleadoRealItem {
+  nombre: string;
+  apellido: string;
+  ci: string;
+  email: string;
+  cargo: string;
+  categoria: string;
+  ingreso: string;
+  sueldo: number;
+  hijos: number;
+}
+
+export interface ImportarEmpleadosRealInput {
+  empresaId: string;
+  empleados: ImportarEmpleadoRealItem[];
+  actor: string;
+  archivo?: string;
 }
 
 export interface CrearNovedadRealInput {
@@ -104,6 +124,10 @@ export interface MarcarReciboVistoRealInput {
   empleadoId: string;
   empresaId: string;
   mes: string;
+}
+
+export interface ImportarEmpleadosRealResult extends AltaRealResult {
+  ids?: string[];
 }
 
 export interface ActualizarEmpresaRealInput {
@@ -274,6 +298,72 @@ export async function crearEmpleadoInicial(input: CrearEmpleadoInicialInput): Pr
     modo: "real",
     mensaje: `Empleado guardado en backend con acceso inicial para ${res.usuario.email}.`,
     id: res.empleado.id,
+  };
+}
+
+export async function importarEmpleadosReal(input: ImportarEmpleadosRealInput): Promise<ImportarEmpleadosRealResult> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || ctx.actorTipo !== "estudio" || !process.env.DATABASE_URL || !uuidValido(input.empresaId)) {
+    return { ok: true, modo: "demo", mensaje: "Importacion simulada: falta sesion de estudio o backend real." };
+  }
+  if (!input.empleados.length) {
+    return { ok: false, modo: "real", mensaje: "No hay empleados validos para importar." };
+  }
+
+  const empresaId = input.empresaId as EmpresaId;
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
+
+  const { db } = await import("cierrabe/datos/db");
+  const empleadosRepo = crearEmpleadosRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  const existentes = await empleadosRepo.listarPorEmpresa(tenant, empresaId);
+  const cisExistentes = new Set(existentes.map((empleado) => empleado.ci.replace(/\D/g, "")).filter(Boolean));
+  const repetida = input.empleados.find((empleado) => cisExistentes.has(empleado.ci.replace(/\D/g, "")));
+  if (repetida) {
+    return { ok: false, modo: "real", mensaje: `Ya existe una persona con cedula ${repetida.ci}.` };
+  }
+
+  const creados = [];
+  for (const empleado of input.empleados) {
+    const creado = await crearEmpleadoBackend(
+      ctx,
+      empleadosRepo,
+      { estudioId: ctx.estudioId, empresaId },
+      {
+        empresaId,
+        nombre: empleado.nombre,
+        apellido: empleado.apellido,
+        ci: empleado.ci,
+        email: empleado.email,
+        cargo: empleado.cargo,
+        categoria: empleado.categoria,
+        modalidad: "mensual",
+        ingreso: empleado.ingreso,
+        sueldos: [{ desde: empleado.ingreso, monto: empleado.sueldo }],
+        hijos: empleado.hijos,
+        conyugeFonasa: false,
+      },
+    );
+    creados.push(creado);
+  }
+
+  await auditoriaRepo.registrar(tenant, {
+    actor: input.actor,
+    empresaId,
+    entidad: "Empleado",
+    accion: `Importo ${creados.length} ${creados.length === 1 ? "persona" : "personas"} desde Excel`,
+    detalle: input.archivo ? `Archivo: ${input.archivo}` : creados.map((empleado) => `${empleado.nombre} ${empleado.apellido}`).join(", "),
+  });
+
+  revalidatePath("/empleados");
+  revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath("/empresas");
+  return {
+    ok: true,
+    modo: "real",
+    mensaje: `Importadas ${creados.length} ${creados.length === 1 ? "persona" : "personas"} en backend.`,
+    ids: creados.map((empleado) => empleado.id),
   };
 }
 
