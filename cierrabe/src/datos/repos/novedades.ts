@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import type { NovedadId } from "../contexto";
-import type { CrearNovedadInput, NovedadesRepo } from "../contratos";
+import type { ActualizarNovedadInput, CrearNovedadInput, NovedadesRepo } from "../contratos";
 import { novedades } from "../schema";
 import type { Novedad } from "../../dominio/types";
 
@@ -21,6 +21,19 @@ function mapNovedad(row: NovedadRow): Novedad {
     origen: row.origen,
     autor: row.autor,
     fecha: row.creada.toISOString(),
+  };
+}
+
+function valoresActualizacion(input: ActualizarNovedadInput) {
+  return {
+    empleadoId: input.empleadoId,
+    tipo: input.tipo,
+    cantidad: input.cantidad ?? null,
+    importeCent: input.importe !== undefined ? Math.round(input.importe * 100) : null,
+    nota: input.nota,
+    adjunto: input.adjunto,
+    origen: input.origen,
+    autor: input.autor,
   };
 }
 
@@ -51,6 +64,16 @@ export function crearNovedadesRepo(db: Db): NovedadesRepo {
         })
         .returning();
       return { ...mapNovedad(row), mes: input.mes };
+    },
+
+    async actualizar(ctx, novedadId, input) {
+      const [row] = await db
+        .update(novedades)
+        .set(valoresActualizacion(input))
+        .where(and(eq(novedades.estudioId, ctx.estudioId), eq(novedades.id, novedadId as NovedadId)))
+        .returning();
+      if (!row) throw new Error("Novedad no encontrada");
+      return mapNovedad(row);
     },
 
     async borrar(ctx, novedadId) {

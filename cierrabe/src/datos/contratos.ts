@@ -117,6 +117,10 @@ export interface CrearNovedadInput extends Omit<Novedad, "id" | "fecha"> {
   fecha?: string;
 }
 
+export interface ActualizarNovedadInput extends Partial<Omit<Novedad, "id" | "empresaId" | "mes" | "fecha">> {
+  resumen: string;
+}
+
 export interface CrearAuditEventInput extends Omit<AuditEvent, "id" | "fecha" | "empresaId"> {
   id?: AuditEventId;
   fecha?: string;
@@ -157,6 +161,7 @@ export interface PeriodosRepo {
 export interface NovedadesRepo {
   listarPorPeriodo(ctx: TenantContext, periodoId: PeriodoId): Promise<Novedad[]>;
   crear(ctx: TenantContext, input: CrearNovedadInput): Promise<Novedad>;
+  actualizar(ctx: TenantContext, novedadId: NovedadId, input: ActualizarNovedadInput): Promise<Novedad>;
   borrar(ctx: TenantContext, novedadId: NovedadId): Promise<void>;
 }
 

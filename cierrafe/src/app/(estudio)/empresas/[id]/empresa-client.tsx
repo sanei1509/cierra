@@ -6,8 +6,9 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState, type MouseEvent } from "react";
 import {
   AlertOctagon, AlertTriangle, Info, Check, ChevronRight, Plus, X, Send, Calculator, FileDown, Lock, RefreshCw,
-  ExternalLink, UserRound, Mail, Undo2, MessageSquare, Eye, Paperclip, ImagePlus, FileSpreadsheet, Files,
+  ExternalLink, UserRound, Mail, Undo2, MessageSquare, Eye, Paperclip, ImagePlus, FileSpreadsheet, Files, Pencil,
 } from "lucide-react";
+import { borrarNovedadReal } from "@/app/(estudio)/actions";
 import { useStore, usePeriodoVista, useUsuario, type Vista } from "@/lib/store";
 import { PASOS, pasoActual } from "@/lib/status";
 import { TIPOS, valorNovedad, estadoNovedades } from "@/lib/labels";
@@ -341,9 +342,28 @@ function TabNovedades({ v, empleados }: { v: Vista; empleados: Empleado[] }) {
   const u = useUsuario();
   const puede = useStore((s) => s.puede)("editar");
   const borrar = useStore((s) => s.borrarNovedad);
-  const [form, setForm] = useState<{ emp?: string } | null>(null);
+  const [form, setForm] = useState<{ emp?: string; novedad?: Novedad } | null>(null);
+  const [eliminando, setEliminando] = useState("");
+  const [error, setError] = useState("");
   const bloqueado = v.periodo.etapa === "cerrada";
   const est = estadoNovedades(v.periodo);
+  const eliminar = async (n: Novedad) => {
+    setError("");
+    setEliminando(n.id);
+    const antes = `${TIPOS[n.tipo].corto} ${valorNovedad(n)}`;
+    try {
+      const res = await borrarNovedadReal({ id: n.id, empresaId: n.empresaId, tipo: n.tipo, autor: u.nombre, antes });
+      if (!res.ok) {
+        setError(res.mensaje);
+        return;
+      }
+      borrar(n.id, u.nombre);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos eliminar la novedad.");
+    } finally {
+      setEliminando("");
+    }
+  };
   return (
     <Panel className="p-3">
       <div className="flex flex-wrap items-center gap-3 px-3 pt-2 pb-4">
@@ -354,6 +374,7 @@ function TabNovedades({ v, empleados }: { v: Vista; empleados: Empleado[] }) {
         {!bloqueado && puede && <Boton onClick={() => setForm({})}><Plus size={15} /> Agregar novedad</Boton>}
       </div>
       {bloqueado && <p className="mx-3 mb-3 rounded-2xl bg-hundido px-4 py-3 text-sm text-tinta-2"><Lock size={14} className="mr-1 inline" /> Período cerrado. Para cambiar novedades iniciá una rectificación.</p>}
+      {error && <p className="mx-3 mb-3 rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}
       <ul>
         {empleados.map((e) => {
           const ns = v.novedadesMes.filter((n) => n.empleadoId === e.id);
@@ -373,9 +394,14 @@ function TabNovedades({ v, empleados }: { v: Vista; empleados: Empleado[] }) {
                     {n.adjunto && <Paperclip size={12} className="text-petroleo" aria-label={`Adjunto: ${n.adjunto.nombre}`} />}
                     {n.origen === "cliente" && <span className="rounded-full bg-lila px-1.5 text-[10px] font-semibold text-lila-t">cliente</span>}
                     {!bloqueado && puede && (
-                      <button onClick={() => borrar(n.id)} className="rounded-full p-0.5 text-apagado hover:bg-rosa hover:text-rosa-t" aria-label={`Quitar ${TIPOS[n.tipo].corto}`}>
-                        <X size={13} />
-                      </button>
+                      <>
+                        <button onClick={() => setForm({ emp: e.id, novedad: n })} className="rounded-full p-0.5 text-apagado hover:bg-hundido hover:text-petroleo" aria-label={`Editar ${TIPOS[n.tipo].corto}`}>
+                          <Pencil size={13} />
+                        </button>
+                        <button disabled={eliminando === n.id} onClick={() => void eliminar(n)} className="rounded-full p-0.5 text-apagado hover:bg-rosa hover:text-rosa-t disabled:opacity-50" aria-label={`Quitar ${TIPOS[n.tipo].corto}`}>
+                          <X size={13} />
+                        </button>
+                      </>
                     )}
                   </span>
                 ))}
@@ -387,9 +413,9 @@ function TabNovedades({ v, empleados }: { v: Vista; empleados: Empleado[] }) {
           );
         })}
       </ul>
-      <Drawer abierto={!!form} onCerrar={() => setForm(null)} titulo="Agregar novedad" subtitulo={`${v.empresa.nombre} · ${nombreMes(v.periodo.mes)}`}>
+      <Drawer abierto={!!form} onCerrar={() => setForm(null)} titulo={form?.novedad ? "Editar novedad" : "Agregar novedad"} subtitulo={`${v.empresa.nombre} · ${nombreMes(v.periodo.mes)}`}>
         {form && (
-          <NovedadForm empresaId={v.empresa.id} mes={v.periodo.mes} empleados={empleados} origen="estudio" autor={u.nombre} empleadoInicial={form.emp} onListo={() => setForm(null)} />
+          <NovedadForm empresaId={v.empresa.id} mes={v.periodo.mes} empleados={empleados} origen="estudio" autor={u.nombre} empleadoInicial={form.emp} novedadInicial={form.novedad} onListo={() => setForm(null)} />
         )}
       </Drawer>
     </Panel>

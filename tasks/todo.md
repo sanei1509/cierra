@@ -944,3 +944,34 @@
 - `cierrafe/src/components/novedad-form.tsx`
 
 **Estimated scope:** Medium
+
+## Task 34: Persistent Novedades Corrections
+**Description:** Complete the real novedades correction loop so loaded novedades can be edited or removed against PostgreSQL, with audit events.
+
+**Acceptance criteria:**
+- [x] Novedades repository can update an existing novelty within tenant scope.
+- [x] Study UI can edit a persisted novelty from the company detail screen.
+- [x] Study UI can delete a persisted novelty from the company detail screen.
+- [x] Create flow keeps the backend novelty id in the client state immediately.
+- [x] Edit and delete actions write audit records with before/after context.
+- [x] Demo fallback still updates the local store when the real backend is unavailable.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+
+**Notes:**
+- [ ] Pending later: expose the same correction controls in the client portal if clients should self-correct after submitting.
+- [ ] Pending later: add dedicated repository tests for update/delete once integration-test DB helpers are available.
+
+**Dependencies:** Task 33
+
+**Files touched:**
+- `cierrabe/src/datos/contratos.ts`
+- `cierrabe/src/datos/repos/novedades.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/components/novedad-form.tsx`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+- `cierrafe/src/lib/store.ts`
+
+**Estimated scope:** Small

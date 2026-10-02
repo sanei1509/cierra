@@ -35,7 +35,8 @@ interface Acciones {
   setUsuario: (id: string) => void;
   setTemaUsuario: (tema: TemaPreferido) => void;
   puede: (a: Accion) => boolean;
-  agregarNovedad: (n: Omit<Novedad, "id" | "fecha">) => void;
+  agregarNovedad: (n: Omit<Novedad, "id" | "fecha"> & { id?: string; fecha?: string }) => void;
+  editarNovedad: (id: string, n: Omit<Novedad, "id" | "fecha">, actor?: string) => void;
   borrarNovedad: (id: string, actor?: string) => void;
   solicitarNovedades: (periodoId: string) => void;
   abrirSolicitud: (periodoId: string, actor: string) => void;
@@ -140,12 +141,20 @@ export const useStore = create<Datos & Acciones>()(
           return true;
         },
         agregarNovedad: (n) => {
-          set((s) => ({ novedades: [...s.novedades, { ...n, id: uid("n"), fecha: ahora() }] }));
+          set((s) => ({ novedades: [...s.novedades, { ...n, id: n.id ?? uid("n"), fecha: n.fecha ?? ahora() }] }));
           const p = get().periodos.find((x) => x.empresaId === n.empresaId && x.mes === n.mes);
           // Cualquier cambio invalida la versión enviada / aprobada (RN-05)
           if (p && ["enviada", "aprobada", "devuelta"].includes(p.etapa)) upd(p.id, () => ({ etapa: "borrador", aprobacion: undefined }));
           const e = get().empleados.find((x) => x.id === n.empleadoId);
           log({ actor: n.origen === "cliente" ? n.autor : undefined, empresaId: n.empresaId, entidad: "Novedad", accion: `Agregó ${n.tipo.replace("_", " ")} a ${e?.nombre} ${e?.apellido}`, despues: n.cantidad ? String(n.cantidad) : n.importe ? `$ ${n.importe}` : undefined });
+        },
+        editarNovedad: (id, n, a) => {
+          const anterior = get().novedades.find((x) => x.id === id);
+          if (!anterior) return;
+          set((s) => ({ novedades: s.novedades.map((x) => x.id === id ? { ...x, ...n } : x) }));
+          const p = get().periodos.find((x) => x.empresaId === n.empresaId && x.mes === n.mes);
+          if (p && ["enviada", "aprobada", "devuelta"].includes(p.etapa)) upd(p.id, () => ({ etapa: "borrador", aprobacion: undefined }));
+          log({ actor: a, empresaId: n.empresaId, entidad: "Novedad", accion: `Editó ${n.tipo.replace("_", " ")}`, antes: anterior.cantidad ? String(anterior.cantidad) : anterior.importe ? `$ ${anterior.importe}` : undefined, despues: n.cantidad ? String(n.cantidad) : n.importe ? `$ ${n.importe}` : undefined });
         },
         borrarNovedad: (id, a) => {
           const n = get().novedades.find((x) => x.id === id);

@@ -2,10 +2,10 @@
 
 import clsx from "clsx";
 import { useState } from "react";
-import type { Adjunto, Empleado, TipoNovedad } from "@/lib/types";
+import type { Adjunto, Empleado, Novedad, TipoNovedad } from "@/lib/types";
 import { Paperclip, X } from "lucide-react";
-import { crearNovedadReal } from "@/app/(estudio)/actions";
-import { TIPOS } from "@/lib/labels";
+import { actualizarNovedadReal, crearNovedadReal } from "@/app/(estudio)/actions";
+import { TIPOS, valorNovedad } from "@/lib/labels";
 import { useStore } from "@/lib/store";
 import { Boton, Campo, inputCls } from "./ui";
 
@@ -18,6 +18,7 @@ export function NovedadForm({
   empleadoInicial,
   tipoInicial = "hora_extra",
   tipos = Object.keys(TIPOS) as TipoNovedad[],
+  novedadInicial,
   onListo,
 }: {
   empresaId: string;
@@ -28,19 +29,22 @@ export function NovedadForm({
   empleadoInicial?: string;
   tipoInicial?: TipoNovedad;
   tipos?: TipoNovedad[];
+  novedadInicial?: Novedad;
   onListo: () => void;
 }) {
   const agregar = useStore((s) => s.agregarNovedad);
-  const [empleadoId, setEmpleadoId] = useState(empleadoInicial ?? empleados[0]?.id);
-  const [tipo, setTipo] = useState<TipoNovedad>(tipoInicial);
-  const [valor, setValor] = useState("");
-  const [nota, setNota] = useState("");
-  const [adjunto, setAdjunto] = useState<Adjunto | undefined>();
+  const editar = useStore((s) => s.editarNovedad);
+  const [empleadoId, setEmpleadoId] = useState(novedadInicial?.empleadoId ?? empleadoInicial ?? empleados[0]?.id);
+  const [tipo, setTipo] = useState<TipoNovedad>(novedadInicial?.tipo ?? tipoInicial);
+  const [valor, setValor] = useState(String(novedadInicial?.importe ?? novedadInicial?.cantidad ?? ""));
+  const [nota, setNota] = useState(novedadInicial?.nota ?? "");
+  const [adjunto, setAdjunto] = useState<Adjunto | undefined>(novedadInicial?.adjunto);
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   const t = TIPOS[tipo];
   const v = Number(valor.replace(/\./g, "").replace(",", "."));
   const valido = empleadoId && v > 0;
+  const editando = !!novedadInicial;
 
   if (empleados.length === 0) {
     return (
@@ -71,12 +75,20 @@ export function NovedadForm({
           autor,
         };
         try {
-          const res = await crearNovedadReal(novedad);
+          const antes = novedadInicial ? `${TIPOS[novedadInicial.tipo].corto} ${valorNovedad(novedadInicial)}` : undefined;
+          const despues = `${TIPOS[tipo].corto} ${t.unidad === "$" ? `$ ${v}` : v}`;
+          const res = editando
+            ? await actualizarNovedadReal({ ...novedad, id: novedadInicial.id, antes, despues })
+            : await crearNovedadReal(novedad);
           if (!res.ok) {
             setError(res.mensaje);
             return;
           }
-          agregar(novedad);
+          if (editando) {
+            editar(novedadInicial.id, novedad, autor);
+          } else {
+            agregar({ ...novedad, id: res.id });
+          }
           onListo();
         } catch (error) {
           setError(error instanceof Error ? error.message : "No pudimos guardar la novedad.");
@@ -147,7 +159,7 @@ export function NovedadForm({
       </div>
       {error && <p className="rounded-2xl bg-rosa px-3 py-2 text-sm text-rosa-t">{error}</p>}
       <Boton type="submit" disabled={!valido || guardando} className="w-full" tam="lg">
-        {guardando ? "Guardando..." : `Agregar ${t.corto.toLowerCase()}`}
+        {guardando ? "Guardando..." : editando ? "Guardar cambios" : `Agregar ${t.corto.toLowerCase()}`}
       </Boton>
     </form>
   );

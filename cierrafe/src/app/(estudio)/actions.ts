@@ -57,6 +57,20 @@ export interface CrearNovedadRealInput {
   autor: string;
 }
 
+export interface ActualizarNovedadRealInput extends CrearNovedadRealInput {
+  id: string;
+  antes?: string;
+  despues?: string;
+}
+
+export interface BorrarNovedadRealInput {
+  id: string;
+  empresaId: string;
+  tipo: TipoNovedad;
+  autor: string;
+  antes?: string;
+}
+
 export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Promise<AltaRealResult> {
   const ctx = contextoEstudioDesarrollo(await obtenerSesionDev());
   if (!ctx) {
@@ -234,5 +248,96 @@ export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<Al
     modo: "real",
     mensaje: "Novedad guardada en backend.",
     id: novedad.id,
+  };
+}
+
+export async function actualizarNovedadReal(input: ActualizarNovedadRealInput): Promise<AltaRealResult> {
+  const ctx = await contextoEstudioActual();
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(input.id) || !uuidValido(input.empresaId) || !uuidValido(input.empleadoId)) {
+    return {
+      ok: true,
+      modo: "demo",
+      mensaje: "Novedad actualizada solo en demo: falta backend real o IDs UUID.",
+    };
+  }
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) {
+    return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
+  }
+
+  const { db } = await import("cierrabe/datos/db");
+  const novedadesRepo = crearNovedadesRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  const novedad = await novedadesRepo.actualizar(tenant, input.id as NovedadId, {
+    empleadoId: input.empleadoId as EmpleadoId,
+    tipo: input.tipo,
+    cantidad: input.cantidad,
+    importe: input.importe,
+    nota: input.nota,
+    adjunto: input.adjunto,
+    origen: input.origen,
+    autor: input.autor,
+    resumen: `Actualizo ${input.tipo.replace("_", " ")}`,
+  });
+
+  await auditoriaRepo.registrar(tenant, {
+    actor: input.autor,
+    empresaId: input.empresaId as EmpresaId,
+    entidad: "Novedad",
+    entidadId: novedad.id as NovedadId,
+    accion: `Actualizo ${input.tipo.replace("_", " ")}`,
+    detalle: input.nota,
+    antes: input.antes,
+    despues: input.despues,
+  });
+
+  revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath(`/cliente/${input.empresaId}`);
+  revalidatePath("/empresas");
+  return {
+    ok: true,
+    modo: "real",
+    mensaje: "Novedad actualizada en backend.",
+    id: novedad.id,
+  };
+}
+
+export async function borrarNovedadReal(input: BorrarNovedadRealInput): Promise<AltaRealResult> {
+  const ctx = await contextoEstudioActual();
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(input.id) || !uuidValido(input.empresaId)) {
+    return {
+      ok: true,
+      modo: "demo",
+      mensaje: "Novedad eliminada solo en demo: falta backend real o IDs UUID.",
+    };
+  }
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) {
+    return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
+  }
+
+  const { db } = await import("cierrabe/datos/db");
+  const novedadesRepo = crearNovedadesRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  await novedadesRepo.borrar(tenant, input.id as NovedadId);
+  await auditoriaRepo.registrar(tenant, {
+    actor: input.autor,
+    empresaId: input.empresaId as EmpresaId,
+    entidad: "Novedad",
+    entidadId: input.id as NovedadId,
+    accion: `Elimino ${input.tipo.replace("_", " ")}`,
+    antes: input.antes,
+  });
+
+  revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath(`/cliente/${input.empresaId}`);
+  revalidatePath("/empresas");
+  return {
+    ok: true,
+    modo: "real",
+    mensaje: "Novedad eliminada en backend.",
+    id: input.id,
   };
 }
