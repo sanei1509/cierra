@@ -158,6 +158,30 @@ function ahoraIso() {
   return new Date().toISOString();
 }
 
+const TIPOS_ADJUNTO_PERMITIDOS = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+const MAX_ADJUNTO_BYTES = 700 * 1024;
+const MAX_IMPORTAR_EMPLEADOS = 250;
+
+function ciNormalizada(ci: string) {
+  return ci.replace(/\D/g, "");
+}
+
+function validarAdjunto(adjunto: Adjunto | undefined) {
+  if (!adjunto) return undefined;
+  if (!adjunto.nombre.trim()) throw new Error("El adjunto no tiene nombre.");
+  if (!TIPOS_ADJUNTO_PERMITIDOS.has(adjunto.tipo)) throw new Error("El adjunto debe ser PDF, JPG, PNG o WEBP.");
+  if (!Number.isFinite(adjunto.tamano) || adjunto.tamano <= 0 || adjunto.tamano > MAX_ADJUNTO_BYTES) {
+    throw new Error("El adjunto puede pesar hasta 700 KB.");
+  }
+  if (adjunto.dataUrl) {
+    const prefijo = `data:${adjunto.tipo};base64,`;
+    if (!adjunto.dataUrl.startsWith(prefijo)) throw new Error("El contenido del adjunto no coincide con su tipo.");
+    const bytesAprox = Math.ceil((adjunto.dataUrl.slice(prefijo.length).length * 3) / 4);
+    if (bytesAprox > MAX_ADJUNTO_BYTES + 1024) throw new Error("El adjunto supera el tamaño permitido.");
+  }
+  return adjunto;
+}
+
 function periodoInicial(empresaId: EmpresaId, mes: string): Periodo {
   return {
     id: crypto.randomUUID(),
@@ -318,51 +342,71 @@ export async function importarEmpleadosReal(input: ImportarEmpleadosRealInput): 
   if (!input.empleados.length) {
     return { ok: false, modo: "real", mensaje: "No hay empleados validos para importar." };
   }
+  if (input.empleados.length > MAX_IMPORTAR_EMPLEADOS) {
+    return { ok: false, modo: "real", mensaje: `Importa hasta ${MAX_IMPORTAR_EMPLEADOS} personas por archivo.` };
+  }
 
   const empresaId = input.empresaId as EmpresaId;
   const tenant = tenantContextDesdeAcceso(ctx);
   if (!tenant) return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
 
+  const cisArchivo = new Set<string>();
+  for (const empleado of input.empleados) {
+    const ci = ciNormalizada(empleado.ci);
+    if (!empleado.nombre.trim() || !empleado.apellido.trim() || !empleado.cargo.trim() || !empleado.categoria.trim()) {
+      return { ok: false, modo: "real", mensaje: "Hay filas con nombre, apellido, cargo o categoria incompletos." };
+    }
+    if (ci.length < 6) return { ok: false, modo: "real", mensaje: `Cedula invalida para ${empleado.nombre} ${empleado.apellido}.` };
+    if (cisArchivo.has(ci)) return { ok: false, modo: "real", mensaje: `La cedula ${empleado.ci} esta repetida en el archivo.` };
+    if (!/^\S+@\S+\.\S+$/.test(empleado.email)) return { ok: false, modo: "real", mensaje: `Email invalido para ${empleado.nombre} ${empleado.apellido}.` };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(empleado.ingreso)) return { ok: false, modo: "real", mensaje: `Fecha de ingreso invalida para ${empleado.nombre} ${empleado.apellido}.` };
+    if (!Number.isFinite(empleado.sueldo) || empleado.sueldo <= 0) return { ok: false, modo: "real", mensaje: `Sueldo invalido para ${empleado.nombre} ${empleado.apellido}.` };
+    cisArchivo.add(ci);
+  }
+
   const { db } = await import("cierrabe/datos/db");
   const empleadosRepo = crearEmpleadosRepo(db);
-  const auditoriaRepo = crearAuditoriaRepo(db);
   const existentes = await empleadosRepo.listarPorEmpresa(tenant, empresaId);
-  const cisExistentes = new Set(existentes.map((empleado) => empleado.ci.replace(/\D/g, "")).filter(Boolean));
-  const repetida = input.empleados.find((empleado) => cisExistentes.has(empleado.ci.replace(/\D/g, "")));
+  const cisExistentes = new Set(existentes.map((empleado) => ciNormalizada(empleado.ci)).filter(Boolean));
+  const repetida = input.empleados.find((empleado) => cisExistentes.has(ciNormalizada(empleado.ci)));
   if (repetida) {
     return { ok: false, modo: "real", mensaje: `Ya existe una persona con cedula ${repetida.ci}.` };
   }
 
-  const creados = [];
-  for (const empleado of input.empleados) {
-    const creado = await crearEmpleadoBackend(
-      ctx,
-      empleadosRepo,
-      { estudioId: ctx.estudioId, empresaId },
-      {
-        empresaId,
-        nombre: empleado.nombre,
-        apellido: empleado.apellido,
-        ci: empleado.ci,
-        email: empleado.email,
-        cargo: empleado.cargo,
-        categoria: empleado.categoria,
-        modalidad: "mensual",
-        ingreso: empleado.ingreso,
-        sueldos: [{ desde: empleado.ingreso, monto: empleado.sueldo }],
-        hijos: empleado.hijos,
-        conyugeFonasa: false,
-      },
-    );
-    creados.push(creado);
-  }
-
-  await auditoriaRepo.registrar(tenant, {
-    actor: input.actor,
-    empresaId,
-    entidad: "Empleado",
-    accion: `Importo ${creados.length} ${creados.length === 1 ? "persona" : "personas"} desde Excel`,
-    detalle: input.archivo ? `Archivo: ${input.archivo}` : creados.map((empleado) => `${empleado.nombre} ${empleado.apellido}`).join(", "),
+  const creados = await db.transaction(async (tx) => {
+    const empleadosTx = crearEmpleadosRepo(tx as unknown as typeof db);
+    const auditoriaTx = crearAuditoriaRepo(tx as unknown as typeof db);
+    const creadosTx = [];
+    for (const empleado of input.empleados) {
+      const creado = await crearEmpleadoBackend(
+        ctx,
+        empleadosTx,
+        { estudioId: ctx.estudioId, empresaId },
+        {
+          empresaId,
+          nombre: empleado.nombre,
+          apellido: empleado.apellido,
+          ci: empleado.ci,
+          email: empleado.email,
+          cargo: empleado.cargo,
+          categoria: empleado.categoria,
+          modalidad: "mensual",
+          ingreso: empleado.ingreso,
+          sueldos: [{ desde: empleado.ingreso, monto: empleado.sueldo }],
+          hijos: empleado.hijos,
+          conyugeFonasa: false,
+        },
+      );
+      creadosTx.push(creado);
+    }
+    await auditoriaTx.registrar(tenant, {
+      actor: input.actor,
+      empresaId,
+      entidad: "Empleado",
+      accion: `Importo ${creadosTx.length} ${creadosTx.length === 1 ? "persona" : "personas"} desde Excel`,
+      detalle: input.archivo ? `Archivo: ${input.archivo}` : creadosTx.map((empleado) => `${empleado.nombre} ${empleado.apellido}`).join(", "),
+    });
+    return creadosTx;
   });
 
   revalidatePath("/empleados");
@@ -469,7 +513,7 @@ export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<Al
     cantidad: input.cantidad,
     importe: input.importe,
     nota: input.nota,
-    adjunto: input.adjunto,
+    adjunto: validarAdjunto(input.adjunto),
     origen: input.origen,
     autor: input.autor,
   });
@@ -517,7 +561,7 @@ export async function actualizarNovedadReal(input: ActualizarNovedadRealInput): 
     cantidad: input.cantidad,
     importe: input.importe,
     nota: input.nota,
-    adjunto: input.adjunto,
+    adjunto: validarAdjunto(input.adjunto),
     origen: input.origen,
     autor: input.autor,
     resumen: `Actualizo ${input.tipo.replace("_", " ")}`,

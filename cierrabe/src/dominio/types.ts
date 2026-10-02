@@ -67,6 +67,7 @@ export interface Adjunto {
   nombre: string;
   tipo: string;
   tamano: number;
+  dataUrl?: string;
 }
 
 export interface Novedad {

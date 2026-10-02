@@ -1162,7 +1162,7 @@
 - [x] `corepack pnpm --filter cierrafe build`
 
 **Notes:**
-- [ ] Pending later: make the batch import transactional end-to-end if partial imports become unacceptable.
+- [x] Completed in Task 45: the batch import now validates rows and writes all imported employees plus audit inside one transaction.
 - [ ] Pending later: optionally create employee portal access only for imported rows with valid email.
 
 **Dependencies:** Task 33, Task 39
@@ -1285,3 +1285,43 @@
 - `cierrafe/src/app/(estudio)/portales/portales-client.tsx`
 
 **Estimated scope:** Small
+
+## Task 45: Local-Real Workflow Cleanup And Hardening
+**Description:** Replace remaining confusing demo copy in active workflows, refresh employee data after real writes, make Excel imports atomic, persist small novelty attachments, and add baseline HTTP hardening.
+
+**Acceptance criteria:**
+- [x] Sidebar/dev access copy clarifies that reset only affects browser state, not the PostgreSQL database.
+- [x] Employee creation refreshes real server data after successful backend writes and keeps the visible count tied to real data.
+- [x] Employee Excel import validates duplicates, required fields, dates, email and row limits server-side.
+- [x] Employee Excel import creates all imported rows and its audit event inside one database transaction.
+- [x] Novelty attachments persist lightweight PDF/image data with client and server validation.
+- [x] Next.js sends baseline security headers and keeps Server Action upload size bounded.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe build`
+- [x] `corepack pnpm audit --prod`
+
+**Notes:**
+- [ ] Pending later: move attachments from JSONB data URLs to dedicated object storage before production.
+- [ ] Pending later: replace dev role shortcuts with real authentication and impersonation/session handoff.
+
+**Dependencies:** Task 35, Task 40, Task 44
+
+**Files touched:**
+- `README.md`
+- `cierrafe/next.config.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/app/(estudio)/empleados/empleados-client.tsx`
+- `cierrafe/src/app/(estudio)/funciones/page.tsx`
+- `cierrafe/src/components/novedad-form.tsx`
+- `cierrafe/src/components/shell.tsx`
+- `cierrafe/src/lib/funciones.ts`
+- `cierrafe/src/lib/types.ts`
+- `cierrabe/src/datos/schema.ts`
+- `cierrabe/src/dominio/types.ts`
+
+**Estimated scope:** Medium

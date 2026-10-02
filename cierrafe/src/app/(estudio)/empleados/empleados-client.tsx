@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { crearEmpleadoInicial, type AltaRealResult } from "../actions";
@@ -17,6 +18,7 @@ function NuevoEmpleadoDrawer({
   empresaInicial,
   onResultado,
   empresasDisponibles,
+  cantidadActual,
   onEmpleadoCreado,
 }: {
   abierto: boolean;
@@ -24,7 +26,8 @@ function NuevoEmpleadoDrawer({
   empresaInicial: string;
   onResultado: (resultado: AltaRealResult | null) => void;
   empresasDisponibles?: Empresa[];
-  onEmpleadoCreado?: (empleado: Empleado) => void;
+  cantidadActual?: number;
+  onEmpleadoCreado?: (empleado: Empleado, resultado: AltaRealResult) => void;
 }) {
   const empresasDemo = useStore((s) => s.empresas);
   const empleados = useStore((s) => s.empleados);
@@ -91,7 +94,7 @@ function NuevoEmpleadoDrawer({
         });
         const empleadoCreado = { ...empleado, id: alta.id ?? empleado.id };
         agregarEmpleado(empleadoCreado, { nombre: `${nombre} ${apellido}`, email });
-        onEmpleadoCreado?.(empleadoCreado);
+        onEmpleadoCreado?.(empleadoCreado, alta);
         setResultado(alta);
         onResultado(alta);
         onCerrar();
@@ -144,22 +147,27 @@ function NuevoEmpleadoDrawer({
         {error && <ResultadoAccion resultado={{ ok: false, mensaje: error }} />}
         <ResultadoAccion resultado={resultado && !resultado.ok ? resultado : null} />
         <Boton type="submit" tam="lg" className="w-full" disabled={pendiente}><Plus size={16} /> {pendiente ? "Creando..." : "Crear empleado"}</Boton>
-        <p className="text-xs text-apagado">Actuales en demo: {empleados.length}. En producción este alta también enviará la invitación.</p>
+        <p className="text-xs text-apagado">{cantidadActual ?? empleados.length} personas cargadas. El envío real de invitaciones queda para la etapa de autenticación.</p>
       </form>
     </Drawer>
   );
 }
 
 export default function EmpleadosClient({ datosIniciales }: { datosIniciales: { modo: "real" | "demo"; empresas: Empresa[]; empleados: Empleado[] } }) {
+  const router = useRouter();
   const empleadosDemo = useStore((s) => s.empleados);
   const empresasDemo = useStore((s) => s.empresas);
-  const [empleadosReales, setEmpleadosReales] = useState(datosIniciales.empleados);
+  const [empleadosOptimistas, setEmpleadosOptimistas] = useState<Empleado[]>([]);
   const [q, setQ] = useState("");
   const [emp, setEmp] = useState("todas");
   const [nuevo, setNuevo] = useState(false);
   const [resultado, setResultado] = useState<AltaRealResult | null>(null);
   const esReal = datosIniciales.modo === "real";
-  const empleados = esReal ? empleadosReales : empleadosDemo;
+  const empleados = useMemo(() => {
+    if (!esReal) return empleadosDemo;
+    const reales = new Set(datosIniciales.empleados.map((empleado) => empleado.id));
+    return [...datosIniciales.empleados, ...empleadosOptimistas.filter((empleado) => !reales.has(empleado.id))];
+  }, [datosIniciales.empleados, empleadosDemo, empleadosOptimistas, esReal]);
   const empresas = esReal ? datosIniciales.empresas : empresasDemo;
   const lista = useMemo(() => {
     const t = q.toLowerCase();
@@ -197,9 +205,11 @@ export default function EmpleadosClient({ datosIniciales }: { datosIniciales: { 
         empresaInicial={emp}
         onResultado={setResultado}
         empresasDisponibles={empresas}
-        onEmpleadoCreado={(empleado) => {
-          if (!esReal || empleadosReales.some((actual) => actual.id === empleado.id)) return;
-          setEmpleadosReales((actual) => [...actual, empleado]);
+        cantidadActual={empleados.length}
+        onEmpleadoCreado={(empleado, alta) => {
+          if (!esReal || empleados.some((actual) => actual.id === empleado.id)) return;
+          setEmpleadosOptimistas((actual) => [...actual, empleado]);
+          if (alta.modo === "real") router.refresh();
         }}
       />
       <Panel className="p-3">

@@ -18,7 +18,7 @@ pnpm db:seed:dev
 
 `pnpm db:seed:dev` crea/actualiza los usuarios, sus credenciales password de desarrollo, el estudio UUID y el catalogo comercial base definido en `.env.example` para que las Server Actions de desarrollo puedan escribir en PostgreSQL. Para probar login real local, configurá `DATABASE_URL`, `CIERRA_SESSION_SECRET`, ejecutá el seed y entrá con `CIERRA_DEV_ADMIN_EMAIL` o `CIERRA_DEV_USUARIO_EMAIL` usando `CIERRA_DEV_PASSWORD`.
 
-- Los datos son ficticios y se guardan en el navegador (localStorage). Botón "Reiniciar datos de ejemplo" en la barra lateral.
+- Con `DATABASE_URL` configurado, las pantallas principales leen y escriben en PostgreSQL local. El botón de la barra lateral reinicia solo el estado guardado en el navegador.
 - Cambiá de usuario (arriba a la derecha) para probar roles: Administradora, Liquidador, Solo lectura.
 - "Cliente y empleado" en la barra lateral abre los portales.
 - La fecha de la demo está fija en septiembre 2026.
@@ -31,7 +31,7 @@ pnpm db:seed:dev
 | `cierrafe/` | Frontend Next.js: pantallas del estudio, cliente y empleado |
 | `cierrafe/src/lib/engine.ts` | Motor de cálculo determinista usado por el front actual |
 | `cierrafe/src/lib/params.ts` | Parámetros normativos y laudos con vigencia (**valores de ejemplo**) |
-| `cierrafe/src/lib/store.ts` | Workflow demo en navegador, a reemplazar por backend |
+| `cierrafe/src/lib/store.ts` | Estado interactivo del navegador y fallback de prueba cuando no hay backend real |
 | `cierrabe/` | Backend: schema PostgreSQL, Drizzle, contratos y acceso a datos |
 | `cierrabe/src/datos/schema.ts` | Primer esquema real de base de datos |
 | `cierrabe/drizzle/` | Migraciones SQL generadas |

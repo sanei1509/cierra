@@ -9,6 +9,18 @@ import { TIPOS, valorNovedad } from "@/lib/labels";
 import { useStore } from "@/lib/store";
 import { Boton, Campo, inputCls } from "./ui";
 
+const TIPOS_ADJUNTO_PERMITIDOS = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+const MAX_ADJUNTO_BYTES = 700 * 1024;
+
+function archivoADataUrl(archivo: File) {
+  return new Promise<string>((resolve, reject) => {
+    const lector = new FileReader();
+    lector.onload = () => resolve(String(lector.result));
+    lector.onerror = () => reject(new Error("No pudimos leer el archivo."));
+    lector.readAsDataURL(archivo);
+  });
+}
+
 export function NovedadForm({
   empresaId,
   mes,
@@ -149,9 +161,25 @@ export function NovedadForm({
               type="file"
               accept="image/*,application/pdf"
               className="sr-only"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const f = e.target.files?.[0];
-                if (f) setAdjunto({ nombre: f.name, tipo: f.type, tamano: f.size });
+                if (!f) return;
+                setError("");
+                if (!TIPOS_ADJUNTO_PERMITIDOS.has(f.type)) {
+                  setError("Adjuntá PDF, JPG, PNG o WEBP.");
+                  e.target.value = "";
+                  return;
+                }
+                if (f.size > MAX_ADJUNTO_BYTES) {
+                  setError("El comprobante puede pesar hasta 700 KB en esta versión.");
+                  e.target.value = "";
+                  return;
+                }
+                try {
+                  setAdjunto({ nombre: f.name, tipo: f.type, tamano: f.size, dataUrl: await archivoADataUrl(f) });
+                } catch (error) {
+                  setError(error instanceof Error ? error.message : "No pudimos adjuntar el archivo.");
+                }
               }}
             />
           </label>

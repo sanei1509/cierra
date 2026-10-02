@@ -88,8 +88,8 @@ function Sidebar({ onNav }: { onNav?: () => void }) {
       </Link>
 
       <div className="mt-auto overflow-hidden rounded-2xl bg-[linear-gradient(135deg,var(--cierra-navy),var(--cierra-blue))] p-4 text-white">
-        <p className="text-sm font-bold">Datos de demostración</p>
-        <p className="mt-1 text-xs leading-relaxed text-[#DCE9FF]">Sirven para probar el flujo mientras armamos la base real.</p>
+        <p className="text-sm font-bold">Estado local</p>
+        <p className="mt-1 text-xs leading-relaxed text-[#DCE9FF]">Reinicia solo lo guardado en este navegador. La base local no se borra.</p>
         <button
           onClick={() => {
             reiniciar();
@@ -97,7 +97,7 @@ function Sidebar({ onNav }: { onNav?: () => void }) {
           }}
           className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/12 text-xs font-semibold text-white hover:bg-white/20"
         >
-          <RotateCcw size={13} /> Reiniciar datos de ejemplo
+          <RotateCcw size={13} /> Reiniciar navegador
         </button>
       </div>
     </nav>
@@ -239,10 +239,10 @@ function DevAccessBar() {
       <button onClick={() => entrarEstudio("u3")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
         <Eye size={13} /> Solo lectura
       </button>
-      <Link href="/cliente/colon" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
+      <Link href="/portales" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
         <Building2 size={13} /> Empresa
       </Link>
-      <Link href="/portal/espiga-3" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
+      <Link href="/portales" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
         <UserRound size={13} /> Empleado
       </Link>
     </section>

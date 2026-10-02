@@ -465,7 +465,7 @@ export const novedades = pgTable(
     cantidad: integer("cantidad"),
     importeCent: integer("importe_cent"),
     nota: text("nota"),
-    adjunto: jsonb("adjunto").$type<{ nombre: string; tipo: string; tamano: number }>(),
+    adjunto: jsonb("adjunto").$type<{ nombre: string; tipo: string; tamano: number; dataUrl?: string }>(),
     origen: origenNovedadEnum("origen").notNull(),
     autor: text("autor").notNull(),
     creada: timestamp("creada", { withTimezone: true }).defaultNow().notNull(),

@@ -110,7 +110,7 @@ export default function Funciones() {
 
         <Panel className="bg-petroleo p-6 text-white">
           <h2 className="font-bold">Recorrido para una entrevista</h2>
-          <p className="mt-1 text-xs text-[#DCE9FF]">Pedile al contador cada tarea sin explicarle cómo. Antes, tocá “Reiniciar datos de ejemplo”.</p>
+          <p className="mt-1 text-xs text-[#DCE9FF]">Pedile al contador cada tarea sin explicarle cómo. Si mezclaste pruebas, reiniciá el estado local del navegador.</p>
           <ol className="mt-4 space-y-2">
             {RECORRIDO.map((r, i) => (
               <li key={r.t}>
