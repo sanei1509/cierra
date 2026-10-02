@@ -234,6 +234,65 @@ async function actualizarFichaPorEgreso({
   });
 }
 
+function fusionarSueldo(sueldos: Empleado["sueldos"], desde: string, monto: number) {
+  return [...sueldos.filter((sueldo) => sueldo.desde !== desde), { desde, monto }].sort((a, b) => a.desde.localeCompare(b.desde));
+}
+
+async function actualizarFichaPorIngresoMes({
+  ctx,
+  tenant,
+  empresaId,
+  input,
+  auditoriaRepo,
+}: {
+  ctx: NonNullable<Awaited<ReturnType<typeof contextoOperativoActual>>>;
+  tenant: NonNullable<ReturnType<typeof tenantContextDesdeAcceso>>;
+  empresaId: EmpresaId;
+  input: CrearNovedadRealInput;
+  auditoriaRepo: ReturnType<typeof crearAuditoriaRepo>;
+}) {
+  const ingreso = fechaIsoSimple(input.datos?.ingresoFecha);
+  const sueldo = input.datos?.ingresoSueldoInicial;
+  const categoria = input.datos?.ingresoCategoria?.trim();
+  const modalidad = input.datos?.ingresoModalidad;
+  if (
+    ctx.actorTipo !== "estudio" ||
+    input.tipo !== "ingreso_mes" ||
+    input.origen !== "estudio" ||
+    !ingreso ||
+    !categoria ||
+    !modalidad ||
+    !sueldo ||
+    sueldo <= 0
+  ) {
+    return;
+  }
+  const { db } = await import("cierrabe/datos/db");
+  const empleadosRepo = crearEmpleadosRepo(db);
+  const actual = await empleadosRepo.obtener(tenant, input.empleadoId as EmpleadoId);
+  if (!actual || actual.empresaId !== empresaId) return;
+  const empleado = await actualizarEmpleadoBackend(
+    ctx,
+    empleadosRepo,
+    { estudioId: ctx.estudioId, empresaId, empleadoId: input.empleadoId as EmpleadoId },
+    {
+      ingreso,
+      categoria,
+      modalidad,
+      sueldos: fusionarSueldo(actual.sueldos, ingreso, sueldo),
+      resumen: `Ingreso informado por novedad: ${ingreso}`,
+    },
+  );
+  await auditoriaRepo.registrar(tenant, {
+    actor: input.autor,
+    empresaId,
+    entidad: "Empleado",
+    entidadId: empleado.id as EmpleadoId,
+    accion: `Actualizo ingreso de ${empleado.nombre} ${empleado.apellido}`,
+    detalle: `${ingreso} · ${categoria} · ${modalidad} · sueldo ${sueldo}${input.datos?.ingresoHorario ? ` · horario ${input.datos.ingresoHorario}` : ""}`,
+  });
+}
+
 function periodoInicial(empresaId: EmpresaId, mes: string): Periodo {
   return {
     id: crypto.randomUUID(),
@@ -580,6 +639,7 @@ export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<Al
     detalle: input.nota,
   });
   await actualizarFichaPorEgreso({ ctx, tenant, empresaId, input, auditoriaRepo });
+  await actualizarFichaPorIngresoMes({ ctx, tenant, empresaId, input, auditoriaRepo });
 
   revalidatePath(`/empresas/${input.empresaId}`);
   revalidatePath(`/portal/${input.empleadoId}`);
@@ -634,6 +694,7 @@ export async function actualizarNovedadReal(input: ActualizarNovedadRealInput): 
     despues: input.despues,
   });
   await actualizarFichaPorEgreso({ ctx, tenant, empresaId: input.empresaId as EmpresaId, input, auditoriaRepo });
+  await actualizarFichaPorIngresoMes({ ctx, tenant, empresaId: input.empresaId as EmpresaId, input, auditoriaRepo });
 
   revalidatePath(`/empresas/${input.empresaId}`);
   revalidatePath(`/cliente/${input.empresaId}`);

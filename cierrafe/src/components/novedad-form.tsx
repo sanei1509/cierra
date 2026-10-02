@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { useState } from "react";
-import type { Adjunto, Empleado, Novedad, TipoNovedad } from "@/lib/types";
+import type { Adjunto, Empleado, Modalidad, Novedad, TipoNovedad } from "@/lib/types";
 import { Paperclip, X } from "lucide-react";
 import { actualizarNovedadReal, crearNovedadReal } from "@/app/(estudio)/actions";
 import { TIPOS, valorNovedad } from "@/lib/labels";
@@ -20,6 +20,12 @@ function archivoADataUrl(archivo: File) {
     lector.readAsDataURL(archivo);
   });
 }
+
+function numeroDecimal(valor: string) {
+  return Number(valor.replace(/\./g, "").replace(",", "."));
+}
+
+const SIN_VALOR_GENERICO = new Set<TipoNovedad>(["egreso", "ingreso_mes"]);
 
 export function NovedadForm({
   empresaId,
@@ -60,14 +66,33 @@ export function NovedadForm({
   const [egresoPagaSalarioVacacional, setEgresoPagaSalarioVacacional] = useState(Boolean(novedadInicial?.datos?.egresoPagaSalarioVacacional));
   const [egresoPagaAguinaldo, setEgresoPagaAguinaldo] = useState(Boolean(novedadInicial?.datos?.egresoPagaAguinaldo));
   const [egresoObservaciones, setEgresoObservaciones] = useState(novedadInicial?.datos?.egresoObservaciones ?? "");
+  const empleadoActual = empleados.find((e) => e.id === empleadoId);
+  const [ingresoFecha, setIngresoFecha] = useState(novedadInicial?.datos?.ingresoFecha ?? empleadoActual?.ingreso ?? `${mes}-01`);
+  const [ingresoSueldo, setIngresoSueldo] = useState(String(novedadInicial?.datos?.ingresoSueldoInicial ?? empleadoActual?.sueldos.at(-1)?.monto ?? ""));
+  const [ingresoCategoria, setIngresoCategoria] = useState(novedadInicial?.datos?.ingresoCategoria ?? empleadoActual?.categoria ?? "");
+  const [ingresoModalidad, setIngresoModalidad] = useState<Modalidad>(novedadInicial?.datos?.ingresoModalidad ?? empleadoActual?.modalidad ?? "mensual");
+  const [ingresoHorario, setIngresoHorario] = useState(novedadInicial?.datos?.ingresoHorario ?? "");
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   const t = TIPOS[tipo];
-  const v = Number(valor.replace(/\./g, "").replace(",", "."));
-  const requiereValor = tipo !== "egreso";
+  const v = numeroDecimal(valor);
+  const ingresoSueldoValor = numeroDecimal(ingresoSueldo);
+  const requiereValor = !SIN_VALOR_GENERICO.has(tipo);
   const egresoValido = tipo !== "egreso" || /^\d{4}-\d{2}-\d{2}$/.test(egresoFecha);
-  const valido = Boolean(empleadoId && egresoValido && (!requiereValor || v > 0));
+  const ingresoValido =
+    tipo !== "ingreso_mes" ||
+    (/^\d{4}-\d{2}-\d{2}$/.test(ingresoFecha) && ingresoCategoria.trim().length > 0 && ingresoSueldoValor > 0 && ["mensual", "jornalero"].includes(ingresoModalidad));
+  const valido = Boolean(empleadoId && egresoValido && ingresoValido && (!requiereValor || v > 0));
   const editando = !!novedadInicial;
+  const seleccionarEmpleado = (id: string) => {
+    setEmpleadoId(id);
+    if (editando) return;
+    const empleado = empleados.find((e) => e.id === id);
+    setIngresoFecha(empleado?.ingreso ?? `${mes}-01`);
+    setIngresoSueldo(String(empleado?.sueldos.at(-1)?.monto ?? ""));
+    setIngresoCategoria(empleado?.categoria ?? "");
+    setIngresoModalidad(empleado?.modalidad ?? "mensual");
+  };
 
   if (empleados.length === 0) {
     return (
@@ -90,6 +115,15 @@ export function NovedadForm({
         const datos = {
           ...(tipo === "ausencia_justificada" ? { ausenciaDescuenta } : {}),
           ...(tipo === "cambio_categoria" ? { nuevaCategoria: nuevaCategoria.trim() || undefined, nuevoSueldo: v, aplicaDesde: `${mes}-01` } : {}),
+          ...(tipo === "ingreso_mes"
+            ? {
+                ingresoFecha,
+                ingresoSueldoInicial: ingresoSueldoValor,
+                ingresoCategoria: ingresoCategoria.trim(),
+                ingresoModalidad,
+                ingresoHorario: ingresoHorario.trim() || undefined,
+              }
+            : {}),
           ...(tipo === "egreso"
             ? {
                 egresoFecha,
@@ -106,7 +140,7 @@ export function NovedadForm({
           mes,
           empleadoId: empleadoId!,
           tipo,
-          ...(tipo === "egreso" ? {} : t.unidad === "$" ? { importe: v } : { cantidad: v }),
+          ...(SIN_VALOR_GENERICO.has(tipo) ? {} : t.unidad === "$" ? { importe: v } : { cantidad: v }),
           nota: nota || undefined,
           adjunto,
           datos: Object.keys(datos).length ? datos : undefined,
@@ -132,6 +166,15 @@ export function NovedadForm({
             const empleado = empleados.find((e) => e.id === empleadoId);
             actualizarEmpleado(empleadoId!, { egreso: egresoFecha }, `egreso ${empleado?.egreso ?? "sin fecha"} → ${egresoFecha}`);
           }
+          if (tipo === "ingreso_mes" && origen === "estudio") {
+            const empleado = empleados.find((e) => e.id === empleadoId);
+            const sueldos = [...(empleado?.sueldos ?? []).filter((sueldo) => sueldo.desde !== ingresoFecha), { desde: ingresoFecha, monto: ingresoSueldoValor }].sort((a, b) => a.desde.localeCompare(b.desde));
+            actualizarEmpleado(
+              empleadoId!,
+              { ingreso: ingresoFecha, categoria: ingresoCategoria.trim(), modalidad: ingresoModalidad, sueldos },
+              `ingreso ${empleado?.ingreso ?? "sin fecha"} → ${ingresoFecha}`,
+            );
+          }
           onListo();
         } catch (error) {
           setError(error instanceof Error ? error.message : "No pudimos guardar la novedad.");
@@ -141,7 +184,7 @@ export function NovedadForm({
       }}
     >
       <Campo label="Persona">
-        <select className={inputCls} value={empleadoId} onChange={(e) => setEmpleadoId(e.target.value)}>
+        <select className={inputCls} value={empleadoId} onChange={(e) => seleccionarEmpleado(e.target.value)}>
           {empleados.map((e) => (
             <option key={e.id} value={e.id}>
               {e.nombre} {e.apellido} · {e.cargo}
@@ -165,7 +208,7 @@ export function NovedadForm({
           ))}
         </div>
       </fieldset>
-      {tipo !== "egreso" && (
+      {!SIN_VALOR_GENERICO.has(tipo) && (
         <Campo label={t.unidad === "$" ? "Importe en pesos" : `Cantidad de ${t.unidad}`} ayuda={t.ayuda}>
           <div className="relative">
             {t.unidad === "$" && <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-apagado">$</span>}
@@ -213,6 +256,31 @@ export function NovedadForm({
           </label>
           <Campo label="Observaciones de egreso">
             <textarea className={clsx(inputCls, "min-h-20 resize-y py-3")} value={egresoObservaciones} onChange={(e) => setEgresoObservaciones(e.target.value)} placeholder="Ej.: baja confirmada por la empresa, revisar liquidación final" />
+          </Campo>
+        </section>
+      )}
+      {tipo === "ingreso_mes" && (
+        <section className="space-y-3 rounded-2xl bg-hundido px-3.5 py-3">
+          <Campo label="Fecha real de ingreso">
+            <input type="date" className={inputCls} value={ingresoFecha} onChange={(e) => setIngresoFecha(e.target.value)} />
+          </Campo>
+          <Campo label="Sueldo inicial">
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-apagado">$</span>
+              <input className={clsx(inputCls, "pl-8")} inputMode="decimal" value={ingresoSueldo} onChange={(e) => setIngresoSueldo(e.target.value.replace(/[^\d,.]/g, ""))} placeholder="0" />
+            </div>
+          </Campo>
+          <Campo label="Categoría">
+            <input className={inputCls} value={ingresoCategoria} onChange={(e) => setIngresoCategoria(e.target.value)} placeholder="Ej.: Mecánico" />
+          </Campo>
+          <Campo label="Modalidad">
+            <select className={inputCls} value={ingresoModalidad} onChange={(e) => setIngresoModalidad(e.target.value as Modalidad)}>
+              <option value="mensual">Mensual</option>
+              <option value="jornalero">Jornalero</option>
+            </select>
+          </Campo>
+          <Campo label="Horario">
+            <input className={inputCls} value={ingresoHorario} onChange={(e) => setIngresoHorario(e.target.value)} placeholder="Ej.: lunes a viernes 9 a 18" />
           </Campo>
         </section>
       )}

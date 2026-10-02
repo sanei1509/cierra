@@ -119,6 +119,11 @@ export interface NovedadDatos {
   nuevaCategoria?: string;
   nuevoSueldo?: number;
   aplicaDesde?: string;
+  ingresoFecha?: string;
+  ingresoSueldoInicial?: number;
+  ingresoCategoria?: string;
+  ingresoModalidad?: Modalidad;
+  ingresoHorario?: string;
   egresoFecha?: string;
   egresoCausal?: string;
   egresoLicenciaNoGozadaDias?: number;

@@ -1555,3 +1555,43 @@
 - `tasks/todo.md`
 
 **Estimated scope:** Medium
+
+## Task 52: Specialized Monthly Hire Novelty
+
+**Status:** Done  
+**Date:** 2026-10-02  
+**Description:** Replace the generic ingreso en el mes input with a hire-specific form and use studio-entered hires to correct the employee ficha for partial-month liquidation.
+
+**Acceptance criteria:**
+- [x] The ingreso novelty asks for the real hire date.
+- [x] The ingreso novelty captures initial salary, category, modality and schedule text.
+- [x] The generic days/amount field is not shown for ingreso, avoiding duplicated salary discounts when the ficha is corrected.
+- [x] When the studio creates or edits an ingreso novelty in real backend mode, the employee ficha is updated with `ingreso`, `categoria`, `modalidad` and a salary vigencia.
+- [x] The local/demo store also updates the employee ficha after saving from the studio form.
+- [x] Employee novelty history shows the hire details.
+- [x] The liquidation engine has regression coverage for partial-month hire and excludes previous months.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe test -- engine.test.ts`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- Schedule is stored in the novelty details because the public `Empleado` contract does not expose `horario` yet, even though backend vigencias already have a database column for it.
+- Company-submitted ingreso novedades remain pending review and do not auto-update the ficha.
+
+**Dependencies:** Task 48, Task 51
+
+**Files touched:**
+- `cierrabe/src/dominio/types.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+- `cierrafe/src/components/novedad-form.tsx`
+- `cierrafe/src/lib/labels.ts`
+- `cierrafe/src/lib/types.ts`
+- `cierrafe/tests/engine.test.ts`
+- `tasks/todo.md`
+
+**Estimated scope:** Medium

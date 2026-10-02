@@ -865,6 +865,15 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
                           {n.datos.egresoLicenciaNoGozadaDias ? ` · licencia no gozada: ${n.datos.egresoLicenciaNoGozadaDias} día(s)` : ""}
                         </p>
                       )}
+                      {n.datos?.ingresoFecha && (
+                        <p className="mt-1 text-xs text-apagado">
+                          Fecha de ingreso: {n.datos.ingresoFecha}
+                          {n.datos.ingresoCategoria ? ` · categoría: ${n.datos.ingresoCategoria}` : ""}
+                          {n.datos.ingresoSueldoInicial ? ` · sueldo inicial ${fmt(n.datos.ingresoSueldoInicial)}` : ""}
+                          {n.datos.ingresoModalidad ? ` · ${n.datos.ingresoModalidad}` : ""}
+                          {n.datos.ingresoHorario ? ` · horario: ${n.datos.ingresoHorario}` : ""}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

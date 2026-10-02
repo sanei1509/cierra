@@ -270,4 +270,14 @@ describe("motor de liquidacion", () => {
     expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", cantidad: 10, importe: 16666.67 }));
     expect(octubre).toHaveLength(0);
   });
+
+  it("calcula mes parcial y excluye meses anteriores cuando hay fecha real de ingreso", () => {
+    const empleadoConIngreso: Empleado = { ...empleadoBase, ingreso: "2026-09-12", sueldos: [{ desde: "2026-09-12", monto: 60000 }] };
+
+    const agosto = calcularEmpresa(empresaBase, [empleadoConIngreso], "2026-08", []);
+    const septiembre = calcularEmpleado(empresaBase, empleadoConIngreso, "2026-09", []);
+
+    expect(agosto).toHaveLength(0);
+    expect(septiembre.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", base: 60000, cantidad: 19, importe: 38000 }));
+  });
 });

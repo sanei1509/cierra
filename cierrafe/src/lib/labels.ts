@@ -18,7 +18,7 @@ export const TIPOS: Record<TipoNovedad, { label: string; corto: string; unidad: 
   accidente_laboral: { label: "Accidente laboral / BSE", corto: "Accidente BSE", unidad: "días", tono: "rosa", ayuda: "Días cubiertos por BSE. Adjuntá constancia si aplica" },
   maternidad: { label: "Maternidad / subsidio", corto: "Maternidad", unidad: "días", tono: "menta", ayuda: "Días cubiertos por subsidio BPS" },
   egreso: { label: "Egreso / baja", corto: "Egreso", unidad: "días", tono: "rosa", ayuda: "Días no trabajados por egreso. Detallar fecha y causal en comentario" },
-  ingreso_mes: { label: "Ingreso en el mes", corto: "Ingreso mes", unidad: "días", tono: "cielo", ayuda: "Días del mes previos al ingreso, si la ficha todavía no refleja la fecha real" },
+  ingreso_mes: { label: "Ingreso en el mes", corto: "Ingreso mes", unidad: "días", tono: "cielo", ayuda: "Fecha real de ingreso y datos iniciales para corregir la ficha laboral" },
   cambio_horario: { label: "Cambio de horario", corto: "Cambio horario", unidad: "horas", tono: "lila", ayuda: "Horas semanales nuevas o diferencia a revisar. Detallar en comentario" },
   cambio_categoria: { label: "Cambio de categoría", corto: "Cambio categoría", unidad: "$", tono: "lila", ayuda: "Nuevo sueldo/categoría a revisar. Detallar categoría en comentario" },
   viatico: { label: "Viáticos", corto: "Viático", unidad: "$", tono: "crema", ayuda: "Importe de viáticos. Regla simplificada no gravada" },
@@ -36,6 +36,7 @@ export const TIPOS: Record<TipoNovedad, { label: string; corto: string; unidad: 
 export const valorNovedad = (n: Novedad) => {
   const t = TIPOS[n.tipo];
   if (n.tipo === "egreso" && n.datos?.egresoFecha) return n.datos.egresoFecha;
+  if (n.tipo === "ingreso_mes" && n.datos?.ingresoFecha) return n.datos.ingresoFecha;
   if (t.unidad === "$") return fmt(n.importe ?? 0);
   if (t.unidad === "horas") return `${n.cantidad} h`;
   if (t.unidad === "minutos") return `${n.cantidad} min`;
