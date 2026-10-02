@@ -475,6 +475,22 @@ export const novedades = pgTable(
   ],
 );
 
+export const reciboVistas = pgTable(
+  "recibo_vistas",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    estudioId: uuid("estudio_id").notNull().references(() => estudios.id),
+    empresaId: uuid("empresa_id").notNull().references(() => empresas.id),
+    empleadoId: uuid("empleado_id").notNull().references(() => empleados.id),
+    mes: varchar("mes", { length: 7 }).notNull(),
+    visto: timestamp("visto", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("recibo_vistas_empleado_mes_unique").on(t.empleadoId, t.mes),
+    index("recibo_vistas_empresa_mes_idx").on(t.estudioId, t.empresaId, t.mes),
+  ],
+);
+
 export const auditoria = pgTable(
   "auditoria",
   {

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Printer } from "lucide-react";
+import { marcarReciboVistoReal } from "@/app/(estudio)/actions";
 import { ReciboDoc } from "@/components/recibo-doc";
 import { Boton } from "@/components/ui";
 import { hashDe } from "@/lib/engine";
@@ -31,9 +32,12 @@ export default function ReciboClient({
   const listo = !!(e && empresa && v && v.periodo.etapa === "cerrada" && r && !r.fueraDeAlcance);
 
   useEffect(() => {
-    if (listo && desdePortal) marcarVisto(id, mes);
+    if (listo && desdePortal && empresa) {
+      marcarVisto(id, mes);
+      if (datosIniciales.modo === "real") void marcarReciboVistoReal({ empleadoId: id, empresaId: empresa.id, mes });
+    }
     if (listo && imprimir) setTimeout(() => window.print(), 300);
-  }, [listo, desdePortal, imprimir, id, mes, marcarVisto]);
+  }, [listo, desdePortal, imprimir, id, mes, marcarVisto, datosIniciales.modo, empresa]);
 
   if (!listo || !e || !empresa || !v || !r) return <p className="p-10 text-center text-tinta">Este recibo todavía no fue emitido.</p>;
 

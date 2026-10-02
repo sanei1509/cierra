@@ -1,5 +1,5 @@
 import type { AuditEvent, Empleado, Empresa, Novedad, Periodo, Usuario } from "../dominio/types";
-import type { AuditEventId, EmpleadoId, EmpresaId, EstudioId, NovedadId, PeriodoId, TenantContext, UsuarioId } from "./contexto";
+import type { AuditEventId, EmpleadoId, EmpresaId, EstudioId, NovedadId, PeriodoId, ReciboVistaId, TenantContext, UsuarioId } from "./contexto";
 import type { CodigoModulo, ModuloCatalogo } from "../modulos";
 import type { AplicacionPago, CrearSuscripcionEstudioInput, EventoUsoFacturable, PagoEstudio, PlanComercial, ResumenCobroEstudio, SuscripcionEstudio } from "../facturacion";
 import type { RolAcceso } from "./contexto";
@@ -127,6 +127,22 @@ export interface CrearAuditEventInput extends Omit<AuditEvent, "id" | "fecha" | 
   empresaId?: EmpresaId;
 }
 
+export interface ReciboVista {
+  id: string;
+  empresaId: string;
+  empleadoId: string;
+  mes: string;
+  visto: string;
+}
+
+export interface RegistrarReciboVistaInput {
+  id?: ReciboVistaId;
+  empresaId: EmpresaId;
+  empleadoId: EmpleadoId;
+  mes: string;
+  visto?: string;
+}
+
 export interface EstudiosRepo {
   crear(input: CrearEstudioInput): Promise<Estudio>;
   obtener(ctx: Pick<TenantContext, "estudioId">): Promise<Estudio | null>;
@@ -168,6 +184,11 @@ export interface NovedadesRepo {
 export interface AuditoriaRepo {
   listar(ctx: TenantContext, filtros?: { empresaId?: EmpresaId; limite?: number }): Promise<AuditEvent[]>;
   registrar(ctx: TenantContext, input: CrearAuditEventInput): Promise<AuditEvent>;
+}
+
+export interface ReciboVistasRepo {
+  listarPorEmpresa(ctx: TenantContext, empresaId: EmpresaId, mes?: string): Promise<ReciboVista[]>;
+  registrar(ctx: TenantContext, input: RegistrarReciboVistaInput): Promise<ReciboVista>;
 }
 
 export interface ArchivosMarcaRepo {
@@ -215,6 +236,7 @@ export interface DatosRepos {
   periodos: PeriodosRepo;
   novedades: NovedadesRepo;
   auditoria: AuditoriaRepo;
+  reciboVistas: ReciboVistasRepo;
   archivosMarca: ArchivosMarcaRepo;
   modulos: ModulosRepo;
   planes: PlanesRepo;

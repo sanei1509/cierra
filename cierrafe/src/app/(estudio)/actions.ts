@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { crearEmpleadoConAccesoInicial, crearEmpresaConAccesoInicial } from "cierrabe/acciones";
 import { tenantContextDesdeAcceso, type EmpleadoId, type EmpresaId, type NovedadId, type PeriodoId } from "cierrabe/datos/contexto";
-import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
+import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo, crearReciboVistasRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
 import { contextoEstudioDesarrollo, uuidValido } from "@/lib/backend-dev-context";
 import { contextoOperativoActual } from "@/lib/backend-operativo";
 import { obtenerSesionDev } from "@/lib/dev-auth";
@@ -93,6 +93,12 @@ export interface ResponderAprobacionRealInput extends PeriodoRealInput {
 
 export interface RectificarPeriodoRealInput extends PeriodoRealInput {
   motivo: string;
+}
+
+export interface MarcarReciboVistoRealInput {
+  empleadoId: string;
+  empresaId: string;
+  mes: string;
 }
 
 function ahoraIso() {
@@ -576,4 +582,35 @@ export async function rectificarPeriodoReal(input: RectificarPeriodoRealInput): 
       auditoria: { accion: `Inicio rectificacion de la version ${periodo.cerrado.version}`, detalle: input.motivo },
     };
   });
+}
+
+export async function marcarReciboVistoReal(input: MarcarReciboVistoRealInput): Promise<AltaRealResult> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || ctx.actorTipo !== "empleado" || !process.env.DATABASE_URL || !uuidValido(input.empleadoId) || !uuidValido(input.empresaId)) {
+    return { ok: true, modo: "demo", mensaje: "Vista simulada: falta sesion de empleado o backend real." };
+  }
+  if (ctx.empleadoId !== input.empleadoId || ctx.empresaId !== input.empresaId) {
+    return { ok: false, modo: "real", mensaje: "No podés marcar un recibo de otra persona." };
+  }
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
+
+  const { db } = await import("cierrabe/datos/db");
+  const reciboVistasRepo = crearReciboVistasRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  const vista = await reciboVistasRepo.registrar(tenant, {
+    empresaId: input.empresaId as EmpresaId,
+    empleadoId: input.empleadoId as EmpleadoId,
+    mes: input.mes,
+  });
+  await auditoriaRepo.registrar(tenant, {
+    actor: ctx.usuarioId,
+    empresaId: input.empresaId as EmpresaId,
+    entidad: "Recibo",
+    accion: `Vio recibo ${input.mes}`,
+  });
+  revalidatePath("/documentos");
+  revalidatePath(`/portal/${input.empleadoId}`);
+  return { ok: true, modo: "real", mensaje: "Vista de recibo registrada.", id: vista.id };
 }

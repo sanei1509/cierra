@@ -10,7 +10,7 @@ import {
   type TenantContext,
   type UsuarioId,
 } from "cierrabe/datos/contexto";
-import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo } from "cierrabe/datos/repos";
+import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo, crearReciboVistasRepo } from "cierrabe/datos/repos";
 import { parsearSesionReal, REAL_SESSION_COOKIE } from "./auth-session";
 import { contextoEstudioDesarrollo, uuidValido } from "./backend-dev-context";
 import { obtenerSesionDev } from "./dev-auth";
@@ -26,6 +26,7 @@ export interface DatosOperativosIniciales {
   periodos: Periodo[];
   novedades: Novedad[];
   audit: AuditEvent[];
+  vistas: Record<string, string>;
 }
 
 export async function contextoEstudioActual(): Promise<Extract<AccessContext, { actorTipo: "estudio" }> | null> {
@@ -65,7 +66,7 @@ export async function contextoOperativoActual(): Promise<Exclude<AccessContext, 
 
 export async function cargarDatosOperativosIniciales(): Promise<DatosOperativosIniciales> {
   const ctx = await contextoEstudioActual();
-  if (!ctx || !process.env.DATABASE_URL) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  if (!ctx || !process.env.DATABASE_URL) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [], vistas: {} };
 
   const { db } = await import("cierrabe/datos/db");
   const empresasRepo = crearEmpresasRepo(db);
@@ -73,8 +74,9 @@ export async function cargarDatosOperativosIniciales(): Promise<DatosOperativosI
   const periodosRepo = crearPeriodosRepo(db);
   const novedadesRepo = crearNovedadesRepo(db);
   const auditoriaRepo = crearAuditoriaRepo(db);
+  const reciboVistasRepo = crearReciboVistasRepo(db);
   const tenant = tenantContextDesdeAcceso(ctx);
-  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [], vistas: {} };
 
   const empresas = (await listarEmpresasEstudio(ctx, empresasRepo, ctx.estudioId as EstudioId)) as Empresa[];
   const empleadosPorEmpresa = await Promise.all(
@@ -93,6 +95,7 @@ export async function cargarDatosOperativosIniciales(): Promise<DatosOperativosI
   const auditPorEmpresa = await Promise.all(
     empresas.map((empresa) => auditoriaRepo.listar(tenant, { empresaId: empresa.id as EmpresaId, limite: 30 })),
   );
+  const vistasPorEmpresa = await Promise.all(empresas.map((empresa) => reciboVistasRepo.listarPorEmpresa(tenant, empresa.id as EmpresaId)));
 
   return {
     modo: "real",
@@ -101,6 +104,7 @@ export async function cargarDatosOperativosIniciales(): Promise<DatosOperativosI
     periodos,
     novedades: novedadesPorPeriodo.flat(),
     audit: auditPorEmpresa.flat() as AuditEvent[],
+    vistas: Object.fromEntries(vistasPorEmpresa.flat().map((vista) => [`${vista.empleadoId}|${vista.mes}`, vista.visto])),
   };
 }
 
@@ -111,8 +115,9 @@ async function cargarDatosEmpresaDesdeTenant(tenant: TenantContext, empresaId: s
   const periodosRepo = crearPeriodosRepo(db);
   const novedadesRepo = crearNovedadesRepo(db);
   const auditoriaRepo = crearAuditoriaRepo(db);
+  const reciboVistasRepo = crearReciboVistasRepo(db);
   const empresa = await empresasRepo.obtener(tenant, empresaId as EmpresaId);
-  if (!empresa) return { modo: "real", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  if (!empresa) return { modo: "real", empresas: [], empleados: [], periodos: [], novedades: [], audit: [], vistas: {} };
 
   const empleados = (await empleadosRepo.listarPorEmpresa(tenant, empresa.id as EmpresaId)) as Empleado[];
   const periodos = (await periodosRepo.listarPorEmpresa(tenant, empresa.id as EmpresaId)) as Periodo[];
@@ -123,6 +128,7 @@ async function cargarDatosEmpresaDesdeTenant(tenant: TenantContext, empresaId: s
     }),
   );
   const audit = (await auditoriaRepo.listar(tenant, { empresaId: empresa.id as EmpresaId, limite: 30 })) as AuditEvent[];
+  const vistas = await reciboVistasRepo.listarPorEmpresa(tenant, empresa.id as EmpresaId);
 
   return {
     modo: "real",
@@ -131,39 +137,40 @@ async function cargarDatosEmpresaDesdeTenant(tenant: TenantContext, empresaId: s
     periodos,
     novedades: novedadesPorPeriodo.flat(),
     audit,
+    vistas: Object.fromEntries(vistas.map((vista) => [`${vista.empleadoId}|${vista.mes}`, vista.visto])),
   };
 }
 
 export async function cargarDatosPortalEmpresa(empresaId: string): Promise<DatosOperativosIniciales> {
   const ctx = await contextoOperativoActual();
-  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empresaId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empresaId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [], vistas: {} };
 
   const tenant = tenantContextDesdeAcceso(ctx);
-  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [], vistas: {} };
 
   return cargarDatosEmpresaDesdeTenant(tenant, empresaId);
 }
 
 export async function cargarDatosRecibosEmpresa(empresaId: string): Promise<DatosOperativosIniciales> {
   const ctx = await contextoEstudioActual();
-  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empresaId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empresaId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [], vistas: {} };
 
   const tenant = tenantContextDesdeAcceso(ctx);
-  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [], vistas: {} };
 
   return cargarDatosEmpresaDesdeTenant(tenant, empresaId);
 }
 
 export async function cargarDatosPortalEmpleado(empleadoId: string): Promise<DatosOperativosIniciales> {
   const ctx = await contextoOperativoActual();
-  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empleadoId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empleadoId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [], vistas: {} };
 
   const tenant = tenantContextDesdeAcceso(ctx);
-  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [], vistas: {} };
 
   const { db } = await import("cierrabe/datos/db");
   const empleadosRepo = crearEmpleadosRepo(db);
   const empleado = await empleadosRepo.obtener(tenant, empleadoId as EmpleadoId);
-  if (!empleado) return { modo: "real", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+  if (!empleado) return { modo: "real", empresas: [], empleados: [], periodos: [], novedades: [], audit: [], vistas: {} };
   return cargarDatosPortalEmpresa(empleado.empresaId);
 }

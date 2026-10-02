@@ -8,6 +8,7 @@ export type EmpresaId = Brand<string, "EmpresaId">;
 export type EmpleadoId = Brand<string, "EmpleadoId">;
 export type PeriodoId = Brand<string, "PeriodoId">;
 export type NovedadId = Brand<string, "NovedadId">;
+export type ReciboVistaId = Brand<string, "ReciboVistaId">;
 export type AuditEventId = Brand<string, "AuditEventId">;
 
 export type RolSistema = "system_admin" | "support_admin";

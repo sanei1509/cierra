@@ -1074,3 +1074,36 @@
 - `cierrafe/src/app/recibos/[empresa]/[mes]/*`
 
 **Estimated scope:** Small
+
+## Task 38: Real Receipt View Tracking And Documents
+**Description:** Persist employee receipt-open events and connect the study Documents screen to real closed-period receipt data.
+
+**Acceptance criteria:**
+- [x] PostgreSQL has a `recibo_vistas` table keyed by employee and month.
+- [x] Backend repository can register a receipt view idempotently.
+- [x] Opening an employee receipt from the portal records the view when using a real employee session.
+- [x] The Documents screen loads real companies, employees, periods, receipts and receipt-view metadata.
+- [x] Documents keeps demo fallback for local seeded data.
+- [x] Receipt-view state remains read-only metadata and does not modify closed payroll snapshots.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrabe db:generate`
+- [x] `corepack pnpm --filter cierrabe db:migrate`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+
+**Notes:**
+- [ ] Pending later: add permission tests for receipt-view registration once production route guards are finalized.
+- [ ] Pending later: show receipt-view audit events in a friendlier activity timeline if needed.
+
+**Dependencies:** Task 36, Task 37
+
+**Files touched:**
+- `cierrabe/src/datos/schema.ts`
+- `cierrabe/src/datos/contratos.ts`
+- `cierrabe/src/datos/repos/recibo-vistas.ts`
+- `cierrafe/src/lib/backend-operativo.ts`
+- `cierrafe/src/app/(estudio)/documentos/*`
+- `cierrafe/src/app/recibo/[id]/[mes]/recibo-client.tsx`
+
+**Estimated scope:** Small
