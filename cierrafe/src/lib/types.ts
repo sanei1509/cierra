@@ -119,6 +119,12 @@ export interface NovedadDatos {
   nuevaCategoria?: string;
   nuevoSueldo?: number;
   aplicaDesde?: string;
+  egresoFecha?: string;
+  egresoCausal?: string;
+  egresoLicenciaNoGozadaDias?: number;
+  egresoPagaSalarioVacacional?: boolean;
+  egresoPagaAguinaldo?: boolean;
+  egresoObservaciones?: string;
 }
 
 export interface Novedad {

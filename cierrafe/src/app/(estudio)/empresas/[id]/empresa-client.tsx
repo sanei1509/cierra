@@ -858,6 +858,13 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
                           {n.datos.nuevoSueldo ? ` · sueldo base ${fmt(n.datos.nuevoSueldo)}` : ""}
                         </p>
                       )}
+                      {n.datos?.egresoFecha && (
+                        <p className="mt-1 text-xs text-apagado">
+                          Fecha de egreso: {n.datos.egresoFecha}
+                          {n.datos.egresoCausal ? ` · causal: ${n.datos.egresoCausal}` : ""}
+                          {n.datos.egresoLicenciaNoGozadaDias ? ` · licencia no gozada: ${n.datos.egresoLicenciaNoGozadaDias} día(s)` : ""}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

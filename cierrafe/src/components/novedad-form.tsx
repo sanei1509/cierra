@@ -46,6 +46,7 @@ export function NovedadForm({
 }) {
   const agregar = useStore((s) => s.agregarNovedad);
   const editar = useStore((s) => s.editarNovedad);
+  const actualizarEmpleado = useStore((s) => s.actualizarEmpleado);
   const [empleadoId, setEmpleadoId] = useState(novedadInicial?.empleadoId ?? empleadoInicial ?? empleados[0]?.id);
   const [tipo, setTipo] = useState<TipoNovedad>(novedadInicial?.tipo ?? tipoInicial);
   const [valor, setValor] = useState(String(novedadInicial?.importe ?? novedadInicial?.cantidad ?? ""));
@@ -53,11 +54,19 @@ export function NovedadForm({
   const [adjunto, setAdjunto] = useState<Adjunto | undefined>(novedadInicial?.adjunto);
   const [ausenciaDescuenta, setAusenciaDescuenta] = useState(Boolean(novedadInicial?.datos?.ausenciaDescuenta));
   const [nuevaCategoria, setNuevaCategoria] = useState(novedadInicial?.datos?.nuevaCategoria ?? "");
+  const [egresoFecha, setEgresoFecha] = useState(novedadInicial?.datos?.egresoFecha ?? "");
+  const [egresoCausal, setEgresoCausal] = useState(novedadInicial?.datos?.egresoCausal ?? "");
+  const [egresoLicenciaDias, setEgresoLicenciaDias] = useState(String(novedadInicial?.datos?.egresoLicenciaNoGozadaDias ?? ""));
+  const [egresoPagaSalarioVacacional, setEgresoPagaSalarioVacacional] = useState(Boolean(novedadInicial?.datos?.egresoPagaSalarioVacacional));
+  const [egresoPagaAguinaldo, setEgresoPagaAguinaldo] = useState(Boolean(novedadInicial?.datos?.egresoPagaAguinaldo));
+  const [egresoObservaciones, setEgresoObservaciones] = useState(novedadInicial?.datos?.egresoObservaciones ?? "");
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   const t = TIPOS[tipo];
   const v = Number(valor.replace(/\./g, "").replace(",", "."));
-  const valido = empleadoId && v > 0;
+  const requiereValor = tipo !== "egreso";
+  const egresoValido = tipo !== "egreso" || /^\d{4}-\d{2}-\d{2}$/.test(egresoFecha);
+  const valido = Boolean(empleadoId && egresoValido && (!requiereValor || v > 0));
   const editando = !!novedadInicial;
 
   if (empleados.length === 0) {
@@ -77,16 +86,27 @@ export function NovedadForm({
         if (!valido) return;
         setError("");
         setGuardando(true);
+        const licenciaDias = Number(egresoLicenciaDias.replace(/\D/g, ""));
         const datos = {
           ...(tipo === "ausencia_justificada" ? { ausenciaDescuenta } : {}),
           ...(tipo === "cambio_categoria" ? { nuevaCategoria: nuevaCategoria.trim() || undefined, nuevoSueldo: v, aplicaDesde: `${mes}-01` } : {}),
+          ...(tipo === "egreso"
+            ? {
+                egresoFecha,
+                egresoCausal: egresoCausal.trim() || undefined,
+                egresoLicenciaNoGozadaDias: licenciaDias > 0 ? licenciaDias : undefined,
+                egresoPagaSalarioVacacional,
+                egresoPagaAguinaldo,
+                egresoObservaciones: egresoObservaciones.trim() || undefined,
+              }
+            : {}),
         };
         const novedad = {
           empresaId,
           mes,
           empleadoId: empleadoId!,
           tipo,
-          ...(t.unidad === "$" ? { importe: v } : { cantidad: v }),
+          ...(tipo === "egreso" ? {} : t.unidad === "$" ? { importe: v } : { cantidad: v }),
           nota: nota || undefined,
           adjunto,
           datos: Object.keys(datos).length ? datos : undefined,
@@ -95,7 +115,7 @@ export function NovedadForm({
         };
         try {
           const antes = novedadInicial ? `${TIPOS[novedadInicial.tipo].corto} ${valorNovedad(novedadInicial)}` : undefined;
-          const despues = `${TIPOS[tipo].corto} ${t.unidad === "$" ? `$ ${v}` : v}`;
+          const despues = tipo === "egreso" ? `${TIPOS[tipo].corto} ${egresoFecha}` : `${TIPOS[tipo].corto} ${t.unidad === "$" ? `$ ${v}` : v}`;
           const res = editando
             ? await actualizarNovedadReal({ ...novedad, id: novedadInicial.id, antes, despues })
             : await crearNovedadReal(novedad);
@@ -107,6 +127,10 @@ export function NovedadForm({
             editar(novedadInicial.id, novedad, autor);
           } else {
             agregar({ ...novedad, id: res.id });
+          }
+          if (tipo === "egreso" && origen === "estudio") {
+            const empleado = empleados.find((e) => e.id === empleadoId);
+            actualizarEmpleado(empleadoId!, { egreso: egresoFecha }, `egreso ${empleado?.egreso ?? "sin fecha"} → ${egresoFecha}`);
           }
           onListo();
         } catch (error) {
@@ -141,12 +165,14 @@ export function NovedadForm({
           ))}
         </div>
       </fieldset>
-      <Campo label={t.unidad === "$" ? "Importe en pesos" : `Cantidad de ${t.unidad}`} ayuda={t.ayuda}>
-        <div className="relative">
-          {t.unidad === "$" && <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-apagado">$</span>}
-          <input autoFocus inputMode="decimal" className={clsx(inputCls, t.unidad === "$" && "pl-8")} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0" />
-        </div>
-      </Campo>
+      {tipo !== "egreso" && (
+        <Campo label={t.unidad === "$" ? "Importe en pesos" : `Cantidad de ${t.unidad}`} ayuda={t.ayuda}>
+          <div className="relative">
+            {t.unidad === "$" && <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-apagado">$</span>}
+            <input autoFocus inputMode="decimal" className={clsx(inputCls, t.unidad === "$" && "pl-8")} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0" />
+          </div>
+        </Campo>
+      )}
       {tipo === "ausencia_justificada" && (
         <label className="flex items-center gap-2 rounded-2xl bg-hundido px-3.5 py-3 text-sm">
           <input type="checkbox" checked={ausenciaDescuenta} onChange={(e) => setAusenciaDescuenta(e.target.checked)} className="size-4 accent-petroleo" />
@@ -157,6 +183,38 @@ export function NovedadForm({
         <Campo label="Nueva categoría (opcional)" ayuda="El importe de arriba se toma como nuevo sueldo base desde este mes">
           <input className={inputCls} value={nuevaCategoria} onChange={(e) => setNuevaCategoria(e.target.value)} placeholder="Ej.: Encargado" />
         </Campo>
+      )}
+      {tipo === "egreso" && (
+        <section className="space-y-3 rounded-2xl bg-hundido px-3.5 py-3">
+          <Campo label="Fecha exacta de egreso">
+            <input type="date" className={inputCls} value={egresoFecha} onChange={(e) => setEgresoFecha(e.target.value)} />
+          </Campo>
+          <Campo label="Causal">
+            <select className={inputCls} value={egresoCausal} onChange={(e) => setEgresoCausal(e.target.value)}>
+              <option value="">Seleccionar causal</option>
+              <option value="renuncia">Renuncia</option>
+              <option value="despido">Despido</option>
+              <option value="fin_contrato">Fin de contrato</option>
+              <option value="mutuo_acuerdo">Mutuo acuerdo</option>
+              <option value="jubilacion">Jubilación</option>
+              <option value="otro">Otro</option>
+            </select>
+          </Campo>
+          <Campo label="Licencia no gozada" ayuda="Días a liquidar si corresponde">
+            <input className={inputCls} inputMode="numeric" value={egresoLicenciaDias} onChange={(e) => setEgresoLicenciaDias(e.target.value.replace(/\D/g, ""))} placeholder="0" />
+          </Campo>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={egresoPagaSalarioVacacional} onChange={(e) => setEgresoPagaSalarioVacacional(e.target.checked)} className="size-4 accent-petroleo" />
+            Corresponde salario vacacional
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={egresoPagaAguinaldo} onChange={(e) => setEgresoPagaAguinaldo(e.target.checked)} className="size-4 accent-petroleo" />
+            Corresponde aguinaldo de egreso
+          </label>
+          <Campo label="Observaciones de egreso">
+            <textarea className={clsx(inputCls, "min-h-20 resize-y py-3")} value={egresoObservaciones} onChange={(e) => setEgresoObservaciones(e.target.value)} placeholder="Ej.: baja confirmada por la empresa, revisar liquidación final" />
+          </Campo>
+        </section>
       )}
       <Campo label="Comentario (opcional)">
         <input className={inputCls} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ej.: comisión por ventas de septiembre" />

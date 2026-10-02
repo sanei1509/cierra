@@ -1516,3 +1516,42 @@
 - `tasks/todo.md`
 
 **Estimated scope:** Small
+
+## Task 51: Specialized Termination Novelty
+**Description:** Replace the generic egreso novelty input with a termination-specific form and use it to update the employee's active labor record when the studio records the termination.
+
+**Acceptance criteria:**
+- [x] The egreso novelty asks for exact termination date.
+- [x] The egreso novelty captures causal, non-taken leave days, salary vacation flag, termination bonus/aguinaldo flag and observations.
+- [x] Egreso-specific data is stored in `novedad.datos` and appears in the employee novelty history.
+- [x] When the studio creates or edits an egreso novelty in real backend mode, the employee ficha is updated with `egreso`.
+- [x] The local/demo store also marks the employee with the egreso date after saving from the studio form.
+- [x] The employee repository persists `ingreso`/`egreso` updates in `relaciones_laborales`.
+- [x] The liquidation engine uses the employee egreso date to calculate a partial final month and exclude later months.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe test -- engine.test.ts`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+- [x] `corepack pnpm --filter cierrabe test`
+
+**Notes:**
+- [ ] Pending later: calculate final liquidation concepts for non-taken leave, salary vacation and aguinaldo with accountant-reviewed formulas.
+- [ ] Pending later: decide whether company-submitted egresos should auto-update the ficha or remain pending for studio review.
+
+**Dependencies:** Task 48
+
+**Files touched:**
+- `cierrabe/src/datos/repos/provisioning.ts`
+- `cierrabe/src/dominio/types.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+- `cierrafe/src/components/novedad-form.tsx`
+- `cierrafe/src/lib/labels.ts`
+- `cierrafe/src/lib/types.ts`
+- `cierrafe/tests/engine.test.ts`
+- `tasks/todo.md`
+
+**Estimated scope:** Medium

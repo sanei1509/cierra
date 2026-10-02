@@ -423,6 +423,23 @@ export function crearEmpleadosRepo(db: Db): EmpleadosRepo {
           .returning();
         if (!actualizado) noEncontrado("No encontramos el empleado para actualizar");
 
+        if (input.ingreso !== undefined || input.egreso !== undefined) {
+          const relaciones = await tx
+            .select()
+            .from(relacionesLaborales)
+            .where(and(eq(relacionesLaborales.estudioId, ctx.estudioId), eq(relacionesLaborales.empleadoId, empleadoId)));
+          const vigente = relaciones.sort((a, b) => b.ingreso.getTime() - a.ingreso.getTime())[0];
+          if (vigente) {
+            await tx
+              .update(relacionesLaborales)
+              .set({
+                ingreso: input.ingreso !== undefined ? fechaDb(input.ingreso)! : vigente.ingreso,
+                egreso: input.egreso !== undefined ? fechaDb(input.egreso) : vigente.egreso,
+              })
+              .where(eq(relacionesLaborales.id, vigente.id));
+          }
+        }
+
         if (input.sueldos?.length) {
           await tx.delete(empleadoVigencias).where(and(eq(empleadoVigencias.estudioId, ctx.estudioId), eq(empleadoVigencias.empleadoId, empleadoId)));
           await tx.insert(empleadoVigencias).values(

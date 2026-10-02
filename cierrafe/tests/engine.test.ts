@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calcularEmpleado } from "../src/lib/engine";
+import { calcularEmpleado, calcularEmpresa } from "../src/lib/engine";
 import type { Empleado, Empresa, Novedad } from "../src/lib/types";
 
 const empresaBase: Empresa = {
@@ -259,5 +259,15 @@ describe("motor de liquidacion", () => {
 
     expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", base: 60000, importe: 60000 }));
     expect(resultado.lineas.some((linea) => linea.concepto.startsWith("Cambio de categoría") && linea.importe > 0)).toBe(false);
+  });
+
+  it("calcula mes parcial y excluye meses posteriores cuando hay fecha de egreso en ficha", () => {
+    const empleadoConEgreso: Empleado = { ...empleadoBase, egreso: "2026-09-10" };
+
+    const resultado = calcularEmpleado(empresaBase, empleadoConEgreso, "2026-09", []);
+    const octubre = calcularEmpresa(empresaBase, [empleadoConEgreso], "2026-10", []);
+
+    expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", cantidad: 10, importe: 16666.67 }));
+    expect(octubre).toHaveLength(0);
   });
 });

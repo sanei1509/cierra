@@ -197,6 +197,43 @@ function validarAdjunto(adjunto: Adjunto | undefined) {
   return adjunto;
 }
 
+function fechaIsoSimple(valor: string | undefined) {
+  return valor && /^\d{4}-\d{2}-\d{2}$/.test(valor) ? valor : undefined;
+}
+
+async function actualizarFichaPorEgreso({
+  ctx,
+  tenant,
+  empresaId,
+  input,
+  auditoriaRepo,
+}: {
+  ctx: NonNullable<Awaited<ReturnType<typeof contextoOperativoActual>>>;
+  tenant: NonNullable<ReturnType<typeof tenantContextDesdeAcceso>>;
+  empresaId: EmpresaId;
+  input: CrearNovedadRealInput;
+  auditoriaRepo: ReturnType<typeof crearAuditoriaRepo>;
+}) {
+  const egreso = fechaIsoSimple(input.datos?.egresoFecha);
+  if (ctx.actorTipo !== "estudio" || input.tipo !== "egreso" || input.origen !== "estudio" || !egreso) return;
+  const { db } = await import("cierrabe/datos/db");
+  const empleadosRepo = crearEmpleadosRepo(db);
+  const empleado = await actualizarEmpleadoBackend(
+    ctx,
+    empleadosRepo,
+    { estudioId: ctx.estudioId, empresaId, empleadoId: input.empleadoId as EmpleadoId },
+    { egreso, resumen: `Egreso informado por novedad: ${egreso}` },
+  );
+  await auditoriaRepo.registrar(tenant, {
+    actor: input.autor,
+    empresaId,
+    entidad: "Empleado",
+    entidadId: empleado.id as EmpleadoId,
+    accion: `Marco egreso de ${empleado.nombre} ${empleado.apellido}`,
+    detalle: `${egreso}${input.datos?.egresoCausal ? ` · ${input.datos.egresoCausal}` : ""}`,
+  });
+}
+
 function periodoInicial(empresaId: EmpresaId, mes: string): Periodo {
   return {
     id: crypto.randomUUID(),
@@ -542,8 +579,10 @@ export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<Al
     accion: `Agrego ${input.tipo.replace("_", " ")}`,
     detalle: input.nota,
   });
+  await actualizarFichaPorEgreso({ ctx, tenant, empresaId, input, auditoriaRepo });
 
   revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath(`/portal/${input.empleadoId}`);
   revalidatePath("/empresas");
   return {
     ok: true,
@@ -594,9 +633,11 @@ export async function actualizarNovedadReal(input: ActualizarNovedadRealInput): 
     antes: input.antes,
     despues: input.despues,
   });
+  await actualizarFichaPorEgreso({ ctx, tenant, empresaId: input.empresaId as EmpresaId, input, auditoriaRepo });
 
   revalidatePath(`/empresas/${input.empresaId}`);
   revalidatePath(`/cliente/${input.empresaId}`);
+  revalidatePath(`/portal/${input.empleadoId}`);
   revalidatePath("/empresas");
   return {
     ok: true,

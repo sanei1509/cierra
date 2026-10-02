@@ -35,6 +35,7 @@ export const TIPOS: Record<TipoNovedad, { label: string; corto: string; unidad: 
 
 export const valorNovedad = (n: Novedad) => {
   const t = TIPOS[n.tipo];
+  if (n.tipo === "egreso" && n.datos?.egresoFecha) return n.datos.egresoFecha;
   if (t.unidad === "$") return fmt(n.importe ?? 0);
   if (t.unidad === "horas") return `${n.cantidad} h`;
   if (t.unidad === "minutos") return `${n.cantidad} min`;
