@@ -902,3 +902,45 @@
 - `cierrafe/src/app/globals.css`
 
 **Estimated scope:** Small
+
+## Task 33: Local PostgreSQL Operational Backend
+**Description:** Bring up a local PostgreSQL development database and connect the main study workflow to persistent data before moving to the Hostinger/MariaDB deployment path later.
+
+**Acceptance criteria:**
+- [x] Local PostgreSQL runs from the project workspace on port `5433`.
+- [x] Local env files point development apps to `postgresql://cierra:cierra@localhost:5433/cierra_dev`.
+- [x] The restart instructions for the local database are documented in `levantar la base.md` and kept out of git.
+- [x] Development seed creates real users for all development access roles.
+- [x] Development seed creates demo companies, employees and periods in PostgreSQL.
+- [x] Study dashboard, companies list, employees list and company detail can read the real PostgreSQL snapshot.
+- [x] Study novedades can be created through a Server Action and persist after logout/reload.
+- [x] Audit events load from PostgreSQL and show a readable actor when the user exists.
+- [x] Demo fallback remains available when the database is not configured.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+- [x] Manual check: created a novedad for Taller Mecanico Colon and verified it remained after logout/reload.
+
+**Notes:**
+- [ ] Pending later: replace the temporary local PostgreSQL setup with the final deployment database strategy.
+- [ ] Pending later: adapt production persistence to Hostinger MariaDB or choose a VPS/container database path if needed.
+- [ ] Pending later: connect edit/delete flows for persisted novedades if the workflow requires corrections.
+- [ ] Pending later: move more pages, portals and receipt/liquidation flows from demo state to real repositories.
+
+**Dependencies:** Task 25, Task 29, Task 30
+
+**Files touched:**
+- `.env.example`
+- `.gitignore`
+- `cierrabe/src/dev/*`
+- `cierrabe/src/datos/repos/*`
+- `cierrabe/tests/seed-desarrollo.test.ts`
+- `cierrafe/src/lib/backend-operativo.ts`
+- `cierrafe/src/app/(estudio)/*`
+- `cierrafe/src/components/novedad-form.tsx`
+
+**Estimated scope:** Medium

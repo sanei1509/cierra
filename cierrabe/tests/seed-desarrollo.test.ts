@@ -8,8 +8,16 @@ describe("seed de desarrollo", () => {
     expect(config.adminId).toBe(DEV_IDS_DEFAULT.adminId);
     expect(config.estudioId).toBe(DEV_IDS_DEFAULT.estudioId);
     expect(config.usuarioEstudioId).toBe(DEV_IDS_DEFAULT.usuarioEstudioId);
+    expect(config.liquidadorId).toBe(DEV_IDS_DEFAULT.liquidadorId);
+    expect(config.soloLecturaId).toBe(DEV_IDS_DEFAULT.soloLecturaId);
+    expect(config.empresaUsuarioId).toBe(DEV_IDS_DEFAULT.empresaUsuarioId);
+    expect(config.empleadoUsuarioId).toBe(DEV_IDS_DEFAULT.empleadoUsuarioId);
     expect(config.adminEmail).toBe("admin@cierra.local");
     expect(config.estudioEmail).toBe("lucia@estudiopereira.uy");
+    expect(config.liquidadorEmail).toBe("martin@estudiopereira.uy");
+    expect(config.soloLecturaEmail).toBe("sofia@estudiopereira.uy");
+    expect(config.empresaEmail).toBe("walter@tallercolon.uy");
+    expect(config.empleadoEmail).toBe("valentina.correa@gmail.com");
     expect(config.password).toBe("CierraDemo123");
   });
 
@@ -25,7 +33,7 @@ describe("seed de desarrollo", () => {
       CIERRA_DEV_USUARIO_NOMBRE: "Contador Demo",
     });
 
-    expect(config).toEqual({
+    expect(config).toMatchObject({
       adminId: "00000000-0000-4000-8000-000000000101",
       estudioId: "00000000-0000-4000-8000-000000000102",
       usuarioEstudioId: "00000000-0000-4000-8000-000000000103",

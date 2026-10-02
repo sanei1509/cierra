@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import type { AuthPasswordRepo, EspacioAcceso, UsuarioAuth } from "../../auth";
-import type { EmpresaId, EstudioId, RolEmpresa, RolEstudio, UsuarioId } from "../contexto";
+import type { EmpleadoId, EmpresaId, EstudioId, RolEmpresa, RolEstudio, UsuarioId } from "../contexto";
 import type { Db } from "../db";
-import { credencialesPassword, membresiaEmpresas, membresias, usuarios } from "../schema";
+import { credencialesPassword, empleados, membresiaEmpresas, membresias, usuarios } from "../schema";
 
 type RolLegacy = "admin" | "liquidador" | "lectura";
 
@@ -61,6 +61,25 @@ export function crearAuthPasswordRepo(db: Db): AuthPasswordRepo {
       }
 
       const espacios: EspacioAcceso[] = [];
+      const empleadosPropios = await db
+        .select({
+          empleadoId: empleados.id,
+          empresaId: empleados.empresaId,
+          estudioId: empleados.estudioId,
+        })
+        .from(empleados)
+        .where(eq(empleados.email, email));
+
+      for (const empleado of empleadosPropios) {
+        espacios.push({
+          actorTipo: "empleado",
+          estudioId: empleado.estudioId as EstudioId,
+          empresaId: empleado.empresaId as EmpresaId,
+          empleadoId: empleado.empleadoId as EmpleadoId,
+          rol: "employee_self",
+        });
+      }
+
       for (const membresia of estudios.values()) {
         if (membresia.empresas.length === 0) {
           espacios.push({

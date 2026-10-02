@@ -113,6 +113,7 @@ export interface ActualizarEmpleadoInput extends Partial<Omit<Empleado, "id" | "
 
 export interface CrearNovedadInput extends Omit<Novedad, "id" | "fecha"> {
   id?: NovedadId;
+  periodoId: PeriodoId;
   fecha?: string;
 }
 

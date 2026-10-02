@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { useState } from "react";
 import type { Adjunto, Empleado, TipoNovedad } from "@/lib/types";
 import { Paperclip, X } from "lucide-react";
+import { crearNovedadReal } from "@/app/(estudio)/actions";
 import { TIPOS } from "@/lib/labels";
 import { useStore } from "@/lib/store";
 import { Boton, Campo, inputCls } from "./ui";
@@ -35,17 +36,30 @@ export function NovedadForm({
   const [valor, setValor] = useState("");
   const [nota, setNota] = useState("");
   const [adjunto, setAdjunto] = useState<Adjunto | undefined>();
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
   const t = TIPOS[tipo];
   const v = Number(valor.replace(/\./g, "").replace(",", "."));
   const valido = empleadoId && v > 0;
 
+  if (empleados.length === 0) {
+    return (
+      <div className="rounded-3xl bg-hundido px-4 py-5 text-sm text-tinta-2">
+        <p className="font-semibold text-tinta">No hay personas cargadas para esta empresa.</p>
+        <p className="mt-1">Primero agregá empleados en la pestaña Empleados y después vas a poder cargar novedades.</p>
+      </div>
+    );
+  }
+
   return (
     <form
       className="space-y-5"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         if (!valido) return;
-        agregar({
+        setError("");
+        setGuardando(true);
+        const novedad = {
           empresaId,
           mes,
           empleadoId: empleadoId!,
@@ -55,8 +69,20 @@ export function NovedadForm({
           adjunto,
           origen,
           autor,
-        });
-        onListo();
+        };
+        try {
+          const res = await crearNovedadReal(novedad);
+          if (!res.ok) {
+            setError(res.mensaje);
+            return;
+          }
+          agregar(novedad);
+          onListo();
+        } catch (error) {
+          setError(error instanceof Error ? error.message : "No pudimos guardar la novedad.");
+        } finally {
+          setGuardando(false);
+        }
       }}
     >
       <Campo label="Persona">
@@ -119,8 +145,9 @@ export function NovedadForm({
           </label>
         )}
       </div>
-      <Boton type="submit" disabled={!valido} className="w-full" tam="lg">
-        Agregar {t.corto.toLowerCase()}
+      {error && <p className="rounded-2xl bg-rosa px-3 py-2 text-sm text-rosa-t">{error}</p>}
+      <Boton type="submit" disabled={!valido || guardando} className="w-full" tam="lg">
+        {guardando ? "Guardando..." : `Agregar ${t.corto.toLowerCase()}`}
       </Boton>
     </form>
   );

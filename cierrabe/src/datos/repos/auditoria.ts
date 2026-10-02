@@ -1,17 +1,17 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import type { AuditEventId } from "../contexto";
 import type { AuditoriaRepo, CrearAuditEventInput } from "../contratos";
-import { auditoria } from "../schema";
+import { auditoria, usuarios } from "../schema";
 import type { AuditEvent } from "../../dominio/types";
 
 type AuditRow = typeof auditoria.$inferSelect;
 
-function mapAudit(row: AuditRow): AuditEvent {
+function mapAudit(row: AuditRow, actorNombre?: string | null): AuditEvent {
   return {
     id: row.id,
     fecha: row.fecha.toISOString(),
-    actor: row.actorId ?? "sistema",
+    actor: actorNombre ?? row.actorId ?? "sistema",
     empresaId: row.empresaId ?? undefined,
     entidad: row.entidad,
     entidadId: row.entidadId ?? undefined,
@@ -36,13 +36,18 @@ export function crearAuditoriaRepo(db: Db): AuditoriaRepo {
     async listar(ctx, filtros) {
       const limite = filtros?.limite ?? 50;
       const rows = await db
-        .select()
+        .select({ evento: auditoria, actorNombre: usuarios.nombre, actorEmail: usuarios.email })
         .from(auditoria)
-        .where(eq(auditoria.estudioId, ctx.estudioId))
+        .leftJoin(usuarios, eq(auditoria.actorId, usuarios.id))
+        .where(
+          filtros?.empresaId
+            ? and(eq(auditoria.estudioId, ctx.estudioId), eq(auditoria.empresaId, filtros.empresaId))
+            : eq(auditoria.estudioId, ctx.estudioId),
+        )
         .orderBy(desc(auditoria.fecha))
         .limit(limite);
 
-      return rows.filter((row) => !filtros?.empresaId || row.empresaId === filtros.empresaId).map(mapAudit);
+      return rows.map((row) => mapAudit(row.evento, row.actorNombre ?? row.actorEmail));
     },
 
     async registrar(ctx, input: CrearAuditEventInput) {
@@ -62,7 +67,7 @@ export function crearAuditoriaRepo(db: Db): AuditoriaRepo {
         })
         .returning();
 
-      return mapAudit(guardado);
+      return mapAudit(guardado, input.actor);
     },
   };
 }

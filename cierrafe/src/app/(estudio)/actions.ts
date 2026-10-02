@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { crearEmpleadoConAccesoInicial, crearEmpresaConAccesoInicial } from "cierrabe/acciones";
-import type { EmpresaId } from "cierrabe/datos/contexto";
-import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearPeriodosRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
+import { tenantContextDesdeAcceso, type EmpleadoId, type EmpresaId, type NovedadId, type PeriodoId } from "cierrabe/datos/contexto";
+import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
 import { contextoEstudioDesarrollo, uuidValido } from "@/lib/backend-dev-context";
+import { contextoEstudioActual } from "@/lib/backend-operativo";
 import { obtenerSesionDev } from "@/lib/dev-auth";
 import { MES_ACTUAL } from "@/lib/format";
-import type { Modalidad, Tono } from "@/lib/types";
+import type { Adjunto, Modalidad, TipoNovedad, Tono } from "@/lib/types";
 
 export interface AltaRealResult {
   ok: boolean;
@@ -41,6 +42,19 @@ export interface CrearEmpleadoInicialInput {
   sueldo: number;
   hijos: number;
   telefono?: string;
+}
+
+export interface CrearNovedadRealInput {
+  empresaId: string;
+  mes: string;
+  empleadoId: string;
+  tipo: TipoNovedad;
+  cantidad?: number;
+  importe?: number;
+  nota?: string;
+  adjunto?: Adjunto;
+  origen: "cliente" | "estudio";
+  autor: string;
 }
 
 export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Promise<AltaRealResult> {
@@ -149,5 +163,76 @@ export async function crearEmpleadoInicial(input: CrearEmpleadoInicialInput): Pr
     modo: "real",
     mensaje: `Empleado guardado en backend con acceso inicial para ${res.usuario.email}.`,
     id: res.empleado.id,
+  };
+}
+
+export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<AltaRealResult> {
+  const ctx = await contextoEstudioActual();
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(input.empresaId) || !uuidValido(input.empleadoId)) {
+    return {
+      ok: true,
+      modo: "demo",
+      mensaje: "Novedad simulada: falta backend real o IDs UUID.",
+    };
+  }
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) {
+    return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
+  }
+
+  const empresaId = input.empresaId as EmpresaId;
+  const { db } = await import("cierrabe/datos/db");
+  const periodosRepo = crearPeriodosRepo(db);
+  const novedadesRepo = crearNovedadesRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+
+  const periodos = await periodosRepo.listarPorEmpresa(tenant, empresaId);
+  const periodo =
+    periodos.find((p) => p.mes === input.mes) ??
+    (await periodosRepo.guardar(tenant, {
+      id: crypto.randomUUID(),
+      empresaId,
+      mes: input.mes,
+      etapa: "novedades",
+      fechaObjetivo: `${input.mes}-28`,
+      sinNovedades: false,
+      versiones: [],
+      advertenciasAceptadas: {},
+      bps: "pendiente",
+      rectificaciones: [],
+      notas: [],
+    }));
+
+  const novedad = await novedadesRepo.crear(tenant, {
+    empresaId,
+    periodoId: periodo.id as PeriodoId,
+    mes: input.mes,
+    empleadoId: input.empleadoId as EmpleadoId,
+    tipo: input.tipo,
+    cantidad: input.cantidad,
+    importe: input.importe,
+    nota: input.nota,
+    adjunto: input.adjunto,
+    origen: input.origen,
+    autor: input.autor,
+  });
+
+  await auditoriaRepo.registrar(tenant, {
+    actor: input.autor,
+    empresaId,
+    entidad: "Novedad",
+    entidadId: novedad.id as NovedadId,
+    accion: `Agrego ${input.tipo.replace("_", " ")}`,
+    detalle: input.nota,
+  });
+
+  revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath("/empresas");
+  return {
+    ok: true,
+    modo: "real",
+    mensaje: "Novedad guardada en backend.",
+    id: novedad.id,
   };
 }

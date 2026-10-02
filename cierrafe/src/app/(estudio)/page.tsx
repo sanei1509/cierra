@@ -217,7 +217,7 @@ export default function Inicio() {
                 {filas.map((v) => {
                   const nov = estadoNovedades(v.periodo);
                   const n = empleados.filter((e) => e.empresaId === v.empresa.id && activoEn(e, MES_ACTUAL)).length;
-                  const r = USUARIOS.find((x) => x.id === v.empresa.responsableId)!;
+                  const r = USUARIOS.find((x) => x.id === v.empresa.responsableId) ?? { nombre: v.empresa.contacto.nombre };
                   const ap = v.periodo.aprobacion;
                   return (
                     <tr key={v.empresa.id} className="group border-t border-linea">
