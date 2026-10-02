@@ -1257,3 +1257,31 @@
 - `cierrafe/src/app/(estudio)/inicio-client.tsx`
 
 **Estimated scope:** Small
+
+## Task 44: Real Portal Launcher Data
+**Description:** Load the portal launcher from PostgreSQL snapshots so client and employee portal links point at real UUID-backed records.
+
+**Acceptance criteria:**
+- [x] The `/portales` route is a server page that loads `cargarDatosOperativosIniciales`.
+- [x] The interactive portal launcher UI lives in a client component.
+- [x] Client portal links are generated from real companies when backend data is available.
+- [x] Employee portal links are generated from real employees when backend data is available.
+- [x] Demo fallback remains available when real backend/session IDs are not applicable.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: replace target blank testing links with proper impersonation/session handoff before production.
+
+**Dependencies:** Task 35
+
+**Files touched:**
+- `cierrafe/src/app/(estudio)/portales/page.tsx`
+- `cierrafe/src/app/(estudio)/portales/portales-client.tsx`
+
+**Estimated scope:** Small
