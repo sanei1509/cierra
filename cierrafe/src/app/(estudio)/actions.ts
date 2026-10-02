@@ -120,6 +120,15 @@ export interface RectificarPeriodoRealInput extends PeriodoRealInput {
   motivo: string;
 }
 
+export interface AceptarAdvertenciaRealInput extends PeriodoRealInput {
+  alertaId: string;
+  nota: string;
+}
+
+export interface AgregarNotaPeriodoRealInput extends PeriodoRealInput {
+  texto: string;
+}
+
 export interface MarcarReciboVistoRealInput {
   empleadoId: string;
   empresaId: string;
@@ -659,6 +668,34 @@ export async function calcularLiquidacionReal(input: PeriodoRealInput): Promise<
       auditoria: { accion: `Calculo la version ${version.version}`, detalle: `${version.motor} - parametros ${version.parametros} - hash ${version.hash.slice(0, 8)}` },
     };
   });
+}
+
+export async function solicitarNovedadesReal(input: PeriodoRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => ({
+    periodo: { ...periodo, solicitud: { enviada: ahoraIso(), abierta: periodo.solicitud?.abierta, respondida: periodo.solicitud?.respondida } },
+    auditoria: { accion: "Solicito novedades por email" },
+  }));
+}
+
+export async function marcarNovedadesRecibidasReal(input: PeriodoRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => ({
+    periodo: { ...periodo, etapa: "recibidas" },
+    auditoria: { accion: "Marco novedades como completas" },
+  }));
+}
+
+export async function aceptarAdvertenciaReal(input: AceptarAdvertenciaRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => ({
+    periodo: { ...periodo, advertenciasAceptadas: { ...periodo.advertenciasAceptadas, [input.alertaId]: input.nota } },
+    auditoria: { accion: "Acepto una advertencia", detalle: input.nota },
+  }));
+}
+
+export async function agregarNotaPeriodoReal(input: AgregarNotaPeriodoRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => ({
+    periodo: { ...periodo, notas: [...periodo.notas, { fecha: ahoraIso(), por: input.actor, texto: input.texto }] },
+    auditoria: { accion: "Agrego nota interna", detalle: input.texto },
+  }));
 }
 
 export async function enviarAprobacionReal(input: PeriodoRealInput): Promise<AltaRealResult> {

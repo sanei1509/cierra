@@ -1172,3 +1172,33 @@
 - `cierrafe/src/components/importar-empleados.tsx`
 
 **Estimated scope:** Small
+
+## Task 41: Persistent Period Utility Actions
+**Description:** Persist smaller period workflow actions from the company detail screen so the period state does not depend on browser memory.
+
+**Acceptance criteria:**
+- [x] Requesting or resending novedades from the company detail screen persists `periodo.solicitud`.
+- [x] Marking novedades as complete from the company detail screen persists the `recibidas` stage.
+- [x] Accepting a warning with a note persists `advertenciasAceptadas`.
+- [x] Adding an internal note persists in `periodo.notas`.
+- [x] Each persisted action records an audit event through the period workflow helper.
+- [x] Demo fallback remains available when real backend/session IDs are not applicable.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: connect the dashboard bulk "Pedir novedades" button to the same real actions.
+- [ ] Pending later: replace simulated email sending with a real notification provider.
+
+**Dependencies:** Task 36
+
+**Files touched:**
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+
+**Estimated scope:** Small

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState, type MouseEvent } from "react";
 import {
+  aceptarAdvertenciaReal,
+  agregarNotaPeriodoReal,
   actualizarEmpleadoReal,
   actualizarEmpresaReal,
   aprobarInternoReal,
@@ -13,8 +15,10 @@ import {
   cerrarPeriodoReal,
   enviarAprobacionReal,
   generarBpsReal,
+  marcarNovedadesRecibidasReal,
   marcarBpsPresentadoReal,
   rectificarPeriodoReal,
+  solicitarNovedadesReal,
 } from "@/app/(estudio)/actions";
 import {
   AlertOctagon, AlertTriangle, Info, Check, ChevronRight, Plus, X, Send, Calculator, FileDown, Lock, RefreshCw,
@@ -71,10 +75,33 @@ const TONO_ALERTA = { bloqueante: "bg-rosa text-rosa-t", advertencia: "bg-crema 
 function AlertaItem({ a, v, onVer }: { a: Alerta; v: Vista; onVer: (id: string) => void }) {
   const aceptar = useStore((s) => s.aceptarAdvertencia);
   const puede = useStore((s) => s.puede);
+  const router = useRouter();
+  const usuario = useUsuario();
   const [nota, setNota] = useState("");
   const [abierta, setAbierta] = useState(false);
+  const [procesando, setProcesando] = useState(false);
+  const [error, setError] = useState("");
   const Icon = ICONO_ALERTA[a.nivel];
   const aceptada = v.periodo.advertenciasAceptadas[a.id];
+  const guardar = async () => {
+    if (!nota.trim()) return;
+    setError("");
+    setProcesando(true);
+    try {
+      const res = await aceptarAdvertenciaReal({ periodoId: v.periodo.id, empresaId: v.empresa.id, actor: usuario.nombre, alertaId: a.id, nota: nota.trim() });
+      if (!res.ok) {
+        setError(res.mensaje);
+        return;
+      }
+      aceptar(v.periodo.id, a.id, nota.trim());
+      setAbierta(false);
+      if (res.modo === "real") router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos aceptar la advertencia.");
+    } finally {
+      setProcesando(false);
+    }
+  };
   return (
     <li className={clsx("rounded-3xl border border-linea p-4", aceptada && "bg-hundido/55")}>
       <div className="flex gap-3">
@@ -103,13 +130,14 @@ function AlertaItem({ a, v, onVer }: { a: Alerta; v: Vista; onVer: (id: string) 
               className="mt-3 flex gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (nota.trim()) aceptar(v.periodo.id, a.id, nota.trim());
+                void guardar();
               }}
             >
               <input autoFocus className={clsx(inputCls, "h-9")} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Por qué está bien, ej.: comisión confirmada por el cliente" />
-              <Boton tam="sm" type="submit" disabled={!nota.trim()}>Aceptar</Boton>
+              <Boton tam="sm" type="submit" disabled={!nota.trim() || procesando}>{procesando ? "Guardando..." : "Aceptar"}</Boton>
             </form>
           )}
+          {error && <p className="mt-2 rounded-xl bg-rosa px-3 py-2 text-xs text-rosa-t">{error}</p>}
         </div>
       </div>
     </li>
@@ -168,9 +196,9 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
         : `Le enviamos a ${empresa.contacto.nombre} un enlace seguro para cargar horas extra, faltas, bonos y licencias antes del ${fecha(p.fechaObjetivo)}.`;
       acciones = (
         <>
-          <Boton disabled={!puede} onClick={() => s.solicitarNovedades(p.id)}><Send size={15} /> {p.solicitud ? "Reenviar pedido" : "Pedir novedades"}</Boton>
+          <Boton disabled={!puede || procesando === "solicitar"} onClick={() => void ejecutar("solicitar", () => solicitarNovedadesReal(periodoInput), () => s.solicitarNovedades(p.id))}><Send size={15} /> {p.solicitud ? "Reenviar pedido" : "Pedir novedades"}</Boton>
           <Boton variante="secundario" onClick={() => irA("novedades")}><Plus size={15} /> Cargarlas yo</Boton>
-          <Boton variante="fantasma" disabled={!puede} onClick={() => s.marcarRecibidas(p.id)}>Marcar como completas</Boton>
+          <Boton variante="fantasma" disabled={!puede || procesando === "recibidas"} onClick={() => void ejecutar("recibidas", () => marcarNovedadesRecibidasReal(periodoInput), () => s.marcarRecibidas(p.id))}>Marcar como completas</Boton>
         </>
       );
       break;
@@ -220,7 +248,7 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
       acciones = (
         <>
           <Boton variante="secundario" href={`/cliente/${empresa.id}`}><Eye size={15} /> Ver lo que ve el cliente</Boton>
-          <Boton variante="fantasma" disabled={!puede} onClick={() => s.solicitarNovedades(p.id)}><Mail size={15} /> Recordar por email</Boton>
+          <Boton variante="fantasma" disabled={!puede || procesando === "solicitar"} onClick={() => void ejecutar("solicitar", () => solicitarNovedadesReal(periodoInput), () => s.solicitarNovedades(p.id))}><Mail size={15} /> Recordar por email</Boton>
         </>
       );
       break;
@@ -344,7 +372,31 @@ function Checklist({ v }: { v: Vista }) {
 
 function Notas({ v }: { v: Vista }) {
   const agregar = useStore((s) => s.agregarNota);
+  const router = useRouter();
+  const usuario = useUsuario();
   const [t, setT] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+  const guardar = async () => {
+    const texto = t.trim();
+    if (!texto) return;
+    setError("");
+    setGuardando(true);
+    try {
+      const res = await agregarNotaPeriodoReal({ periodoId: v.periodo.id, empresaId: v.empresa.id, actor: usuario.nombre, texto });
+      if (!res.ok) {
+        setError(res.mensaje);
+        return;
+      }
+      agregar(v.periodo.id, texto);
+      setT("");
+      if (res.modo === "real") router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos guardar la nota.");
+    } finally {
+      setGuardando(false);
+    }
+  };
   return (
     <Panel className="p-5">
       <h3 className="font-bold">Notas internas</h3>
@@ -357,10 +409,11 @@ function Notas({ v }: { v: Vista }) {
           </li>
         ))}
       </ul>
-      <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (t.trim()) { agregar(v.periodo.id, t.trim()); setT(""); } }}>
+      <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); void guardar(); }}>
         <input className={clsx(inputCls, "h-9")} value={t} onChange={(e) => setT(e.target.value)} placeholder="Escribí una nota" />
-        <Boton tam="sm" type="submit" variante="secundario" disabled={!t.trim()}>Guardar</Boton>
+        <Boton tam="sm" type="submit" variante="secundario" disabled={!t.trim() || guardando}>{guardando ? "Guardando..." : "Guardar"}</Boton>
       </form>
+      {error && <p className="mt-2 rounded-xl bg-rosa px-3 py-2 text-xs text-rosa-t">{error}</p>}
     </Panel>
   );
 }
