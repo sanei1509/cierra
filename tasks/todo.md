@@ -1325,3 +1325,47 @@
 - `cierrabe/src/dominio/types.ts`
 
 **Estimated scope:** Medium
+
+## Task 46: Expanded Payroll Novelty Catalog
+**Description:** Add a broader set of payroll novelty types for real monthly work, including suspensions, subsidies, viatics, presentism, manual discounts and retroactive adjustments.
+
+**Acceptance criteria:**
+- [x] Shared frontend/backend novelty types include suspensions, justified absences, special leave, unemployment insurance, BSE/work accidents, maternity/subsidies, ingreso/egreso notes, schedule/category changes, viatics, presentism, productivity, manual discounts, retentions, reimbursements, retroactive adjustments and pending leave.
+- [x] PostgreSQL `tipo_novedad` enum has a migration for the new values.
+- [x] The client novelty portal exposes the most common new types as quick actions.
+- [x] The study novelty form can create any configured novelty type.
+- [x] The liquidation engine applies basic MVP impacts for suspensions/subsidies/day deductions, gravable variables, non-gravable reimbursements/viatics and manual deductions.
+- [x] Validation warns when subsidy-style novelties are missing supporting documentation.
+- [x] Seed data includes examples for presentism, viatics, suspension and manual discounts.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe test -- engine.test.ts`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrabe db:migrate`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: build specialized forms for egreso, ingreso, seguro de paro and category/hour changes so they can update employee records, not just liquidation novelties.
+- [ ] Pending later: refine legal/tax treatment for viatics, BSE, BPS subsidies and special leave with accountant-reviewed rules before production.
+
+**Dependencies:** Task 45
+
+**Files touched:**
+- `cierrabe/drizzle/0010_mature_darkstar.sql`
+- `cierrabe/drizzle/meta/_journal.json`
+- `cierrabe/drizzle/meta/0010_snapshot.json`
+- `cierrabe/src/datos/schema.ts`
+- `cierrabe/src/dominio/types.ts`
+- `cierrafe/src/app/cliente/[id]/cliente-client.tsx`
+- `cierrafe/src/lib/engine.ts`
+- `cierrafe/src/lib/funciones.ts`
+- `cierrafe/src/lib/labels.ts`
+- `cierrafe/src/lib/seed.ts`
+- `cierrafe/src/lib/types.ts`
+- `cierrafe/src/lib/validations.ts`
+- `cierrafe/tests/engine.test.ts`
+
+**Estimated scope:** Medium

@@ -61,7 +61,27 @@ export type TipoNovedad =
   | "cambio_salarial"
   | "llegada_tarde"
   | "feriado"
-  | "certificacion";
+  | "certificacion"
+  | "suspension"
+  | "ausencia_justificada"
+  | "licencia_especial"
+  | "seguro_paro"
+  | "accidente_laboral"
+  | "maternidad"
+  | "egreso"
+  | "ingreso_mes"
+  | "cambio_horario"
+  | "cambio_categoria"
+  | "viatico"
+  | "presentismo"
+  | "productividad"
+  | "descuento_manual"
+  | "prestamo_retencion"
+  | "reintegro"
+  | "retroactivo"
+  | "ajuste_mes_anterior"
+  | "salario_vacacional_ajuste"
+  | "licencia_pendiente";
 
 export interface Adjunto {
   nombre: string;

@@ -54,7 +54,7 @@ describe("motor de liquidacion", () => {
     expect(resultado.fueraDeAlcance).toBeUndefined();
     expect(resultado.totalHaberes).toBe(55000);
     expect(resultado.nominalGravado).toBe(55000);
-    expect(resultado.lineas.some((l) => l.concepto === "Bono · Comision ventas" && l.importe === 5000)).toBe(true);
+    expect(resultado.lineas.some((l) => l.concepto === "Bono / comisión · Comision ventas" && l.importe === 5000)).toBe(true);
   });
 
   it("bloquea construccion en vez de estimar una liquidacion", () => {
@@ -65,5 +65,62 @@ describe("motor de liquidacion", () => {
     expect(resultado.fueraDeAlcance).toContain("Industria de la construcción");
     expect(resultado.lineas).toHaveLength(0);
     expect(resultado.liquido).toBe(0);
+  });
+
+  it("descuenta suspensiones sin goce del nominal gravado", () => {
+    const novedades: Novedad[] = [
+      {
+        id: "n-susp",
+        empresaId: empresaBase.id,
+        mes: "2026-09",
+        empleadoId: empleadoBase.id,
+        tipo: "suspension",
+        cantidad: 2,
+        nota: "Sancion disciplinaria",
+        origen: "estudio",
+        autor: "Estudio",
+        fecha: "2026-09-18T10:00:00",
+      },
+    ];
+
+    const resultado = calcularEmpleado(empresaBase, empleadoBase, "2026-09", novedades);
+
+    expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Suspensión sin goce", importe: -3333.33 }));
+    expect(resultado.nominalGravado).toBe(46666.67);
+  });
+
+  it("separa viaticos no gravados y descuentos manuales", () => {
+    const novedades: Novedad[] = [
+      {
+        id: "n-viatico",
+        empresaId: empresaBase.id,
+        mes: "2026-09",
+        empleadoId: empleadoBase.id,
+        tipo: "viatico",
+        importe: 3000,
+        origen: "cliente",
+        autor: "Cliente",
+        fecha: "2026-09-20T10:00:00",
+      },
+      {
+        id: "n-desc",
+        empresaId: empresaBase.id,
+        mes: "2026-09",
+        empleadoId: empleadoBase.id,
+        tipo: "descuento_manual",
+        importe: 1200,
+        nota: "Ajuste acordado",
+        origen: "estudio",
+        autor: "Estudio",
+        fecha: "2026-09-20T10:00:00",
+      },
+    ];
+
+    const resultado = calcularEmpleado(empresaBase, empleadoBase, "2026-09", novedades);
+
+    expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Viático", gravadoBps: false, importe: 3000 }));
+    expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Descuento manual · Ajuste acordado", tipo: "descuento", importe: 1200 }));
+    expect(resultado.nominalGravado).toBe(50000);
+    expect(resultado.totalHaberes).toBe(53000);
   });
 });

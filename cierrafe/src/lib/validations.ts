@@ -64,14 +64,15 @@ export function validar(
         detalle: "No va a recibir el aviso del recibo. Puede entrar al portal con su cédula.",
       });
 
-    const certSinAdjunto = novedades.filter((n) => n.empleadoId === e.id && n.mes === mes && n.tipo === "certificacion" && !n.adjunto);
+    const comprobanteRequerido = new Set<Novedad["tipo"]>(["certificacion", "accidente_laboral", "maternidad"]);
+    const certSinAdjunto = novedades.filter((n) => n.empleadoId === e.id && n.mes === mes && comprobanteRequerido.has(n.tipo) && !n.adjunto);
     if (certSinAdjunto.length)
       out.push({
         id: `cert-${e.id}`,
         nivel: "advertencia",
         empleadoId: e.id,
-        titulo: `${nom(e)}: certificación médica sin comprobante`,
-        detalle: "Pedile al cliente el certificado o adjuntalo desde la novedad. Sin comprobante, el descuento puede ser observado.",
+        titulo: `${nom(e)}: novedad de subsidio sin comprobante`,
+        detalle: "Pedile al cliente el certificado/constancia o adjuntalo desde la novedad. Sin comprobante, el descuento puede ser observado.",
       });
 
     // Variables recurrentes sin novedad este mes
@@ -114,7 +115,7 @@ export function validar(
             detalle: `Pasó de ${fmt(p.totalHaberes)} a ${fmt(r.totalHaberes)}. Supera el umbral de ${pct(UMBRAL_VARIACION, 0)}.`,
           });
       }
-      const bono = r.lineas.filter((l) => l.concepto.startsWith("Bono")).reduce((s, l) => s + l.importe, 0);
+      const bono = r.lineas.filter((l) => l.concepto.startsWith("Bono") || l.concepto.startsWith("Productividad")).reduce((s, l) => s + l.importe, 0);
       const base = r.lineas.find((l) => l.codigo === "001")?.base ?? 0;
       if (bono > base * 0.4)
         out.push({

@@ -9,6 +9,39 @@ import { fmt, pct } from "./format";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+const sumaCantidad = (novs: Novedad[], tipo: Novedad["tipo"]) => novs.filter((n) => n.tipo === tipo).reduce((s, n) => s + (n.cantidad ?? 0), 0);
+
+function conceptoDinero(tipo: Novedad["tipo"]) {
+  switch (tipo) {
+    case "bono":
+      return "Bono / comisión";
+    case "presentismo":
+      return "Presentismo";
+    case "productividad":
+      return "Productividad / premio";
+    case "retroactivo":
+      return "Retroactivo";
+    case "ajuste_mes_anterior":
+      return "Ajuste mes anterior";
+    case "cambio_categoria":
+      return "Cambio de categoría";
+    case "viatico":
+      return "Viático";
+    case "reintegro":
+      return "Reintegro";
+    case "salario_vacacional_ajuste":
+      return "Ajuste salario vacacional";
+    case "adelanto":
+      return "Adelanto de sueldo";
+    case "descuento_manual":
+      return "Descuento manual";
+    case "prestamo_retencion":
+      return "Préstamo / retención";
+    default:
+      return "Novedad";
+  }
+}
+
 export function sueldoVigente(emp: Empleado, mes: string, novs: Novedad[] = []): { monto: number; origen: string } {
   const cambio = novs.find((n) => n.empleadoId === emp.id && n.tipo === "cambio_salarial" && n.importe);
   if (cambio) return { monto: cambio.importe!, origen: `novedad de cambio salarial (${mes})` };
@@ -109,6 +142,78 @@ export function calcularEmpleado(
       formula: `Jornal ${fmt(jornal)} × ${cert} día(s) certificados. Esos días los paga el subsidio por enfermedad, no la empresa (regla simplificada, sin días de carencia).`,
     });
 
+  const descuentosDias: Array<{ tipo: Novedad["tipo"]; codigo: string; concepto: string; formula: string }> = [
+    {
+      tipo: "suspension",
+      codigo: "013",
+      concepto: "Suspensión sin goce",
+      formula: "Días de suspensión informados. Se descuentan del nominal del mes.",
+    },
+    {
+      tipo: "seguro_paro",
+      codigo: "014",
+      concepto: "Seguro de paro",
+      formula: "Días cubiertos por seguro de paro. Regla simplificada: no los paga la empresa.",
+    },
+    {
+      tipo: "accidente_laboral",
+      codigo: "015",
+      concepto: "Accidente laboral / BSE",
+      formula: "Días cubiertos por BSE. Regla simplificada: no los paga la empresa.",
+    },
+    {
+      tipo: "maternidad",
+      codigo: "016",
+      concepto: "Maternidad / subsidio BPS",
+      formula: "Días cubiertos por subsidio BPS. Regla simplificada: no los paga la empresa.",
+    },
+    {
+      tipo: "egreso",
+      codigo: "017",
+      concepto: "Egreso informado",
+      formula: "Días no trabajados por egreso cuando la ficha todavía no refleja la baja.",
+    },
+    {
+      tipo: "ingreso_mes",
+      codigo: "018",
+      concepto: "Ingreso en el mes",
+      formula: "Días previos al ingreso cuando la ficha todavía no refleja el alta real.",
+    },
+  ];
+  descuentosDias.forEach((regla) => {
+    const diasDescuento = sumaCantidad(novs, regla.tipo);
+    if (diasDescuento <= 0) return;
+    L.push({
+      codigo: regla.codigo,
+      concepto: regla.concepto,
+      tipo: "haber",
+      gravadoBps: true,
+      base: jornal,
+      cantidad: diasDescuento,
+      importe: r2(-jornal * diasDescuento),
+      formula: `${regla.formula} Jornal ${fmt(jornal)} × ${diasDescuento} día(s).`,
+    });
+  });
+
+  const diasInformativos: Array<{ tipo: Novedad["tipo"]; codigo: string; concepto: string; formula: string }> = [
+    { tipo: "ausencia_justificada", codigo: "019", concepto: "Ausencia justificada", formula: "Registro informativo sin descuento automático." },
+    { tipo: "licencia_especial", codigo: "019A", concepto: "Licencia especial", formula: "Registro informativo sin descuento automático. Validar causal y goce con el estudio." },
+    { tipo: "licencia_pendiente", codigo: "019B", concepto: "Licencia pendiente informada", formula: "Registro para control de saldo de licencia." },
+  ];
+  diasInformativos.forEach((regla) => {
+    const cantidad = sumaCantidad(novs, regla.tipo);
+    if (cantidad <= 0) return;
+    L.push({
+      codigo: regla.codigo,
+      concepto: regla.concepto,
+      tipo: "haber",
+      gravadoBps: false,
+      cantidad,
+      importe: 0,
+      formula: `${regla.formula} Cantidad informada: ${cantidad} día(s).`,
+    });
+  });
+
   // Llegadas tarde (minutos)
   const tarde = novs.filter((n) => n.tipo === "llegada_tarde").reduce((s, n) => s + (n.cantidad ?? 0), 0);
   if (tarde > 0) {
@@ -163,11 +268,11 @@ export function calcularEmpleado(
 
   // Bonos / comisiones
   novs
-    .filter((n) => n.tipo === "bono" && n.importe)
+    .filter((n) => ["bono", "presentismo", "productividad", "retroactivo", "ajuste_mes_anterior", "cambio_categoria"].includes(n.tipo) && n.importe)
     .forEach((n, i) =>
       L.push({
         codigo: `03${i}`,
-        concepto: n.nota ? `Bono · ${n.nota}` : "Bono / comisión",
+        concepto: n.nota ? `${conceptoDinero(n.tipo)} · ${n.nota}` : conceptoDinero(n.tipo),
         tipo: "haber",
         gravadoBps: true,
         importe: r2(n.importe!),
@@ -193,6 +298,36 @@ export function calcularEmpleado(
       formula: `Total nominal del semestre (${meses.length} meses: ${fmt(acumulado)}) ÷ 12. Simplificado: considera sueldo básico, no variables.`,
     });
   }
+
+  novs
+    .filter((n) => ["viatico", "reintegro", "salario_vacacional_ajuste"].includes(n.tipo) && n.importe)
+    .forEach((n, i) =>
+      L.push({
+        codigo: `06${i}`,
+        concepto: n.nota ? `${conceptoDinero(n.tipo)} · ${n.nota}` : conceptoDinero(n.tipo),
+        tipo: "haber",
+        gravadoBps: false,
+        importe: r2(n.importe!),
+        formula: "Importe no gravado BPS en regla simplificada. Validar tratamiento final antes de presentar.",
+      }),
+    );
+
+  const cambiosInformativos: Array<{ tipo: Novedad["tipo"]; codigo: string; concepto: string }> = [
+    { tipo: "cambio_horario", codigo: "070", concepto: "Cambio de horario informado" },
+  ];
+  cambiosInformativos.forEach((regla) => {
+    const cantidad = sumaCantidad(novs, regla.tipo);
+    if (cantidad <= 0) return;
+    L.push({
+      codigo: regla.codigo,
+      concepto: regla.concepto,
+      tipo: "haber",
+      gravadoBps: false,
+      cantidad,
+      importe: 0,
+      formula: `Registro informativo para revisar ficha laboral. Cantidad informada: ${cantidad}.`,
+    });
+  });
 
   // Salario vacacional (no gravado BPS)
   const lic = novs.filter((n) => n.tipo === "licencia").reduce((s, n) => s + (n.cantidad ?? 0), 0);
@@ -292,15 +427,15 @@ export function calcularEmpleado(
 
   // Adelantos / otros descuentos
   novs
-    .filter((n) => n.tipo === "adelanto" && n.importe)
+    .filter((n) => ["adelanto", "descuento_manual", "prestamo_retencion"].includes(n.tipo) && n.importe)
     .forEach((n, i) =>
       L.push({
         codigo: `14${i}`,
-        concepto: n.nota ? `Adelanto · ${n.nota}` : "Adelanto de sueldo",
+        concepto: n.nota ? `${conceptoDinero(n.tipo)} · ${n.nota}` : conceptoDinero(n.tipo),
         tipo: "descuento",
         gravadoBps: false,
         importe: r2(n.importe!),
-        formula: "Adelanto entregado durante el mes, se descuenta del líquido.",
+        formula: "Importe informado durante el mes, se descuenta del líquido.",
       }),
     );
 

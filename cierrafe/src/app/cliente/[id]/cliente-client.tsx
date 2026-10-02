@@ -17,7 +17,22 @@ import { useStore, vistaPeriodo } from "@/lib/store";
 import type { DatosOperativosIniciales } from "@/lib/backend-operativo";
 import type { Novedad, TipoNovedad } from "@/lib/types";
 
-const RAPIDOS: TipoNovedad[] = ["hora_extra", "falta", "certificacion", "llegada_tarde", "feriado", "bono", "licencia", "adelanto"];
+const RAPIDOS: TipoNovedad[] = [
+  "hora_extra",
+  "falta",
+  "certificacion",
+  "suspension",
+  "seguro_paro",
+  "accidente_laboral",
+  "licencia",
+  "licencia_especial",
+  "llegada_tarde",
+  "feriado",
+  "bono",
+  "presentismo",
+  "viatico",
+  "adelanto",
+];
 
 export default function ClienteClient({ id, datosIniciales }: { id: string; datosIniciales: DatosOperativosIniciales }) {
   const router = useRouter();
@@ -103,7 +118,7 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
         <Panel className="bg-sol-suave p-6">
           <p className="text-sm font-semibold text-crema-t">Pedido de {ESTUDIO.nombre}</p>
           <h1 className="mt-1 text-[26px] font-extrabold leading-tight tracking-tight">Necesitamos las novedades de {mesNombre} antes del {fecha(p.fechaObjetivo)}</h1>
-          <p className="mt-2 text-[15px] text-tinta-2">Contanos qué pasó este mes con tu equipo: horas extra, faltas, certificaciones, bonos, licencias o adelantos. Podés adjuntar certificados. Si no hubo nada, avisanos con un toque.</p>
+          <p className="mt-2 text-[15px] text-tinta-2">Contanos qué pasó este mes con tu equipo: horas extra, faltas, suspensiones, certificaciones, seguros, bonos, licencias, viáticos o adelantos. Podés adjuntar comprobantes. Si no hubo nada, avisanos con un toque.</p>
         </Panel>
         {error && <p className="rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}
         <ul className="space-y-2">

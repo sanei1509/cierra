@@ -1,0 +1,20 @@
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'suspension';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'ausencia_justificada';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'licencia_especial';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'seguro_paro';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'accidente_laboral';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'maternidad';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'egreso';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'ingreso_mes';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'cambio_horario';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'cambio_categoria';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'viatico';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'presentismo';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'productividad';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'descuento_manual';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'prestamo_retencion';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'reintegro';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'retroactivo';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'ajuste_mes_anterior';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'salario_vacacional_ajuste';--> statement-breakpoint
+ALTER TYPE "public"."tipo_novedad" ADD VALUE 'licencia_pendiente';

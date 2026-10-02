@@ -165,7 +165,11 @@ export const FUNCIONES: GrupoFunciones[] = [
         ],
         probar: { href: "/cliente/colon", label: "Portal de Taller Colón" },
       },
-      { nombre: "Horas extra, faltas, licencias, certificaciones, comisiones", estado: "si", nota: "También llegadas tarde, feriados, adelantos y cambios de sueldo." },
+      {
+        nombre: "Horas extra, faltas, suspensiones, licencias, subsidios y variables",
+        estado: "si",
+        nota: "También viáticos, presentismo, productividad, descuentos manuales, préstamos/retenciones, retroactivos, adelantos y cambios de sueldo/categoría.",
+      },
       {
         nombre: "Adjuntar documentación",
         estado: "si",

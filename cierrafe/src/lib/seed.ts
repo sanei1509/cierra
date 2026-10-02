@@ -251,13 +251,14 @@ export function crearSeed() {
   // Septiembre
   const S = "2026-09";
   const est = { origen: "estudio" as const, autor: "Martín Suárez" };
-  nov("excelrrhh", S, "excelrrhh-1", "bono", { importe: 1500, nota: "Presentismo según planilla RRHH", ...est, autor: "Lucía Pereira" });
+  nov("excelrrhh", S, "excelrrhh-1", "presentismo", { importe: 1500, nota: "Según planilla RRHH", ...est, autor: "Lucía Pereira" });
   nov("espiga", S, "espiga-1", "hora_extra", { cantidad: 10 });
   nov("espiga", S, "espiga-2", "falta", { cantidad: 1, nota: "Sin certificado" });
   nov("delprado", S, "delprado-3", "hora_extra", { cantidad: 8 });
   nov("delprado", S, "delprado-2", "adelanto", { importe: 8000 });
   nov("brio", S, "brio-2", "hora_extra", { cantidad: 14 });
-  nov("brio", S, "brio-1", "bono", { importe: 4000, nota: "Presentismo" });
+  nov("brio", S, "brio-1", "presentismo", { importe: 4000, nota: "Asistencia completa" });
+  nov("brio", S, "brio-3", "viatico", { importe: 2200, nota: "Traslados a cliente" });
   nov("visionsur", S, "visionsur-2", "bono", { importe: 6500, nota: "Comisión ventas" });
   nov("visionsur", S, "visionsur-3", "licencia", { cantidad: 5 });
   nov("ferrari", S, "ferrari-2", "bono", { importe: 32000, nota: "Honorarios caso Rivas", ...est, autor: "Lucía Pereira" });
@@ -271,6 +272,8 @@ export function crearSeed() {
   nov("palacio", S, "palacio-2", "llegada_tarde", { cantidad: 40, ...est });
   nov("palacio", S, "palacio-1", "certificacion", { cantidad: 1, ...est });
   nov("palacio", S, "palacio-2", "hora_extra", { cantidad: 6, ...est });
+  nov("colon", S, "colon-1", "suspension", { cantidad: 1, nota: "Sanción disciplinaria documentada", ...est });
+  nov("colon", S, "colon-2", "descuento_manual", { importe: 1200, nota: "Ajuste acordado", ...est });
 
   const periodo = (empresaId: string, etapa: Etapa, o: Partial<Periodo> = {}): Periodo => ({
     id: `${empresaId}-${S}`,
