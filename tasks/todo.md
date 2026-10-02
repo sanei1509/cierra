@@ -1045,3 +1045,32 @@
 - `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
 
 **Estimated scope:** Medium
+
+## Task 37: Real Receipt Documents
+**Description:** Connect individual and batch receipt document routes to persisted closed payroll snapshots.
+
+**Acceptance criteria:**
+- [x] `/recibo/[id]/[mes]` loads a real employee/company/period snapshot when the employee id is a UUID.
+- [x] `/recibo/[id]/[mes]` renders only from a closed period version and keeps demo fallback for seeded links.
+- [x] `/recibos/[empresa]/[mes]` loads the real company period snapshot for the study document view.
+- [x] Batch receipt route requires study context in production instead of using the public portal helper.
+- [x] Existing print/download UI remains unchanged.
+- [x] Employee portal receipt links can open real closed-period receipts.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+
+**Notes:**
+- [ ] Pending later: persist employee receipt view/open events in PostgreSQL instead of local demo state.
+- [ ] Pending later: add explicit receipt-access authorization tests once real route guards are expanded beyond the development bridge.
+
+**Dependencies:** Task 35, Task 36
+
+**Files touched:**
+- `cierrafe/src/lib/backend-operativo.ts`
+- `cierrafe/src/app/recibo/[id]/[mes]/*`
+- `cierrafe/src/app/recibos/[empresa]/[mes]/*`
+
+**Estimated scope:** Small

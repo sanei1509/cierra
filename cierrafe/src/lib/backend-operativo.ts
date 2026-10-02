@@ -7,6 +7,7 @@ import {
   type EmpresaId,
   type EstudioId,
   type PeriodoId,
+  type TenantContext,
   type UsuarioId,
 } from "cierrabe/datos/contexto";
 import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo } from "cierrabe/datos/repos";
@@ -103,13 +104,7 @@ export async function cargarDatosOperativosIniciales(): Promise<DatosOperativosI
   };
 }
 
-export async function cargarDatosPortalEmpresa(empresaId: string): Promise<DatosOperativosIniciales> {
-  const ctx = await contextoOperativoActual();
-  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empresaId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
-
-  const tenant = tenantContextDesdeAcceso(ctx);
-  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
-
+async function cargarDatosEmpresaDesdeTenant(tenant: TenantContext, empresaId: string): Promise<DatosOperativosIniciales> {
   const { db } = await import("cierrabe/datos/db");
   const empresasRepo = crearEmpresasRepo(db);
   const empleadosRepo = crearEmpleadosRepo(db);
@@ -137,6 +132,26 @@ export async function cargarDatosPortalEmpresa(empresaId: string): Promise<Datos
     novedades: novedadesPorPeriodo.flat(),
     audit,
   };
+}
+
+export async function cargarDatosPortalEmpresa(empresaId: string): Promise<DatosOperativosIniciales> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empresaId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+
+  return cargarDatosEmpresaDesdeTenant(tenant, empresaId);
+}
+
+export async function cargarDatosRecibosEmpresa(empresaId: string): Promise<DatosOperativosIniciales> {
+  const ctx = await contextoEstudioActual();
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(empresaId)) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) return { modo: "demo", empresas: [], empleados: [], periodos: [], novedades: [], audit: [] };
+
+  return cargarDatosEmpresaDesdeTenant(tenant, empresaId);
 }
 
 export async function cargarDatosPortalEmpleado(empleadoId: string): Promise<DatosOperativosIniciales> {
