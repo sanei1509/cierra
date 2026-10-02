@@ -31,7 +31,7 @@ import { MES_ACTUAL, fecha, fechaHora, fmt, fmt2, mesAnterior, nombreMes, pct } 
 import { activoEn, calcularEmpresa, totales } from "@/lib/engine";
 import { categoriasDe, laudoDe } from "@/lib/params";
 import { archivoNomina, descargar } from "@/lib/bps";
-import type { Alerta, AuditEvent, Empleado, Empresa, Novedad, Periodo } from "@/lib/types";
+import type { Alerta, AuditEvent, CondicionPresentismo, Empleado, Empresa, Novedad, Periodo } from "@/lib/types";
 import { Avatar, Boton, Campo, Chip, Drawer, EstadoChip, MarcaEmpresa, Modal, Panel, Vacio, imagenADataUrl, inputCls } from "@/components/ui";
 import { CalcDetalle } from "@/components/calc-detalle";
 import { NovedadForm } from "@/components/novedad-form";
@@ -841,7 +841,37 @@ function TabActividad({ v }: { v: Vista }) {
   );
 }
 
-const NOVEDADES_PRESENTISMO_DEFAULT: Novedad["tipo"][] = ["falta", "certificacion", "suspension", "seguro_paro", "accidente_laboral", "maternidad", "llegada_tarde"];
+const NOVEDADES_PRESENTISMO_DEFAULT: CondicionPresentismo[] = [
+  { tipo: "falta", desdeCantidad: 1, accion: "no_paga" },
+  { tipo: "certificacion", desdeCantidad: 3, accion: "no_paga" },
+  { tipo: "suspension", desdeCantidad: 1, accion: "no_paga" },
+  { tipo: "seguro_paro", desdeCantidad: 1, accion: "no_paga" },
+  { tipo: "accidente_laboral", desdeCantidad: 1, accion: "no_paga" },
+  { tipo: "maternidad", desdeCantidad: 1, accion: "no_paga" },
+  { tipo: "llegada_tarde", desdeCantidad: 30, accion: "paga_mitad" },
+  { tipo: "ausencia_justificada", desdeCantidad: 1, accion: "paga_mitad" },
+];
+
+const PRESENTISMO_CALCULOS: Array<{ valor: NonNullable<NonNullable<Empresa["reglasLiquidacion"]>["presentismo"]>["tipoCalculo"]; label: string; ayuda: string }> = [
+  { valor: "monto_fijo", label: "Monto fijo", ayuda: "Se paga el mismo importe todos los meses" },
+  { valor: "porcentaje_sueldo_base", label: "% del sueldo base", ayuda: "Calcula sobre el sueldo nominal vigente" },
+  { valor: "porcentaje_liquido_estimado", label: "% del líquido estimado", ayuda: "Calcula sobre una estimación antes del propio presentismo" },
+];
+
+const PRESENTISMO_ACCIONES: Array<{ valor: CondicionPresentismo["accion"]; label: string }> = [
+  { valor: "no_paga", label: "No paga" },
+  { valor: "paga_mitad", label: "Paga mitad" },
+  { valor: "paga_porcentaje", label: "Paga %" },
+];
+
+type PresentismoRegla = NonNullable<NonNullable<Empresa["reglasLiquidacion"]>["presentismo"]>;
+
+function condicionesPresentismoIniciales(presentismo?: PresentismoRegla) {
+  if (presentismo?.condiciones?.length) return presentismo.condiciones;
+  const legacy = presentismo?.descontarConNovedades;
+  if (legacy?.length) return legacy.map((tipo) => ({ tipo, desdeCantidad: 1, accion: "no_paga" as const }));
+  return NOVEDADES_PRESENTISMO_DEFAULT;
+}
 
 function TabReglasLiquidacion({ v }: { v: Vista }) {
   const s = useStore();
@@ -853,19 +883,29 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
   const [horasExtraFactor, setHorasExtraFactor] = useState(String(reglas?.horasExtraFactor ?? 2));
   const [feriadoFactor, setFeriadoFactor] = useState(String(reglas?.feriadoFactor ?? 2));
   const [presentismoActivo, setPresentismoActivo] = useState(Boolean(presentismo?.habilitado));
-  const [presentismoMonto, setPresentismoMonto] = useState(String(presentismo?.monto ?? ""));
-  const [cortan, setCortan] = useState<Novedad["tipo"][]>(presentismo?.descontarConNovedades ?? NOVEDADES_PRESENTISMO_DEFAULT);
+  const [presentismoTipo, setPresentismoTipo] = useState<PresentismoRegla["tipoCalculo"]>(presentismo?.tipoCalculo ?? "monto_fijo");
+  const [presentismoValor, setPresentismoValor] = useState(String(presentismo?.valor ?? presentismo?.monto ?? ""));
+  const [condiciones, setCondiciones] = useState<CondicionPresentismo[]>(() => condicionesPresentismoIniciales(presentismo));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
-  const toggleCorta = (tipo: Novedad["tipo"]) => {
-    setCortan((actual) => (actual.includes(tipo) ? actual.filter((x) => x !== tipo) : [...actual, tipo]));
+  const toggleCondicion = (plantilla: CondicionPresentismo) => {
+    setCondiciones((actual) => (actual.some((c) => c.tipo === plantilla.tipo) ? actual.filter((c) => c.tipo !== plantilla.tipo) : [...actual, plantilla]));
+  };
+
+  const actualizarCondicion = (tipo: Novedad["tipo"], cambios: Partial<CondicionPresentismo>) => {
+    setCondiciones((actual) => actual.map((c) => (c.tipo === tipo ? { ...c, ...cambios } : c)));
   };
 
   const guardar = async () => {
     const he = Number(horasExtraFactor.replace(",", "."));
     const fer = Number(feriadoFactor.replace(",", "."));
-    const monto = Number(presentismoMonto.replace(/\./g, "").replace(",", "."));
+    const valorPresentismo = Number(presentismoValor.replace(/\./g, "").replace(",", "."));
+    const condicionesNormalizadas = condiciones.map((c) => ({
+      ...c,
+      desdeCantidad: c.desdeCantidad && c.desdeCantidad > 0 ? c.desdeCantidad : undefined,
+      porcentajePago: c.accion === "paga_porcentaje" ? c.porcentajePago ?? 0 : undefined,
+    }));
     if (!Number.isFinite(he) || he < 1 || he > 4) {
       setError("El factor de hora extra debe estar entre 1 y 4.");
       return;
@@ -874,8 +914,16 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
       setError("El factor de feriado debe estar entre 1 y 4.");
       return;
     }
-    if (presentismoActivo && (!Number.isFinite(monto) || monto <= 0)) {
-      setError("Cargá un monto de presentismo mayor a cero.");
+    if (presentismoActivo && (!Number.isFinite(valorPresentismo) || valorPresentismo <= 0)) {
+      setError("Cargá un valor de presentismo mayor a cero.");
+      return;
+    }
+    if (presentismoActivo && presentismoTipo !== "monto_fijo" && valorPresentismo > 100) {
+      setError("El porcentaje de presentismo no puede ser mayor a 100.");
+      return;
+    }
+    if (presentismoActivo && condicionesNormalizadas.some((c) => c.accion === "paga_porcentaje" && ((c.porcentajePago ?? 0) < 0 || (c.porcentajePago ?? 0) > 100))) {
+      setError("Los porcentajes de pago de presentismo deben estar entre 0 y 100.");
       return;
     }
     const cambios: Partial<Empresa> = {
@@ -884,12 +932,19 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
         feriadoFactor: fer,
         presentismo: {
           habilitado: presentismoActivo,
-          monto: presentismoActivo ? monto : 0,
-          descontarConNovedades: cortan,
+          tipoCalculo: presentismoTipo,
+          valor: presentismoActivo ? valorPresentismo : 0,
+          monto: presentismoActivo && presentismoTipo === "monto_fijo" ? valorPresentismo : 0,
+          condiciones: condicionesNormalizadas,
+          descontarConNovedades: condicionesNormalizadas.filter((c) => c.accion === "no_paga").map((c) => c.tipo),
         },
       },
     };
-    const resumen = `Reglas de liquidación: HE x${he}, feriado x${fer}${presentismoActivo ? `, presentismo ${fmt(monto)}` : ", sin presentismo automático"}`;
+    const presentismoResumen =
+      presentismoActivo
+        ? `, presentismo ${presentismoTipo === "monto_fijo" ? fmt(valorPresentismo) : `${valorPresentismo}%`} con ${condicionesNormalizadas.length} regla(s)`
+        : ", sin presentismo automático";
+    const resumen = `Reglas de liquidación: HE x${he}, feriado x${fer}${presentismoResumen}`;
     setError("");
     setGuardando(true);
     try {
@@ -916,37 +971,104 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
         </div>
         <Boton disabled={!puede || guardando} onClick={() => void guardar()}>{guardando ? "Guardando..." : "Guardar reglas"}</Boton>
       </div>
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <Campo label="Horas extra" ayuda="2 = doble, 1.5 = tiempo y medio">
           <input className={inputCls} inputMode="decimal" value={horasExtraFactor} onChange={(e) => setHorasExtraFactor(e.target.value)} disabled={!puede} />
         </Campo>
         <Campo label="Feriado trabajado" ayuda="Factor aplicado sobre jornal">
           <input className={inputCls} inputMode="decimal" value={feriadoFactor} onChange={(e) => setFeriadoFactor(e.target.value)} disabled={!puede} />
         </Campo>
-        <Campo label="Presentismo mensual">
-          <div className="flex gap-2">
-            <label className="flex h-11 items-center gap-2 rounded-xl border border-linea bg-superficie px-3 text-sm">
-              <input type="checkbox" checked={presentismoActivo} onChange={(e) => setPresentismoActivo(e.target.checked)} disabled={!puede} className="size-4 accent-petroleo" />
-              Pagar
-            </label>
-            <input className={clsx(inputCls, "min-w-0 flex-1")} inputMode="numeric" value={presentismoMonto} onChange={(e) => setPresentismoMonto(e.target.value.replace(/[^\d,.]/g, ""))} disabled={!puede || !presentismoActivo} placeholder="0" />
-          </div>
-        </Campo>
       </div>
-      <section className="mt-5 rounded-3xl bg-hundido p-4">
-        <h3 className="text-sm font-bold">Novedades que hacen perder presentismo</h3>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {NOVEDADES_PRESENTISMO_DEFAULT.map((tipo) => (
-            <button
-              key={tipo}
-              type="button"
-              onClick={() => toggleCorta(tipo)}
-              disabled={!puede || !presentismoActivo}
-              className={clsx("rounded-full px-3 py-1.5 text-xs font-semibold", cortan.includes(tipo) ? "bg-petroleo text-white" : "bg-superficie text-apagado")}
-            >
-              {TIPOS[tipo].corto}
-            </button>
-          ))}
+      <section className="mt-5 rounded-2xl bg-hundido p-4">
+        <div className="flex flex-wrap items-start gap-3">
+          <label className="flex h-11 items-center gap-2 rounded-xl border border-linea bg-superficie px-3 text-sm">
+            <input type="checkbox" checked={presentismoActivo} onChange={(e) => setPresentismoActivo(e.target.checked)} disabled={!puede} className="size-4 accent-petroleo" />
+            Pago presentismo
+          </label>
+          <div className="grid min-w-[260px] flex-1 gap-3 md:grid-cols-[minmax(180px,1fr)_minmax(150px,0.8fr)]">
+            <Campo label="Cálculo">
+              <select
+                className={inputCls}
+                value={presentismoTipo}
+                onChange={(e) => setPresentismoTipo(e.target.value as typeof presentismoTipo)}
+                disabled={!puede || !presentismoActivo}
+              >
+                {PRESENTISMO_CALCULOS.map((opcion) => (
+                  <option key={opcion.valor} value={opcion.valor}>{opcion.label}</option>
+                ))}
+              </select>
+            </Campo>
+            <Campo label={presentismoTipo === "monto_fijo" ? "Monto" : "Porcentaje"}>
+              <input
+                className={inputCls}
+                inputMode="decimal"
+                value={presentismoValor}
+                onChange={(e) => setPresentismoValor(e.target.value.replace(/[^\d,.]/g, ""))}
+                disabled={!puede || !presentismoActivo}
+                placeholder={presentismoTipo === "monto_fijo" ? "0" : "0%"}
+              />
+            </Campo>
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-apagado">{PRESENTISMO_CALCULOS.find((opcion) => opcion.valor === presentismoTipo)?.ayuda}</p>
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="text-xs uppercase tracking-wide text-apagado">
+              <tr>
+                <th className="px-2 py-2">Aplica</th>
+                <th className="px-2 py-2">Novedad</th>
+                <th className="px-2 py-2">Desde</th>
+                <th className="px-2 py-2">Efecto</th>
+                <th className="px-2 py-2">% pago</th>
+              </tr>
+            </thead>
+            <tbody>
+              {NOVEDADES_PRESENTISMO_DEFAULT.map((plantilla) => {
+                const condicion = condiciones.find((c) => c.tipo === plantilla.tipo);
+                const activa = Boolean(condicion);
+                return (
+                  <tr key={plantilla.tipo} className="border-t border-linea">
+                    <td className="px-2 py-2">
+                      <input type="checkbox" checked={activa} onChange={() => toggleCondicion(plantilla)} disabled={!puede || !presentismoActivo} className="size-4 accent-petroleo" />
+                    </td>
+                    <td className="px-2 py-2 font-semibold">{TIPOS[plantilla.tipo].label}</td>
+                    <td className="px-2 py-2">
+                      <input
+                        className={clsx(inputCls, "h-9 w-24")}
+                        inputMode="numeric"
+                        value={condicion?.desdeCantidad ?? ""}
+                        onChange={(e) => actualizarCondicion(plantilla.tipo, { desdeCantidad: Number(e.target.value.replace(/\D/g, "")) || undefined })}
+                        disabled={!puede || !presentismoActivo || !activa}
+                        placeholder="1"
+                      />
+                    </td>
+                    <td className="px-2 py-2">
+                      <select
+                        className={clsx(inputCls, "h-9")}
+                        value={condicion?.accion ?? plantilla.accion}
+                        onChange={(e) => actualizarCondicion(plantilla.tipo, { accion: e.target.value as CondicionPresentismo["accion"] })}
+                        disabled={!puede || !presentismoActivo || !activa}
+                      >
+                        {PRESENTISMO_ACCIONES.map((opcion) => (
+                          <option key={opcion.valor} value={opcion.valor}>{opcion.label}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-2">
+                      <input
+                        className={clsx(inputCls, "h-9 w-24")}
+                        inputMode="numeric"
+                        value={condicion?.porcentajePago ?? ""}
+                        onChange={(e) => actualizarCondicion(plantilla.tipo, { porcentajePago: Number(e.target.value.replace(/\D/g, "")) || undefined })}
+                        disabled={!puede || !presentismoActivo || !activa || condicion?.accion !== "paga_porcentaje"}
+                        placeholder="50"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </section>
       {error && <p className="mt-4 rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}

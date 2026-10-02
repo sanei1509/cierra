@@ -184,4 +184,80 @@ describe("motor de liquidacion", () => {
     expect(resultadoOk.lineas).toContainEqual(expect.objectContaining({ concepto: "Presentismo automático", importe: 2500 }));
     expect(resultadoConFalta.lineas.some((linea) => linea.concepto === "Presentismo automático")).toBe(false);
   });
+
+  it("calcula presentismo por porcentaje y permite pago parcial segun regla de empresa", () => {
+    const empresaConPresentismo: Empresa = {
+      ...empresaBase,
+      reglasLiquidacion: {
+        presentismo: {
+          habilitado: true,
+          tipoCalculo: "porcentaje_sueldo_base",
+          valor: 10,
+          monto: 0,
+          condiciones: [{ tipo: "falta", desdeCantidad: 1, accion: "paga_mitad" }],
+        },
+      },
+    };
+
+    const resultadoOk = calcularEmpleado(empresaConPresentismo, empleadoBase, "2026-09", []);
+    const resultadoConFalta = calcularEmpleado(empresaConPresentismo, empleadoBase, "2026-09", [
+      {
+        id: "n-falta",
+        empresaId: empresaBase.id,
+        mes: "2026-09",
+        empleadoId: empleadoBase.id,
+        tipo: "falta",
+        cantidad: 1,
+        origen: "cliente",
+        autor: "Cliente",
+        fecha: "2026-09-20T10:00:00",
+      },
+    ]);
+
+    expect(resultadoOk.lineas).toContainEqual(expect.objectContaining({ concepto: "Presentismo automático", importe: 5000 }));
+    expect(resultadoConFalta.lineas).toContainEqual(expect.objectContaining({ concepto: "Presentismo automático", importe: 2500 }));
+  });
+
+  it("solo descuenta ausencia justificada cuando la novedad lo indica", () => {
+    const ausenciaBase: Novedad = {
+      id: "n-aus",
+      empresaId: empresaBase.id,
+      mes: "2026-09",
+      empleadoId: empleadoBase.id,
+      tipo: "ausencia_justificada",
+      cantidad: 2,
+      origen: "cliente",
+      autor: "Cliente",
+      fecha: "2026-09-20T10:00:00",
+    };
+
+    const sinDescuento = calcularEmpleado(empresaBase, empleadoBase, "2026-09", [ausenciaBase]);
+    const conDescuento = calcularEmpleado(empresaBase, empleadoBase, "2026-09", [{ ...ausenciaBase, datos: { ausenciaDescuenta: true } }]);
+
+    expect(sinDescuento.nominalGravado).toBe(50000);
+    expect(sinDescuento.lineas).toContainEqual(expect.objectContaining({ concepto: "Ausencia justificada", importe: 0 }));
+    expect(conDescuento.nominalGravado).toBe(46666.67);
+    expect(conDescuento.lineas).toContainEqual(expect.objectContaining({ concepto: "Ausencia justificada con descuento", importe: -3333.33 }));
+    expect(conDescuento.lineas.some((linea) => linea.concepto === "Ausencia justificada" && linea.importe === 0)).toBe(false);
+  });
+
+  it("usa el cambio de categoria como nuevo sueldo base sin generar un haber extra", () => {
+    const resultado = calcularEmpleado(empresaBase, empleadoBase, "2026-09", [
+      {
+        id: "n-cat",
+        empresaId: empresaBase.id,
+        mes: "2026-09",
+        empleadoId: empleadoBase.id,
+        tipo: "cambio_categoria",
+        importe: 60000,
+        datos: { nuevaCategoria: "Encargado", nuevoSueldo: 60000, aplicaDesde: "2026-09-01" },
+        origen: "estudio",
+        autor: "Estudio",
+        fecha: "2026-09-20T10:00:00",
+      },
+    ]);
+
+    expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Sueldo básico", base: 60000, importe: 60000 }));
+    expect(resultado.lineas.some((linea) => linea.concepto.startsWith("Cambio de categoría") && linea.importe > 0)).toBe(false);
+  });
 });

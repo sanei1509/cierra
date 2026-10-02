@@ -51,6 +51,8 @@ export function NovedadForm({
   const [valor, setValor] = useState(String(novedadInicial?.importe ?? novedadInicial?.cantidad ?? ""));
   const [nota, setNota] = useState(novedadInicial?.nota ?? "");
   const [adjunto, setAdjunto] = useState<Adjunto | undefined>(novedadInicial?.adjunto);
+  const [ausenciaDescuenta, setAusenciaDescuenta] = useState(Boolean(novedadInicial?.datos?.ausenciaDescuenta));
+  const [nuevaCategoria, setNuevaCategoria] = useState(novedadInicial?.datos?.nuevaCategoria ?? "");
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   const t = TIPOS[tipo];
@@ -75,6 +77,10 @@ export function NovedadForm({
         if (!valido) return;
         setError("");
         setGuardando(true);
+        const datos = {
+          ...(tipo === "ausencia_justificada" ? { ausenciaDescuenta } : {}),
+          ...(tipo === "cambio_categoria" ? { nuevaCategoria: nuevaCategoria.trim() || undefined, nuevoSueldo: v, aplicaDesde: `${mes}-01` } : {}),
+        };
         const novedad = {
           empresaId,
           mes,
@@ -83,6 +89,7 @@ export function NovedadForm({
           ...(t.unidad === "$" ? { importe: v } : { cantidad: v }),
           nota: nota || undefined,
           adjunto,
+          datos: Object.keys(datos).length ? datos : undefined,
           origen,
           autor,
         };
@@ -140,6 +147,17 @@ export function NovedadForm({
           <input autoFocus inputMode="decimal" className={clsx(inputCls, t.unidad === "$" && "pl-8")} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0" />
         </div>
       </Campo>
+      {tipo === "ausencia_justificada" && (
+        <label className="flex items-center gap-2 rounded-2xl bg-hundido px-3.5 py-3 text-sm">
+          <input type="checkbox" checked={ausenciaDescuenta} onChange={(e) => setAusenciaDescuenta(e.target.checked)} className="size-4 accent-petroleo" />
+          Descuenta jornal aunque esté justificada
+        </label>
+      )}
+      {tipo === "cambio_categoria" && (
+        <Campo label="Nueva categoría (opcional)" ayuda="El importe de arriba se toma como nuevo sueldo base desde este mes">
+          <input className={inputCls} value={nuevaCategoria} onChange={(e) => setNuevaCategoria(e.target.value)} placeholder="Ej.: Encargado" />
+        </Campo>
+      )}
       <Campo label="Comentario (opcional)">
         <input className={inputCls} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ej.: comisión por ventas de septiembre" />
       </Campo>

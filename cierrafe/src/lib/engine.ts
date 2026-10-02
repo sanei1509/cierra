@@ -54,8 +54,59 @@ function conceptoDinero(tipo: Novedad["tipo"]) {
 export function sueldoVigente(emp: Empleado, mes: string, novs: Novedad[] = []): { monto: number; origen: string } {
   const cambio = novs.find((n) => n.empleadoId === emp.id && n.tipo === "cambio_salarial" && n.importe);
   if (cambio) return { monto: cambio.importe!, origen: `novedad de cambio salarial (${mes})` };
+  const cambioCategoria = novs.find((n) => n.empleadoId === emp.id && n.tipo === "cambio_categoria" && (n.datos?.nuevoSueldo || n.importe));
+  if (cambioCategoria) {
+    return {
+      monto: cambioCategoria.datos?.nuevoSueldo ?? cambioCategoria.importe!,
+      origen: cambioCategoria.datos?.nuevaCategoria ? `cambio de categoría a ${cambioCategoria.datos.nuevaCategoria} (${mes})` : `cambio de categoría (${mes})`,
+    };
+  }
   const vig = [...emp.sueldos].filter((s) => s.desde.slice(0, 7) <= mes).sort((a, b) => b.desde.localeCompare(a.desde))[0];
   return vig ? { monto: vig.monto, origen: `sueldo base vigente desde ${vig.desde}` } : { monto: 0, origen: "sin sueldo cargado" };
+}
+
+function sumarHaberes(lineas: Linea[]) {
+  return lineas.filter((l) => l.tipo === "haber").reduce((s, l) => s + l.importe, 0);
+}
+
+function sumarNominalGravado(lineas: Linea[]) {
+  return lineas.filter((l) => l.tipo === "haber" && l.gravadoBps).reduce((s, l) => s + l.importe, 0);
+}
+
+function montoPresentismo(empresa: Empresa, emp: Empleado, lineas: Linea[], base: number, P: Parametros) {
+  const regla = empresa.reglasLiquidacion?.presentismo;
+  if (!regla?.habilitado) return 0;
+  const valor = regla.valor ?? regla.monto ?? 0;
+  if (valor <= 0) return 0;
+  if (regla.tipoCalculo === "porcentaje_sueldo_base") return r2(base * (valor / 100));
+  if (regla.tipoCalculo === "porcentaje_liquido_estimado") {
+    const nominal = sumarNominalGravado(lineas);
+    const baseJub = Math.min(nominal, P.topeJubilatorio);
+    const bajo = nominal <= P.fonasa.umbralBpc * P.bpc;
+    const tasaFonasa =
+      (bajo ? P.fonasa.tasaBaja : emp.hijos > 0 ? P.fonasa.tasaConHijos : P.fonasa.tasaSinHijos) +
+      (emp.conyugeFonasa ? P.fonasa.adicionalConyuge : 0);
+    const liquidoEstimado = sumarHaberes(lineas) - baseJub * P.personal.jubilatorio - nominal * tasaFonasa - nominal * P.personal.frl;
+    return r2(liquidoEstimado * (valor / 100));
+  }
+  return r2(valor);
+}
+
+function porcentajePresentismo(empresa: Empresa, novs: Novedad[]) {
+  const presentismo = empresa.reglasLiquidacion?.presentismo;
+  const condiciones =
+    presentismo?.condiciones ??
+    (presentismo?.descontarConNovedades ?? NOVEDADES_CORTAN_PRESENTISMO).map((tipo) => ({ tipo, accion: "no_paga" as const, desdeCantidad: 0 }));
+  let porcentaje = 100;
+  for (const condicion of condiciones) {
+    const cantidad = sumaCantidad(novs, condicion.tipo);
+    const aplica = novs.some((n) => n.tipo === condicion.tipo && ((n.cantidad ?? 0) > 0 || (n.importe ?? 0) > 0));
+    if (!aplica || cantidad < (condicion.desdeCantidad ?? 0)) continue;
+    if (condicion.accion === "no_paga") porcentaje = Math.min(porcentaje, 0);
+    if (condicion.accion === "paga_mitad") porcentaje = Math.min(porcentaje, 50);
+    if (condicion.accion === "paga_porcentaje") porcentaje = Math.min(porcentaje, condicion.porcentajePago ?? 0);
+  }
+  return porcentaje;
 }
 
 export function activoEn(emp: Empleado, mes: string) {
@@ -212,7 +263,10 @@ export function calcularEmpleado(
     { tipo: "licencia_pendiente", codigo: "019B", concepto: "Licencia pendiente informada", formula: "Registro para control de saldo de licencia." },
   ];
   diasInformativos.forEach((regla) => {
-    const cantidad = sumaCantidad(novs, regla.tipo);
+    const cantidad =
+      regla.tipo === "ausencia_justificada"
+        ? novs.filter((n) => n.tipo === regla.tipo && !n.datos?.ausenciaDescuenta).reduce((s, n) => s + (n.cantidad ?? 0), 0)
+        : sumaCantidad(novs, regla.tipo);
     if (cantidad <= 0) return;
     L.push({
       codigo: regla.codigo,
@@ -224,6 +278,21 @@ export function calcularEmpleado(
       formula: `${regla.formula} Cantidad informada: ${cantidad} día(s).`,
     });
   });
+
+  novs
+    .filter((n) => n.tipo === "ausencia_justificada" && n.datos?.ausenciaDescuenta && (n.cantidad ?? 0) > 0)
+    .forEach((n, i) =>
+      L.push({
+        codigo: `019D${i}`,
+        concepto: n.nota ? `Ausencia justificada con descuento · ${n.nota}` : "Ausencia justificada con descuento",
+        tipo: "haber",
+        gravadoBps: true,
+        base: jornal,
+        cantidad: n.cantidad,
+        importe: r2(-jornal * (n.cantidad ?? 0)),
+        formula: `Se marcó que esta ausencia justificada descuenta. Jornal ${fmt(jornal)} × ${n.cantidad} día(s).`,
+      }),
+    );
 
   // Llegadas tarde (minutos)
   const tarde = novs.filter((n) => n.tipo === "llegada_tarde").reduce((s, n) => s + (n.cantidad ?? 0), 0);
@@ -279,22 +348,26 @@ export function calcularEmpleado(
 
   const presentismo = empresa.reglasLiquidacion?.presentismo;
   const tienePresentismoManual = novs.some((n) => n.tipo === "presentismo" && n.importe);
-  const cortaPresentismo = presentismo?.descontarConNovedades ?? NOVEDADES_CORTAN_PRESENTISMO;
-  const pierdePresentismo = novs.some((n) => cortaPresentismo.includes(n.tipo) && ((n.cantidad ?? 0) > 0 || (n.importe ?? 0) > 0));
-  if (presentismo?.habilitado && presentismo.monto > 0 && !pierdePresentismo && !tienePresentismoManual) {
+  const montoBasePresentismo = montoPresentismo(empresa, emp, L, base, P);
+  const porcentajePagoPresentismo = porcentajePresentismo(empresa, novs);
+  const importePresentismo = r2(montoBasePresentismo * (porcentajePagoPresentismo / 100));
+  if (presentismo?.habilitado && importePresentismo > 0 && !tienePresentismoManual) {
     L.push({
       codigo: "029",
       concepto: "Presentismo automático",
       tipo: "haber",
       gravadoBps: true,
-      importe: r2(presentismo.monto),
-      formula: `Presentismo configurado para la empresa: ${fmt(presentismo.monto)}. No hubo novedades que lo descuenten.`,
+      importe: importePresentismo,
+      formula:
+        porcentajePagoPresentismo === 100
+          ? `Presentismo configurado para la empresa: ${fmt(montoBasePresentismo)}. No hubo novedades que lo reduzcan.`
+          : `Presentismo configurado: ${fmt(montoBasePresentismo)} × ${porcentajePagoPresentismo}% según novedades del mes.`,
     });
   }
 
   // Bonos / comisiones
   novs
-    .filter((n) => ["bono", "presentismo", "productividad", "retroactivo", "ajuste_mes_anterior", "cambio_categoria"].includes(n.tipo) && n.importe)
+    .filter((n) => ["bono", "presentismo", "productividad", "retroactivo", "ajuste_mes_anterior"].includes(n.tipo) && n.importe)
     .forEach((n, i) =>
       L.push({
         codigo: `03${i}`,
@@ -373,8 +446,8 @@ export function calcularEmpleado(
     });
   }
 
-  const totalHaberes = L.filter((l) => l.tipo === "haber").reduce((s, l) => s + l.importe, 0);
-  const nominalGravado = L.filter((l) => l.tipo === "haber" && l.gravadoBps).reduce((s, l) => s + l.importe, 0);
+  const totalHaberes = sumarHaberes(L);
+  const nominalGravado = sumarNominalGravado(L);
 
   // Aportes personales
   const baseJub = Math.min(nominalGravado, P.topeJubilatorio);

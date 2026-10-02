@@ -1,0 +1,1 @@
+ALTER TABLE "novedades" ADD COLUMN "datos" jsonb;

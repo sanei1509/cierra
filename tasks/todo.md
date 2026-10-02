@@ -1409,3 +1409,47 @@
 - `cierrafe/tests/engine.test.ts`
 
 **Estimated scope:** Medium
+
+## Task 48: Advanced Presentism And Specific Novelty Rules
+**Description:** Refine company payroll rules so presentism can be calculated by amount or percentage, partially reduced by selected novelties, and specific novelties can carry data that changes the liquidation engine.
+
+**Acceptance criteria:**
+- [x] Company presentism rules support fixed amount, percentage of base salary and percentage of estimated net pay.
+- [x] Presentism rules can define which novelty types affect it, from what quantity, and whether they cancel it, halve it or pay a custom percentage.
+- [x] Justified absence novelties can explicitly say whether they discount salary or remain informational.
+- [x] Category change novelties can include a new category and new salary base for the month.
+- [x] PostgreSQL stores novelty-specific `datos` JSON so these decisions persist after reload.
+- [x] Liquidation engine applies the company overtime factor, holiday factor, advanced presentism rules, justified absence discount and category salary change.
+- [x] Engine tests cover percentage presentism, partial presentism, justified absence discount behavior and category salary changes.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe test -- engine.test.ts`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrabe db:generate`
+- [x] `corepack pnpm --filter cierrabe db:migrate`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: accountant-reviewed legal presets for Uruguay-specific presentism, absence, subsidy and category-change rules before production.
+- [ ] Pending later: convert category/salary changes into append-only employee vigencias instead of month-only novelty effects.
+
+**Dependencies:** Task 47
+
+**Files touched:**
+- `cierrabe/drizzle/0012_steady_warbird.sql`
+- `cierrabe/drizzle/meta/_journal.json`
+- `cierrabe/drizzle/meta/0012_snapshot.json`
+- `cierrabe/src/datos/repos/novedades.ts`
+- `cierrabe/src/datos/schema.ts`
+- `cierrabe/src/dominio/types.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+- `cierrafe/src/components/novedad-form.tsx`
+- `cierrafe/src/lib/engine.ts`
+- `cierrafe/src/lib/types.ts`
+- `cierrafe/tests/engine.test.ts`
+
+**Estimated scope:** Medium

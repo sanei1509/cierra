@@ -32,9 +32,19 @@ export interface ReglasLiquidacionEmpresa {
   feriadoFactor?: number;
   presentismo?: {
     habilitado: boolean;
+    tipoCalculo?: "monto_fijo" | "porcentaje_sueldo_base" | "porcentaje_liquido_estimado";
+    valor?: number;
     monto: number;
     descontarConNovedades?: TipoNovedad[];
+    condiciones?: CondicionPresentismo[];
   };
+}
+
+export interface CondicionPresentismo {
+  tipo: TipoNovedad;
+  desdeCantidad?: number;
+  accion: "no_paga" | "paga_mitad" | "paga_porcentaje";
+  porcentajePago?: number;
 }
 
 export type Tono = "menta" | "lila" | "crema" | "cielo" | "rosa";
@@ -104,6 +114,13 @@ export interface Adjunto {
   dataUrl?: string;
 }
 
+export interface NovedadDatos {
+  ausenciaDescuenta?: boolean;
+  nuevaCategoria?: string;
+  nuevoSueldo?: number;
+  aplicaDesde?: string;
+}
+
 export interface Novedad {
   id: string;
   empresaId: string;
@@ -114,6 +131,7 @@ export interface Novedad {
   importe?: number;
   nota?: string;
   adjunto?: Adjunto;
+  datos?: NovedadDatos;
   origen: "cliente" | "estudio";
   autor: string;
   fecha: string; // ISO

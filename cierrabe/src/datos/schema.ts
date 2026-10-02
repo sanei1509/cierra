@@ -13,7 +13,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import type { Aprobacion, Periodo, ReglasLiquidacionEmpresa, VersionLiquidacion } from "../dominio/types";
+import type { Aprobacion, NovedadDatos, Periodo, ReglasLiquidacionEmpresa, VersionLiquidacion } from "../dominio/types";
 import type { EventoUsoFacturable, LineaCobro } from "../facturacion";
 
 export const rolEnum = pgEnum("rol", ["admin", "liquidador", "lectura"]);
@@ -487,6 +487,7 @@ export const novedades = pgTable(
     importeCent: integer("importe_cent"),
     nota: text("nota"),
     adjunto: jsonb("adjunto").$type<{ nombre: string; tipo: string; tamano: number; dataUrl?: string }>(),
+    datos: jsonb("datos").$type<NovedadDatos>(),
     origen: origenNovedadEnum("origen").notNull(),
     autor: text("autor").notNull(),
     creada: timestamp("creada", { withTimezone: true }).defaultNow().notNull(),

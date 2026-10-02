@@ -18,6 +18,7 @@ function mapNovedad(row: NovedadRow): Novedad {
     importe: row.importeCent !== null && row.importeCent !== undefined ? Math.round(row.importeCent / 100) : undefined,
     nota: row.nota ?? undefined,
     adjunto: row.adjunto ?? undefined,
+    datos: row.datos ?? undefined,
     origen: row.origen,
     autor: row.autor,
     fecha: row.creada.toISOString(),
@@ -32,6 +33,7 @@ function valoresActualizacion(input: ActualizarNovedadInput) {
     importeCent: input.importe !== undefined ? Math.round(input.importe * 100) : null,
     nota: input.nota,
     adjunto: input.adjunto,
+    datos: input.datos,
     origen: input.origen,
     autor: input.autor,
   };
@@ -58,6 +60,7 @@ export function crearNovedadesRepo(db: Db): NovedadesRepo {
           importeCent: input.importe !== undefined ? Math.round(input.importe * 100) : undefined,
           nota: input.nota,
           adjunto: input.adjunto,
+          datos: input.datos,
           origen: input.origen,
           autor: input.autor,
           creada: input.fecha ? new Date(input.fecha) : undefined,

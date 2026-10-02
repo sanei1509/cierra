@@ -16,7 +16,7 @@ import { obtenerSesionDev } from "@/lib/dev-auth";
 import { calcularEmpresa, hashDe } from "@/lib/engine";
 import { MES_ACTUAL } from "@/lib/format";
 import { MOTOR_VERSION, parametrosVigentes } from "@/lib/params";
-import type { Adjunto, Empleado, Empresa, Modalidad, Periodo, TipoNovedad, Tono, VersionLiquidacion } from "@/lib/types";
+import type { Adjunto, Empleado, Empresa, Modalidad, Novedad, Periodo, TipoNovedad, Tono, VersionLiquidacion } from "@/lib/types";
 
 export interface AltaRealResult {
   ok: boolean;
@@ -80,6 +80,7 @@ export interface CrearNovedadRealInput {
   importe?: number;
   nota?: string;
   adjunto?: Adjunto;
+  datos?: Novedad["datos"];
   origen: "cliente" | "estudio";
   autor: string;
 }
@@ -514,6 +515,7 @@ export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<Al
     importe: input.importe,
     nota: input.nota,
     adjunto: validarAdjunto(input.adjunto),
+    datos: input.datos,
     origen: input.origen,
     autor: input.autor,
   });
@@ -562,6 +564,7 @@ export async function actualizarNovedadReal(input: ActualizarNovedadRealInput): 
     importe: input.importe,
     nota: input.nota,
     adjunto: validarAdjunto(input.adjunto),
+    datos: input.datos,
     origen: input.origen,
     autor: input.autor,
     resumen: `Actualizo ${input.tipo.replace("_", " ")}`,
