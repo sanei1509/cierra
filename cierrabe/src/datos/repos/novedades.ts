@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import type { NovedadId } from "../contexto";
 import type { ActualizarNovedadInput, CrearNovedadInput, NovedadesRepo } from "../contratos";
-import { novedades } from "../schema";
+import { novedades, periodos } from "../schema";
 import type { Novedad } from "../../dominio/types";
 
 type NovedadRow = typeof novedades.$inferSelect;
@@ -25,6 +25,12 @@ function mapNovedad(row: NovedadRow): Novedad {
   };
 }
 
+export function normalizarPaginacionNovedades(opciones?: { limite?: number; offset?: number }) {
+  const limite = Math.min(Math.max(Math.trunc(opciones?.limite ?? 10), 1), 50);
+  const offset = Math.max(Math.trunc(opciones?.offset ?? 0), 0);
+  return { limite, offset };
+}
+
 function valoresActualizacion(input: ActualizarNovedadInput) {
   return {
     empleadoId: input.empleadoId,
@@ -44,6 +50,29 @@ export function crearNovedadesRepo(db: Db): NovedadesRepo {
     async listarPorPeriodo(ctx, periodoId) {
       const rows = await db.select().from(novedades).where(and(eq(novedades.estudioId, ctx.estudioId), eq(novedades.periodoId, periodoId)));
       return rows.map(mapNovedad);
+    },
+
+    async listarPorEmpleado(ctx, empleadoId, opciones) {
+      const { limite, offset } = normalizarPaginacionNovedades(opciones);
+      const condiciones = [eq(novedades.estudioId, ctx.estudioId), eq(novedades.empleadoId, empleadoId)];
+      if (opciones?.empresaId) condiciones.push(eq(novedades.empresaId, opciones.empresaId));
+
+      const [totalRow] = await db.select({ total: count() }).from(novedades).where(and(...condiciones));
+      const rows = await db
+        .select({ novedad: novedades, mes: periodos.mes })
+        .from(novedades)
+        .innerJoin(periodos, eq(novedades.periodoId, periodos.id))
+        .where(and(...condiciones))
+        .orderBy(desc(periodos.mes), desc(novedades.creada))
+        .limit(limite)
+        .offset(offset);
+
+      return {
+        items: rows.map((row) => ({ ...mapNovedad(row.novedad), mes: row.mes })),
+        total: Number(totalRow?.total ?? 0),
+        limite,
+        offset,
+      };
     },
 
     async crear(ctx, input: CrearNovedadInput) {

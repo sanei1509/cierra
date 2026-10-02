@@ -1480,3 +1480,39 @@
 - `tasks/todo.md`
 
 **Estimated scope:** Small
+
+## Task 50: Paginated Employee Novelty History
+**Description:** Make the employee novelty history scalable by adding a server-side paginated query and a load-more flow in the employee drawer.
+
+**Acceptance criteria:**
+- [x] Backend novelty repository can list novedades by employee with `limite` and `offset`.
+- [x] The paginated query returns items, total, normalized limit and offset.
+- [x] The query includes the period month so the UI can keep grouping by month.
+- [x] A Server Action exposes the employee history only for a valid real study session and confirms the employee belongs to the selected company.
+- [x] The employee drawer loads the first page from the server when real UUID data is available.
+- [x] The employee drawer can load more history pages without rendering all years at once.
+- [x] Demo/local fallback still uses the loaded in-memory novedades.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrabe test -- repos-novedades.test.ts`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: reduce the company initial loader so very old novedades are not hydrated globally when the tenant has years of data.
+- [ ] Pending later: add month/type filters to the paginated employee history if users need faster searching.
+
+**Dependencies:** Task 49
+
+**Files touched:**
+- `cierrabe/src/datos/contratos.ts`
+- `cierrabe/src/datos/repos/novedades.ts`
+- `cierrabe/tests/repos-novedades.test.ts`
+- `cierrafe/src/app/(estudio)/actions.ts`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+- `tasks/todo.md`
+
+**Estimated scope:** Small

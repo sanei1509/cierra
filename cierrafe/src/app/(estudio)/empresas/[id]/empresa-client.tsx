@@ -15,6 +15,7 @@ import {
   cerrarPeriodoReal,
   enviarAprobacionReal,
   generarBpsReal,
+  listarNovedadesEmpleadoReal,
   marcarNovedadesRecibidasReal,
   marcarBpsPresentadoReal,
   rectificarPeriodoReal,
@@ -38,6 +39,8 @@ import { NovedadForm } from "@/components/novedad-form";
 import { ImportarEmpleados } from "@/components/importar-empleados";
 
 type Tab = "resumen" | "novedades" | "liquidacion" | "empleados" | "reglas" | "actividad";
+const LIMITE_HISTORIAL_NOVEDADES = 10;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function Stepper({ v }: { v: Vista }) {
   const actual = pasoActual(v.periodo, v.pend.total);
@@ -671,10 +674,15 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
   const usuario = useUsuario();
   const puede = s.puede("editar");
   const actual = [...e.sueldos].sort((a, b) => b.desde.localeCompare(a.desde))[0];
-  const novedadesHistoricas = useMemo(
+  const novedadesMemoria = useMemo(
     () => s.novedades.filter((n) => n.empleadoId === e.id).sort((a, b) => `${b.mes}-${b.fecha}`.localeCompare(`${a.mes}-${a.fecha}`)),
     [s.novedades, e.id],
   );
+  const usaHistorialReal = UUID_RE.test(e.id) && UUID_RE.test(e.empresaId);
+  const [novedadesHistoricas, setNovedadesHistoricas] = useState<Novedad[]>(() => novedadesMemoria.slice(0, LIMITE_HISTORIAL_NOVEDADES));
+  const [totalHistorial, setTotalHistorial] = useState(novedadesMemoria.length);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
+  const [errorHistorial, setErrorHistorial] = useState("");
   const novedadesPorMes = useMemo(() => {
     const grupos = new Map<string, Novedad[]>();
     novedadesHistoricas.forEach((n) => grupos.set(n.mes, [...(grupos.get(n.mes) ?? []), n]));
@@ -685,6 +693,62 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
   const [error, setError] = useState("");
   const cats = categoriasDe(v.empresa.grupo, v.empresa.subgrupo);
   const laudo = laudoDe(v.empresa.grupo, v.empresa.subgrupo, f.categoria);
+
+  useEffect(() => {
+    if (!usaHistorialReal) return;
+    let cancelado = false;
+    listarNovedadesEmpleadoReal({ empleadoId: e.id, empresaId: e.empresaId, limite: LIMITE_HISTORIAL_NOVEDADES, offset: 0 })
+      .then((res) => {
+        if (cancelado) return;
+        if (!res.ok) {
+          setErrorHistorial(res.mensaje);
+          return;
+        }
+        if (res.modo === "real") {
+          setNovedadesHistoricas(res.novedades);
+          setTotalHistorial(res.total);
+        }
+      })
+      .catch((err) => {
+        if (!cancelado) setErrorHistorial(err instanceof Error ? err.message : "No pudimos cargar el historial.");
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [e.id, e.empresaId, usaHistorialReal]);
+
+  const cargarMasHistorial = async () => {
+    if (!usaHistorialReal) {
+      const siguiente = novedadesMemoria.slice(0, novedadesHistoricas.length + LIMITE_HISTORIAL_NOVEDADES);
+      setNovedadesHistoricas(siguiente);
+      setTotalHistorial(novedadesMemoria.length);
+      return;
+    }
+    setErrorHistorial("");
+    setCargandoHistorial(true);
+    try {
+      const res = await listarNovedadesEmpleadoReal({
+        empleadoId: e.id,
+        empresaId: e.empresaId,
+        limite: LIMITE_HISTORIAL_NOVEDADES,
+        offset: novedadesHistoricas.length,
+      });
+      if (!res.ok) {
+        setErrorHistorial(res.mensaje);
+        return;
+      }
+      setNovedadesHistoricas((actual) => {
+        const existentes = new Set(actual.map((n) => n.id));
+        return [...actual, ...res.novedades.filter((n) => !existentes.has(n.id))];
+      });
+      setTotalHistorial(res.total);
+    } catch (err) {
+      setErrorHistorial(err instanceof Error ? err.message : "No pudimos cargar más novedades.");
+    } finally {
+      setCargandoHistorial(false);
+    }
+  };
+
   const guardar = async () => {
     const monto = Number(f.sueldo);
     const cambios: Partial<Empleado> = { ci: f.ci, email: f.email, categoria: f.categoria, hijos: Number(f.hijos), conyugeFonasa: f.conyuge };
@@ -764,9 +828,11 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
       <section className="rounded-3xl bg-hundido px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-bold">Historial de novedades</h3>
-          <Chip tono={novedadesHistoricas.length ? "cielo" : "gris"}>{novedadesHistoricas.length}</Chip>
+          <Chip tono={totalHistorial ? "cielo" : "gris"}>{novedadesHistoricas.length} de {totalHistorial}</Chip>
         </div>
-        {novedadesHistoricas.length === 0 ? (
+        {cargandoHistorial && novedadesHistoricas.length === 0 ? (
+          <p className="mt-2 text-sm text-apagado">Cargando historial...</p>
+        ) : novedadesHistoricas.length === 0 ? (
           <p className="mt-2 text-sm text-apagado">Todavía no hay novedades registradas para esta persona.</p>
         ) : (
           <div className="mt-3 space-y-4">
@@ -798,6 +864,12 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
               </div>
             ))}
           </div>
+        )}
+        {errorHistorial && <p className="mt-3 rounded-2xl bg-rosa px-3 py-2 text-xs text-rosa-t">{errorHistorial}</p>}
+        {novedadesHistoricas.length < totalHistorial && (
+          <Boton className="mt-3 w-full" variante="secundario" tam="sm" onClick={() => void cargarMasHistorial()} disabled={cargandoHistorial}>
+            {cargandoHistorial ? "Cargando..." : "Cargar más novedades"}
+          </Boton>
         )}
       </section>
       {error && <p className="rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}

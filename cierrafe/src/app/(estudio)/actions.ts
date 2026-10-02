@@ -136,6 +136,20 @@ export interface MarcarReciboVistoRealInput {
   mes: string;
 }
 
+export interface ListarNovedadesEmpleadoRealInput {
+  empleadoId: string;
+  empresaId: string;
+  limite?: number;
+  offset?: number;
+}
+
+export interface ListarNovedadesEmpleadoRealResult extends AltaRealResult {
+  novedades: Novedad[];
+  total: number;
+  limite: number;
+  offset: number;
+}
+
 export interface ImportarEmpleadosRealResult extends AltaRealResult {
   ids?: string[];
 }
@@ -628,6 +642,47 @@ export async function borrarNovedadReal(input: BorrarNovedadRealInput): Promise<
     modo: "real",
     mensaje: "Novedad eliminada en backend.",
     id: input.id,
+  };
+}
+
+export async function listarNovedadesEmpleadoReal(input: ListarNovedadesEmpleadoRealInput): Promise<ListarNovedadesEmpleadoRealResult> {
+  const vacio = (modo: "real" | "demo", mensaje: string, ok = true): ListarNovedadesEmpleadoRealResult => ({
+    ok,
+    modo,
+    mensaje,
+    novedades: [],
+    total: 0,
+    limite: input.limite ?? 10,
+    offset: input.offset ?? 0,
+  });
+  const ctx = await contextoOperativoActual();
+  if (!ctx || ctx.actorTipo !== "estudio" || !process.env.DATABASE_URL || !uuidValido(input.empleadoId) || !uuidValido(input.empresaId)) {
+    return vacio("demo", "Historial local: falta sesion de estudio o backend real.");
+  }
+
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) return vacio("real", "No pudimos resolver el contexto del estudio.", false);
+
+  const { db } = await import("cierrabe/datos/db");
+  const empleadosRepo = crearEmpleadosRepo(db);
+  const empleado = await empleadosRepo.obtener(tenant, input.empleadoId as EmpleadoId);
+  if (!empleado || empleado.empresaId !== input.empresaId) return vacio("real", "No encontramos esa persona en la empresa.", false);
+
+  const novedadesRepo = crearNovedadesRepo(db);
+  const pagina = await novedadesRepo.listarPorEmpleado(tenant, input.empleadoId as EmpleadoId, {
+    empresaId: input.empresaId as EmpresaId,
+    limite: input.limite,
+    offset: input.offset,
+  });
+
+  return {
+    ok: true,
+    modo: "real",
+    mensaje: "Historial de novedades cargado.",
+    novedades: pagina.items,
+    total: pagina.total,
+    limite: pagina.limite,
+    offset: pagina.offset,
   };
 }
 
