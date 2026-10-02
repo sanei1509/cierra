@@ -10,6 +10,15 @@ import { fmt, pct } from "./format";
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const sumaCantidad = (novs: Novedad[], tipo: Novedad["tipo"]) => novs.filter((n) => n.tipo === tipo).reduce((s, n) => s + (n.cantidad ?? 0), 0);
+const NOVEDADES_CORTAN_PRESENTISMO: Novedad["tipo"][] = [
+  "falta",
+  "certificacion",
+  "suspension",
+  "seguro_paro",
+  "accidente_laboral",
+  "maternidad",
+  "llegada_tarde",
+];
 
 function conceptoDinero(tipo: Novedad["tipo"]) {
   switch (tipo) {
@@ -99,6 +108,8 @@ export function calcularEmpleado(
   const { monto: base, origen } = sueldoVigente(emp, mes, novs);
   const jornal = base / 30;
   const dias = diasTrabajados(emp, mes);
+  const horasExtraFactor = empresa.reglasLiquidacion?.horasExtraFactor ?? 1 + P.horas.recargoExtra;
+  const feriadoFactor = empresa.reglasLiquidacion?.feriadoFactor ?? P.feriadoFactor;
   const sueldo = dias >= 30 ? base : jornal * dias;
   L.push({
     codigo: "001",
@@ -241,17 +252,17 @@ export function calcularEmpleado(
       gravadoBps: true,
       base: jornal,
       cantidad: fer,
-      tasa: P.feriadoFactor,
-      importe: r2(jornal * P.feriadoFactor * fer),
-      formula: `Jornal ${fmt(jornal)} × ${P.feriadoFactor} × ${fer} feriado(s) pago(s) trabajado(s). Regla de ejemplo: validar con el contador asesor.`,
-      parametros: [`Factor feriado ${P.feriadoFactor}`],
+      tasa: feriadoFactor,
+      importe: r2(jornal * feriadoFactor * fer),
+      formula: `Jornal ${fmt(jornal)} × ${feriadoFactor} × ${fer} feriado(s) pago(s) trabajado(s). Factor configurado para la empresa.`,
+      parametros: [`Factor feriado ${feriadoFactor}`],
     });
 
   // Horas extra
   const he = novs.filter((n) => n.tipo === "hora_extra").reduce((s, n) => s + (n.cantidad ?? 0), 0);
   if (he > 0) {
     const vh = base / P.horas.divisor;
-    const imp = vh * (1 + P.horas.recargoExtra) * he;
+    const imp = vh * horasExtraFactor * he;
     L.push({
       codigo: "020",
       concepto: "Horas extra",
@@ -259,10 +270,25 @@ export function calcularEmpleado(
       gravadoBps: true,
       base: vh,
       cantidad: he,
-      tasa: 1 + P.horas.recargoExtra,
+      tasa: horasExtraFactor,
       importe: r2(imp),
-      formula: `Valor hora ${fmt(vh)} (sueldo ÷ ${P.horas.divisor}) × ${1 + P.horas.recargoExtra} (recargo ${pct(P.horas.recargoExtra)}) × ${he} h.`,
-      parametros: [`Divisor horario ${P.horas.divisor}`, `Recargo ${pct(P.horas.recargoExtra)}`],
+      formula: `Valor hora ${fmt(vh)} (sueldo ÷ ${P.horas.divisor}) × factor ${horasExtraFactor} × ${he} h. Factor configurado para la empresa.`,
+      parametros: [`Divisor horario ${P.horas.divisor}`, `Factor hora extra ${horasExtraFactor}`],
+    });
+  }
+
+  const presentismo = empresa.reglasLiquidacion?.presentismo;
+  const tienePresentismoManual = novs.some((n) => n.tipo === "presentismo" && n.importe);
+  const cortaPresentismo = presentismo?.descontarConNovedades ?? NOVEDADES_CORTAN_PRESENTISMO;
+  const pierdePresentismo = novs.some((n) => cortaPresentismo.includes(n.tipo) && ((n.cantidad ?? 0) > 0 || (n.importe ?? 0) > 0));
+  if (presentismo?.habilitado && presentismo.monto > 0 && !pierdePresentismo && !tienePresentismoManual) {
+    L.push({
+      codigo: "029",
+      concepto: "Presentismo automático",
+      tipo: "haber",
+      gravadoBps: true,
+      importe: r2(presentismo.monto),
+      formula: `Presentismo configurado para la empresa: ${fmt(presentismo.monto)}. No hubo novedades que lo descuenten.`,
     });
   }
 

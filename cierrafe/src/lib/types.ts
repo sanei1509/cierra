@@ -24,6 +24,17 @@ export interface Empresa {
   tono: Tono;
   /** Logo como data URL (en producción: archivo en storage) */
   logo?: string;
+  reglasLiquidacion?: ReglasLiquidacionEmpresa;
+}
+
+export interface ReglasLiquidacionEmpresa {
+  horasExtraFactor?: number;
+  feriadoFactor?: number;
+  presentismo?: {
+    habilitado: boolean;
+    monto: number;
+    descontarConNovedades?: TipoNovedad[];
+  };
 }
 
 export type Tono = "menta" | "lila" | "crema" | "cielo" | "rosa";

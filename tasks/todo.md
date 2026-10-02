@@ -1369,3 +1369,43 @@
 - `cierrafe/tests/engine.test.ts`
 
 **Estimated scope:** Medium
+
+## Task 47: Company Payroll Rule Configuration
+**Description:** Add per-company liquidation rules for overtime, worked holidays and automatic presentism so the engine does not assume one universal payment rule.
+
+**Acceptance criteria:**
+- [x] Company data model stores liquidation rules in PostgreSQL.
+- [x] Company detail has a `Reglas` tab to configure overtime factor, holiday factor and monthly presentism.
+- [x] Presentism can be configured to be lost when selected discounting novelties exist.
+- [x] Liquidation engine uses company overtime and holiday factors in receipt lines.
+- [x] Liquidation engine adds automatic presentism when enabled and no configured disqualifying novelty exists.
+- [x] Manual presentism novelty prevents duplicate automatic presentism.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrabe db:migrate`
+- [x] `corepack pnpm --filter cierrafe test -- engine.test.ts`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: add accountant-reviewed presets for Uruguay-specific overtime/holiday rules instead of only free numeric factors.
+- [ ] Pending later: surface current configured rules in the client portal request copy.
+
+**Dependencies:** Task 46
+
+**Files touched:**
+- `cierrabe/drizzle/0011_worthless_wilson_fisk.sql`
+- `cierrabe/drizzle/meta/_journal.json`
+- `cierrabe/drizzle/meta/0011_snapshot.json`
+- `cierrabe/src/datos/repos/provisioning.ts`
+- `cierrabe/src/datos/schema.ts`
+- `cierrabe/src/dominio/types.ts`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+- `cierrafe/src/lib/engine.ts`
+- `cierrafe/src/lib/types.ts`
+- `cierrafe/tests/engine.test.ts`
+
+**Estimated scope:** Medium

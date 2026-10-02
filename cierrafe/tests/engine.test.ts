@@ -123,4 +123,65 @@ describe("motor de liquidacion", () => {
     expect(resultado.nominalGravado).toBe(50000);
     expect(resultado.totalHaberes).toBe(53000);
   });
+
+  it("usa los factores de la empresa para horas extra y feriados", () => {
+    const empresaConReglas: Empresa = {
+      ...empresaBase,
+      reglasLiquidacion: { horasExtraFactor: 1.5, feriadoFactor: 2 },
+    };
+    const novedades: Novedad[] = [
+      {
+        id: "n-he",
+        empresaId: empresaBase.id,
+        mes: "2026-09",
+        empleadoId: empleadoBase.id,
+        tipo: "hora_extra",
+        cantidad: 3,
+        origen: "cliente",
+        autor: "Cliente",
+        fecha: "2026-09-20T10:00:00",
+      },
+      {
+        id: "n-fer",
+        empresaId: empresaBase.id,
+        mes: "2026-09",
+        empleadoId: empleadoBase.id,
+        tipo: "feriado",
+        cantidad: 1,
+        origen: "cliente",
+        autor: "Cliente",
+        fecha: "2026-09-20T10:00:00",
+      },
+    ];
+
+    const resultado = calcularEmpleado(empresaConReglas, empleadoBase, "2026-09", novedades);
+
+    expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Horas extra", tasa: 1.5, importe: 1125 }));
+    expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Feriado trabajado", tasa: 2, importe: 3333.33 }));
+  });
+
+  it("paga presentismo automatico solo si no hay novedades que lo descuenten", () => {
+    const empresaConPresentismo: Empresa = {
+      ...empresaBase,
+      reglasLiquidacion: { presentismo: { habilitado: true, monto: 2500 } },
+    };
+
+    const resultadoOk = calcularEmpleado(empresaConPresentismo, empleadoBase, "2026-09", []);
+    const resultadoConFalta = calcularEmpleado(empresaConPresentismo, empleadoBase, "2026-09", [
+      {
+        id: "n-falta",
+        empresaId: empresaBase.id,
+        mes: "2026-09",
+        empleadoId: empleadoBase.id,
+        tipo: "falta",
+        cantidad: 1,
+        origen: "cliente",
+        autor: "Cliente",
+        fecha: "2026-09-20T10:00:00",
+      },
+    ]);
+
+    expect(resultadoOk.lineas).toContainEqual(expect.objectContaining({ concepto: "Presentismo automático", importe: 2500 }));
+    expect(resultadoConFalta.lineas.some((linea) => linea.concepto === "Presentismo automático")).toBe(false);
+  });
 });

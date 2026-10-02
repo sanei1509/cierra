@@ -37,7 +37,7 @@ import { CalcDetalle } from "@/components/calc-detalle";
 import { NovedadForm } from "@/components/novedad-form";
 import { ImportarEmpleados } from "@/components/importar-empleados";
 
-type Tab = "resumen" | "novedades" | "liquidacion" | "empleados" | "actividad";
+type Tab = "resumen" | "novedades" | "liquidacion" | "empleados" | "reglas" | "actividad";
 
 function Stepper({ v }: { v: Vista }) {
   const actual = pasoActual(v.periodo, v.pend.total);
@@ -841,6 +841,119 @@ function TabActividad({ v }: { v: Vista }) {
   );
 }
 
+const NOVEDADES_PRESENTISMO_DEFAULT: Novedad["tipo"][] = ["falta", "certificacion", "suspension", "seguro_paro", "accidente_laboral", "maternidad", "llegada_tarde"];
+
+function TabReglasLiquidacion({ v }: { v: Vista }) {
+  const s = useStore();
+  const router = useRouter();
+  const usuario = useUsuario();
+  const puede = s.puede("configurar");
+  const reglas = v.empresa.reglasLiquidacion;
+  const presentismo = reglas?.presentismo;
+  const [horasExtraFactor, setHorasExtraFactor] = useState(String(reglas?.horasExtraFactor ?? 2));
+  const [feriadoFactor, setFeriadoFactor] = useState(String(reglas?.feriadoFactor ?? 2));
+  const [presentismoActivo, setPresentismoActivo] = useState(Boolean(presentismo?.habilitado));
+  const [presentismoMonto, setPresentismoMonto] = useState(String(presentismo?.monto ?? ""));
+  const [cortan, setCortan] = useState<Novedad["tipo"][]>(presentismo?.descontarConNovedades ?? NOVEDADES_PRESENTISMO_DEFAULT);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  const toggleCorta = (tipo: Novedad["tipo"]) => {
+    setCortan((actual) => (actual.includes(tipo) ? actual.filter((x) => x !== tipo) : [...actual, tipo]));
+  };
+
+  const guardar = async () => {
+    const he = Number(horasExtraFactor.replace(",", "."));
+    const fer = Number(feriadoFactor.replace(",", "."));
+    const monto = Number(presentismoMonto.replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(he) || he < 1 || he > 4) {
+      setError("El factor de hora extra debe estar entre 1 y 4.");
+      return;
+    }
+    if (!Number.isFinite(fer) || fer < 1 || fer > 4) {
+      setError("El factor de feriado debe estar entre 1 y 4.");
+      return;
+    }
+    if (presentismoActivo && (!Number.isFinite(monto) || monto <= 0)) {
+      setError("Cargá un monto de presentismo mayor a cero.");
+      return;
+    }
+    const cambios: Partial<Empresa> = {
+      reglasLiquidacion: {
+        horasExtraFactor: he,
+        feriadoFactor: fer,
+        presentismo: {
+          habilitado: presentismoActivo,
+          monto: presentismoActivo ? monto : 0,
+          descontarConNovedades: cortan,
+        },
+      },
+    };
+    const resumen = `Reglas de liquidación: HE x${he}, feriado x${fer}${presentismoActivo ? `, presentismo ${fmt(monto)}` : ", sin presentismo automático"}`;
+    setError("");
+    setGuardando(true);
+    try {
+      const res = await actualizarEmpresaReal({ empresaId: v.empresa.id, cambios, resumen, actor: usuario.nombre });
+      if (!res.ok) {
+        setError(res.mensaje);
+        return;
+      }
+      s.actualizarEmpresa(v.empresa.id, cambios, resumen);
+      if (res.modo === "real") router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos guardar las reglas.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Panel className="p-6">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="mr-auto">
+          <h2 className="text-lg font-bold tracking-tight">Reglas de pago</h2>
+          <p className="mt-1 text-sm text-apagado">Se aplican al calcular la liquidación y quedan explicadas en el recibo.</p>
+        </div>
+        <Boton disabled={!puede || guardando} onClick={() => void guardar()}>{guardando ? "Guardando..." : "Guardar reglas"}</Boton>
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        <Campo label="Horas extra" ayuda="2 = doble, 1.5 = tiempo y medio">
+          <input className={inputCls} inputMode="decimal" value={horasExtraFactor} onChange={(e) => setHorasExtraFactor(e.target.value)} disabled={!puede} />
+        </Campo>
+        <Campo label="Feriado trabajado" ayuda="Factor aplicado sobre jornal">
+          <input className={inputCls} inputMode="decimal" value={feriadoFactor} onChange={(e) => setFeriadoFactor(e.target.value)} disabled={!puede} />
+        </Campo>
+        <Campo label="Presentismo mensual">
+          <div className="flex gap-2">
+            <label className="flex h-11 items-center gap-2 rounded-xl border border-linea bg-superficie px-3 text-sm">
+              <input type="checkbox" checked={presentismoActivo} onChange={(e) => setPresentismoActivo(e.target.checked)} disabled={!puede} className="size-4 accent-petroleo" />
+              Pagar
+            </label>
+            <input className={clsx(inputCls, "min-w-0 flex-1")} inputMode="numeric" value={presentismoMonto} onChange={(e) => setPresentismoMonto(e.target.value.replace(/[^\d,.]/g, ""))} disabled={!puede || !presentismoActivo} placeholder="0" />
+          </div>
+        </Campo>
+      </div>
+      <section className="mt-5 rounded-3xl bg-hundido p-4">
+        <h3 className="text-sm font-bold">Novedades que hacen perder presentismo</h3>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {NOVEDADES_PRESENTISMO_DEFAULT.map((tipo) => (
+            <button
+              key={tipo}
+              type="button"
+              onClick={() => toggleCorta(tipo)}
+              disabled={!puede || !presentismoActivo}
+              className={clsx("rounded-full px-3 py-1.5 text-xs font-semibold", cortan.includes(tipo) ? "bg-petroleo text-white" : "bg-superficie text-apagado")}
+            >
+              {TIPOS[tipo].corto}
+            </button>
+          ))}
+        </div>
+      </section>
+      {error && <p className="mt-4 rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}
+    </Panel>
+  );
+}
+
 function LogoEditable({ v }: { v: Vista }) {
   const s = useStore();
   const router = useRouter();
@@ -945,6 +1058,7 @@ function Contenido({
     { k: "novedades", l: "Novedades", n: v.novedadesMes.length },
     { k: "liquidacion", l: "Liquidación" },
     { k: "empleados", l: "Empleados", n: empleados.length },
+    { k: "reglas", l: "Reglas" },
     { k: "actividad", l: "Actividad" },
   ];
 
@@ -993,6 +1107,7 @@ function Contenido({
       {tab === "novedades" && <TabNovedades v={v} empleados={empleados} />}
       {tab === "liquidacion" && <TabLiquidacion v={v} empleados={empleados} verCalc={(e) => setQ({ calc: e })} />}
       {tab === "empleados" && <TabEmpleados v={v} empleados={empleados} ver={(e) => setQ({ emp: e })} />}
+      {tab === "reglas" && <TabReglasLiquidacion v={v} />}
       {tab === "actividad" && <TabActividad v={v} />}
 
       <Drawer

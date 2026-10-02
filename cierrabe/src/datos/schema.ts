@@ -13,7 +13,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import type { Aprobacion, Periodo, VersionLiquidacion } from "../dominio/types";
+import type { Aprobacion, Periodo, ReglasLiquidacionEmpresa, VersionLiquidacion } from "../dominio/types";
 import type { EventoUsoFacturable, LineaCobro } from "../facturacion";
 
 export const rolEnum = pgEnum("rol", ["admin", "liquidador", "lectura"]);
@@ -346,6 +346,7 @@ export const empresas = pgTable(
     direccion: text("direccion"),
     logoArchivoId: uuid("logo_archivo_id"),
     logoDataUrl: text("logo_data_url"),
+    reglasLiquidacion: jsonb("reglas_liquidacion").$type<ReglasLiquidacionEmpresa>(),
     activa: boolean("activa").default(true).notNull(),
     creada: timestamp("creada", { withTimezone: true }).defaultNow().notNull(),
   },
