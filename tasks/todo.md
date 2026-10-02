@@ -1229,3 +1229,31 @@
 - `cierrafe/src/app/(estudio)/page.tsx`
 
 **Estimated scope:** Small
+
+## Task 43: Real Dashboard Initial Data
+**Description:** Load the study dashboard from PostgreSQL snapshots so status cards, company rows and recent activity reflect persisted state.
+
+**Acceptance criteria:**
+- [x] The dashboard route is a server page that loads `cargarDatosOperativosIniciales`.
+- [x] The interactive dashboard UI lives in a client component.
+- [x] Real companies, employees, periods, novedades, audit events and receipt views hydrate the store on dashboard load.
+- [x] Recent activity on the dashboard uses persisted audit events after hydration.
+- [x] Demo fallback remains available when real backend/session IDs are not applicable.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrabe test`
+
+**Notes:**
+- [ ] Pending later: consider replacing the shared Zustand hydration bridge with direct server props per dashboard section.
+
+**Dependencies:** Task 35, Task 42
+
+**Files touched:**
+- `cierrafe/src/app/(estudio)/page.tsx`
+- `cierrafe/src/app/(estudio)/inicio-client.tsx`
+
+**Estimated scope:** Small
