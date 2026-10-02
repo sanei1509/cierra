@@ -2,8 +2,10 @@
 
 import clsx from "clsx";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight, Send, CalendarClock } from "lucide-react";
 import { useMemo, useState } from "react";
+import { solicitarNovedadesReal } from "@/app/(estudio)/actions";
 import { useStore, useUsuario, useVistas, type Vista } from "@/lib/store";
 import { ESTADOS, type EstadoVisible } from "@/lib/status";
 import { USUARIOS } from "@/lib/seed";
@@ -110,13 +112,37 @@ function Tarjeta({ k, vistas, activo, onClick }: { k: Exclude<Filtro, "todas">; 
 function Accion({ v }: { v: Vista }) {
   const solicitar = useStore((s) => s.solicitarNovedades);
   const puede = useStore((s) => s.puede);
+  const router = useRouter();
+  const usuario = useUsuario();
+  const [procesando, setProcesando] = useState(false);
+  const [error, setError] = useState("");
   const e = ESTADOS[v.estado];
+  const pedirNovedades = async () => {
+    setError("");
+    setProcesando(true);
+    try {
+      const res = await solicitarNovedadesReal({ periodoId: v.periodo.id, empresaId: v.empresa.id, actor: usuario.nombre });
+      if (!res.ok) {
+        setError(res.mensaje);
+        return;
+      }
+      solicitar(v.periodo.id);
+      if (res.modo === "real") router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos pedir novedades.");
+    } finally {
+      setProcesando(false);
+    }
+  };
   if (v.estado === "pendiente") {
     const yaPedida = !!v.periodo.solicitud;
     return (
-      <Boton tam="sm" variante={yaPedida ? "secundario" : "primario"} disabled={!puede("editar")} onClick={() => solicitar(v.periodo.id)}>
-        <Send size={13} /> {yaPedida ? "Reenviar pedido" : "Pedir novedades"}
-      </Boton>
+      <span className="inline-flex flex-col items-end gap-1">
+        <Boton tam="sm" variante={yaPedida ? "secundario" : "primario"} disabled={!puede("editar") || procesando} onClick={() => void pedirNovedades()}>
+          <Send size={13} /> {procesando ? "Enviando..." : yaPedida ? "Reenviar pedido" : "Pedir novedades"}
+        </Boton>
+        {error && <span className="max-w-56 text-right text-xs font-semibold text-rosa-t">{error}</span>}
+      </span>
     );
   }
   const tab = v.estado === "alertas" ? "resumen" : ["lista", "borrador", "devuelta", "rectificacion"].includes(v.estado) ? "liquidacion" : "resumen";
@@ -131,6 +157,7 @@ function Accion({ v }: { v: Vista }) {
 export default function Inicio() {
   const vistas = useVistas();
   const u = useUsuario();
+  const router = useRouter();
   const empleados = useStore((s) => s.empleados);
   const audit = useStore((s) => s.audit);
   const empresas = useStore((s) => s.empresas);
@@ -138,6 +165,8 @@ export default function Inicio() {
   const puede = useStore((s) => s.puede);
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const [resp, setResp] = useState("todos");
+  const [pidiendo, setPidiendo] = useState(false);
+  const [errorPedido, setErrorPedido] = useState("");
 
   const filas = useMemo(
     () =>
@@ -150,6 +179,27 @@ export default function Inicio() {
   const sinPedir = vistas.filter((v) => v.estado === "pendiente" && !v.periodo.solicitud);
   const hora = new Date().getHours();
   const saludo = hora < 13 ? "Buen día" : hora < 20 ? "Buenas tardes" : "Buenas noches";
+  const pedirTodas = async () => {
+    setErrorPedido("");
+    setPidiendo(true);
+    try {
+      let refrescar = false;
+      for (const v of sinPedir) {
+        const res = await solicitarNovedadesReal({ periodoId: v.periodo.id, empresaId: v.empresa.id, actor: u.nombre });
+        if (!res.ok) {
+          setErrorPedido(res.mensaje);
+          return;
+        }
+        solicitar(v.periodo.id);
+        refrescar ||= res.modo === "real";
+      }
+      if (refrescar) router.refresh();
+    } catch (err) {
+      setErrorPedido(err instanceof Error ? err.message : "No pudimos pedir las novedades.");
+    } finally {
+      setPidiendo(false);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -163,9 +213,12 @@ export default function Inicio() {
           </p>
         </div>
         {sinPedir.length > 0 && (
-          <Boton disabled={!puede("editar")} onClick={() => sinPedir.forEach((v) => solicitar(v.periodo.id))}>
-            <Send size={15} /> Pedir novedades a {sinPedir.length} {sinPedir.length === 1 ? "empresa" : "empresas"}
-          </Boton>
+          <div className="flex flex-col items-end gap-1">
+            <Boton disabled={!puede("editar") || pidiendo} onClick={() => void pedirTodas()}>
+              <Send size={15} /> {pidiendo ? "Enviando..." : <>Pedir novedades a {sinPedir.length} {sinPedir.length === 1 ? "empresa" : "empresas"}</>}
+            </Boton>
+            {errorPedido && <p className="max-w-sm text-right text-xs font-semibold text-rosa-t">{errorPedido}</p>}
+          </div>
         )}
       </Panel>
 

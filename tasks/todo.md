@@ -1192,7 +1192,7 @@
 - [x] `corepack pnpm --filter cierrafe build`
 
 **Notes:**
-- [ ] Pending later: connect the dashboard bulk "Pedir novedades" button to the same real actions.
+- [x] Dashboard bulk "Pedir novedades" button connected in Task 42.
 - [ ] Pending later: replace simulated email sending with a real notification provider.
 
 **Dependencies:** Task 36
@@ -1200,5 +1200,32 @@
 **Files touched:**
 - `cierrafe/src/app/(estudio)/actions.ts`
 - `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+
+**Estimated scope:** Small
+
+## Task 42: Persistent Dashboard Novelty Requests
+**Description:** Persist novelty-request actions launched from the study dashboard.
+
+**Acceptance criteria:**
+- [x] The per-company dashboard "Pedir novedades" action calls the real period Server Action before updating local state.
+- [x] The dashboard bulk "Pedir novedades" action persists every pending company sequentially.
+- [x] Both dashboard actions refresh real data after successful backend writes.
+- [x] Error feedback is shown inline when a backend write fails.
+- [x] Demo fallback remains available when real backend/session IDs are not applicable.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrabe test`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: replace simulated email sending with a real notification provider.
+
+**Dependencies:** Task 41
+
+**Files touched:**
+- `cierrafe/src/app/(estudio)/page.tsx`
 
 **Estimated scope:** Small
