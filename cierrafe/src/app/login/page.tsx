@@ -26,23 +26,23 @@ export default function LoginPage() {
   const devPassword = process.env.CIERRA_DEV_PASSWORD ?? "CierraDemo123";
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F7FAFF] p-2 text-[#102247] sm:p-3 lg:p-4">
-      <div className="relative mx-auto grid w-full min-w-0 grid-cols-1 min-h-[calc(100vh-16px)] max-w-[1360px] overflow-hidden rounded-[30px] border border-white bg-[linear-gradient(135deg,#FFFFFF_0%,#F7FAFF_52%,#EAF2FF_100%)] shadow-[0_20px_58px_rgba(16,34,71,0.14)] lg:min-h-[calc(100vh-32px)] lg:grid-cols-[minmax(0,1fr)_430px] xl:grid-cols-[minmax(0,1fr)_480px]">
-        <section className="relative hidden min-h-[690px] overflow-hidden px-12 py-9 lg:flex lg:flex-col xl:px-16">
+    <main className="h-screen overflow-hidden bg-[linear-gradient(135deg,#FFFFFF_0%,#F7FAFF_52%,#EAF2FF_100%)] text-[#102247]">
+      <div className="relative grid h-full w-full min-w-0 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_430px] xl:grid-cols-[minmax(0,1fr)_480px]">
+        <section className="relative hidden min-h-0 overflow-hidden px-12 py-8 lg:flex lg:flex-col xl:px-16">
           <div className="relative z-20">
             <Logo variant="full" className="w-[168px]" />
           </div>
 
-          <div className="relative z-20 mt-9 max-w-2xl">
-            <h1 className="max-w-[660px] text-[43px] font-extrabold leading-[1.06] tracking-tight text-[#102247] xl:text-[51px]">
+          <div className="relative z-20 mt-8 max-w-2xl">
+            <h1 className="max-w-[660px] text-[42px] font-extrabold leading-[1.06] tracking-tight text-[#102247] xl:text-[50px]">
               Todo el trabajo mensual de tu estudio, en un solo lugar.
             </h1>
-            <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-[#667592] xl:text-lg">
+            <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-[#667592] xl:text-lg">
               Empresas, empleados, novedades, liquidaciones y recibos organizados en una plataforma clara, segura y moderna.
             </p>
           </div>
 
-          <div className="relative z-20 mt-7 grid max-w-[515px] grid-cols-4 gap-4">
+          <div className="relative z-20 mt-6 grid max-w-[515px] grid-cols-4 gap-4">
             {conceptos.map((item) => (
               <div key={item.label} className="flex flex-col items-center gap-2 rounded-2xl border border-white bg-white/82 px-3 py-4 text-center shadow-[0_10px_24px_rgba(16,34,71,0.08)]">
                 <span className="flex size-11 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#2F6BFF]">
@@ -53,7 +53,7 @@ export default function LoginPage() {
             ))}
           </div>
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[355px] overflow-hidden">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[350px] overflow-hidden">
             <div className="absolute -left-24 bottom-[-92px] h-[300px] w-[760px] rounded-[50%] bg-[linear-gradient(135deg,#2F6BFF_0%,#6CB3FF_100%)] opacity-95" />
             <div className="absolute left-[22%] bottom-[-34px] h-[255px] w-[680px] rounded-[50%] bg-[#CFE4FF]/90" />
             <div className="absolute left-[-6%] bottom-[112px] h-[210px] w-[710px] rounded-[50%] border border-white/75" />
@@ -61,7 +61,7 @@ export default function LoginPage() {
             <div className="absolute left-[44%] bottom-[138px] h-32 w-[390px] rounded-[50%] border border-[#F5B633]" />
           </div>
 
-          <div className="pointer-events-none absolute inset-x-12 bottom-9 z-10 h-[218px] xl:inset-x-16">
+          <div className="pointer-events-none absolute inset-x-12 bottom-8 z-10 h-[218px] xl:inset-x-16">
             <PreviewCard title="Liquidaciones" className="absolute left-0 bottom-3 w-[250px] rotate-[-6deg]">
               <div className="mt-2 flex items-center justify-between text-xs">
                 <span className="text-[#667592]">Agosto 2026</span>
@@ -98,7 +98,7 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <section className="relative z-20 flex min-w-0 overflow-hidden items-center justify-center px-3 py-7 sm:px-8 lg:bg-transparent">
+        <section className="relative z-20 flex min-w-0 items-center justify-center overflow-hidden px-3 py-6 sm:px-8 lg:bg-transparent">
           <div className="min-w-0 max-w-[394px] space-y-3" style={{ width: "min(394px, calc(100vw - 48px))" }}>
             <div className="px-1 lg:hidden">
               <Logo variant="full" className="w-[154px]" />
