@@ -10,6 +10,7 @@ import { fmt, pct } from "./format";
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const sumaCantidad = (novs: Novedad[], tipo: Novedad["tipo"]) => novs.filter((n) => n.tipo === tipo).reduce((s, n) => s + (n.cantidad ?? 0), 0);
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const NOVEDADES_CORTAN_PRESENTISMO: Novedad["tipo"][] = [
   "falta",
   "certificacion",
@@ -99,8 +100,9 @@ function porcentajePresentismo(empresa: Empresa, novs: Novedad[]) {
     (presentismo?.descontarConNovedades ?? NOVEDADES_CORTAN_PRESENTISMO).map((tipo) => ({ tipo, accion: "no_paga" as const, desdeCantidad: 0 }));
   let porcentaje = 100;
   for (const condicion of condiciones) {
-    const cantidad = sumaCantidad(novs, condicion.tipo);
-    const aplica = novs.some((n) => n.tipo === condicion.tipo && ((n.cantidad ?? 0) > 0 || (n.importe ?? 0) > 0));
+    const candidatas = novs.filter((n) => n.tipo === condicion.tipo && (n.tipo !== "seguro_paro" || n.datos?.seguroParoAfectaPresentismo !== false));
+    const cantidad = candidatas.reduce((s, n) => s + (n.cantidad ?? 0), 0);
+    const aplica = candidatas.some((n) => ((n.cantidad ?? 0) > 0 || (n.importe ?? 0) > 0));
     if (!aplica || cantidad < (condicion.desdeCantidad ?? 0)) continue;
     if (condicion.accion === "no_paga") porcentaje = Math.min(porcentaje, 0);
     if (condicion.accion === "paga_mitad") porcentaje = Math.min(porcentaje, 50);
@@ -212,12 +214,6 @@ export function calcularEmpleado(
       formula: "Días de suspensión informados. Se descuentan del nominal del mes.",
     },
     {
-      tipo: "seguro_paro",
-      codigo: "014",
-      concepto: "Seguro de paro",
-      formula: "Días cubiertos por seguro de paro. Regla simplificada: no los paga la empresa.",
-    },
-    {
       tipo: "accidente_laboral",
       codigo: "015",
       concepto: "Accidente laboral / BSE",
@@ -256,6 +252,40 @@ export function calcularEmpleado(
       formula: `${regla.formula} Jornal ${fmt(jornal)} × ${diasDescuento} día(s).`,
     });
   });
+
+  novs
+    .filter((n) => n.tipo === "seguro_paro" && (n.cantidad ?? 0) > 0)
+    .forEach((n, i) => {
+      const diasSeguro = n.cantidad ?? 0;
+      const pagaBps = n.datos?.seguroParoPagaBps !== false;
+      const parcial = n.datos?.seguroParoTipo === "parcial";
+      const reduccion = parcial ? clamp((n.datos?.seguroParoReduccionPorcentaje ?? 0) / 100, 0, 1) : 1;
+      if (!pagaBps || reduccion <= 0) {
+        L.push({
+          codigo: `014I${i}`,
+          concepto: "Seguro de paro informado",
+          tipo: "haber",
+          gravadoBps: false,
+          cantidad: diasSeguro,
+          importe: 0,
+          formula: `Registro informativo de seguro de paro${n.datos?.seguroParoDesde && n.datos?.seguroParoHasta ? ` (${n.datos.seguroParoDesde} a ${n.datos.seguroParoHasta})` : ""}. Se marcó que no descuenta pago de la empresa.`,
+        });
+        return;
+      }
+      L.push({
+        codigo: `014${i}`,
+        concepto: parcial ? "Seguro de paro parcial" : "Seguro de paro",
+        tipo: "haber",
+        gravadoBps: true,
+        base: jornal,
+        cantidad: diasSeguro,
+        tasa: reduccion,
+        importe: r2(-jornal * diasSeguro * reduccion),
+        formula: parcial
+          ? `Seguro de paro parcial${n.datos?.seguroParoDesde && n.datos?.seguroParoHasta ? ` (${n.datos.seguroParoDesde} a ${n.datos.seguroParoHasta})` : ""}: jornal ${fmt(jornal)} × ${diasSeguro} día(s) × reducción ${pct(reduccion)}.`
+          : `Días cubiertos por seguro de paro${n.datos?.seguroParoDesde && n.datos?.seguroParoHasta ? ` (${n.datos.seguroParoDesde} a ${n.datos.seguroParoHasta})` : ""}. Jornal ${fmt(jornal)} × ${diasSeguro} día(s). Esos días los paga BPS/no la empresa.`,
+      });
+    });
 
   const diasInformativos: Array<{ tipo: Novedad["tipo"]; codigo: string; concepto: string; formula: string }> = [
     { tipo: "ausencia_justificada", codigo: "019", concepto: "Ausencia justificada", formula: "Registro informativo sin descuento automático." },

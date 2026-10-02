@@ -218,6 +218,65 @@ describe("motor de liquidacion", () => {
     expect(resultadoConFalta.lineas).toContainEqual(expect.objectContaining({ concepto: "Presentismo automático", importe: 2500 }));
   });
 
+  it("prorratea seguro de paro parcial segun porcentaje de reduccion", () => {
+    const resultado = calcularEmpleado(empresaBase, empleadoBase, "2026-09", [
+      {
+        id: "n-seguro",
+        empresaId: empresaBase.id,
+        mes: "2026-09",
+        empleadoId: empleadoBase.id,
+        tipo: "seguro_paro",
+        cantidad: 10,
+        datos: {
+          seguroParoDesde: "2026-09-01",
+          seguroParoHasta: "2026-09-10",
+          seguroParoTipo: "parcial",
+          seguroParoReduccionPorcentaje: 50,
+          seguroParoPagaBps: true,
+          seguroParoAfectaPresentismo: true,
+        },
+        origen: "estudio",
+        autor: "Estudio",
+        fecha: "2026-09-20T10:00:00",
+      },
+    ]);
+
+    expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Seguro de paro parcial", cantidad: 10, tasa: 0.5, importe: -8333.33 }));
+    expect(resultado.nominalGravado).toBe(41666.67);
+  });
+
+  it("permite seguro de paro informativo sin descuento ni corte de presentismo", () => {
+    const empresaConPresentismo: Empresa = {
+      ...empresaBase,
+      reglasLiquidacion: { presentismo: { habilitado: true, monto: 2500 } },
+    };
+
+    const resultado = calcularEmpleado(empresaConPresentismo, empleadoBase, "2026-09", [
+      {
+        id: "n-seguro-info",
+        empresaId: empresaBase.id,
+        mes: "2026-09",
+        empleadoId: empleadoBase.id,
+        tipo: "seguro_paro",
+        cantidad: 5,
+        datos: {
+          seguroParoDesde: "2026-09-01",
+          seguroParoHasta: "2026-09-05",
+          seguroParoTipo: "total",
+          seguroParoPagaBps: false,
+          seguroParoAfectaPresentismo: false,
+        },
+        origen: "estudio",
+        autor: "Estudio",
+        fecha: "2026-09-20T10:00:00",
+      },
+    ]);
+
+    expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Seguro de paro informado", importe: 0 }));
+    expect(resultado.lineas).toContainEqual(expect.objectContaining({ concepto: "Presentismo automático", importe: 2500 }));
+    expect(resultado.nominalGravado).toBe(52500);
+  });
+
   it("solo descuenta ausencia justificada cuando la novedad lo indica", () => {
     const ausenciaBase: Novedad = {
       id: "n-aus",

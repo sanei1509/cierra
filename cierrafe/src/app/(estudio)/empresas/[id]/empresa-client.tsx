@@ -874,6 +874,16 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
                           {n.datos.ingresoHorario ? ` · horario: ${n.datos.ingresoHorario}` : ""}
                         </p>
                       )}
+                      {n.datos?.seguroParoDesde && n.datos?.seguroParoHasta && (
+                        <p className="mt-1 text-xs text-apagado">
+                          Seguro de paro: {n.datos.seguroParoDesde} a {n.datos.seguroParoHasta}
+                          {n.datos.seguroParoTipo ? ` · ${n.datos.seguroParoTipo}` : ""}
+                          {n.datos.seguroParoReduccionPorcentaje ? ` · reducción ${n.datos.seguroParoReduccionPorcentaje}%` : ""}
+                          {n.datos.seguroParoReduccionHoraria ? ` · ${n.datos.seguroParoReduccionHoraria}` : ""}
+                          {n.datos.seguroParoPagaBps === false ? " · no descuenta pago empresa" : " · paga BPS"}
+                          {n.datos.seguroParoAfectaPresentismo === false ? " · no afecta presentismo" : ""}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

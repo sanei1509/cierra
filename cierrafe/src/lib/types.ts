@@ -124,6 +124,13 @@ export interface NovedadDatos {
   ingresoCategoria?: string;
   ingresoModalidad?: Modalidad;
   ingresoHorario?: string;
+  seguroParoDesde?: string;
+  seguroParoHasta?: string;
+  seguroParoTipo?: "total" | "parcial";
+  seguroParoReduccionPorcentaje?: number;
+  seguroParoReduccionHoraria?: string;
+  seguroParoAfectaPresentismo?: boolean;
+  seguroParoPagaBps?: boolean;
   egresoFecha?: string;
   egresoCausal?: string;
   egresoLicenciaNoGozadaDias?: number;

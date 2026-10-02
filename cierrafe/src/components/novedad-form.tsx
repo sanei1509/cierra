@@ -25,7 +25,20 @@ function numeroDecimal(valor: string) {
   return Number(valor.replace(/\./g, "").replace(",", "."));
 }
 
-const SIN_VALOR_GENERICO = new Set<TipoNovedad>(["egreso", "ingreso_mes"]);
+function finDeMes(mes: string) {
+  const [y, m] = mes.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
+
+function diasInclusivos(desde: string, hasta: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) return 0;
+  const d1 = new Date(`${desde}T00:00:00Z`).getTime();
+  const d2 = new Date(`${hasta}T00:00:00Z`).getTime();
+  if (!Number.isFinite(d1) || !Number.isFinite(d2) || d2 < d1) return 0;
+  return Math.floor((d2 - d1) / 86_400_000) + 1;
+}
+
+const SIN_VALOR_GENERICO = new Set<TipoNovedad>(["egreso", "ingreso_mes", "seguro_paro"]);
 
 export function NovedadForm({
   empresaId,
@@ -72,17 +85,28 @@ export function NovedadForm({
   const [ingresoCategoria, setIngresoCategoria] = useState(novedadInicial?.datos?.ingresoCategoria ?? empleadoActual?.categoria ?? "");
   const [ingresoModalidad, setIngresoModalidad] = useState<Modalidad>(novedadInicial?.datos?.ingresoModalidad ?? empleadoActual?.modalidad ?? "mensual");
   const [ingresoHorario, setIngresoHorario] = useState(novedadInicial?.datos?.ingresoHorario ?? "");
+  const [seguroParoDesde, setSeguroParoDesde] = useState(novedadInicial?.datos?.seguroParoDesde ?? `${mes}-01`);
+  const [seguroParoHasta, setSeguroParoHasta] = useState(novedadInicial?.datos?.seguroParoHasta ?? finDeMes(mes));
+  const [seguroParoTipo, setSeguroParoTipo] = useState<"total" | "parcial">(novedadInicial?.datos?.seguroParoTipo ?? "total");
+  const [seguroParoReduccionPorcentaje, setSeguroParoReduccionPorcentaje] = useState(String(novedadInicial?.datos?.seguroParoReduccionPorcentaje ?? ""));
+  const [seguroParoReduccionHoraria, setSeguroParoReduccionHoraria] = useState(novedadInicial?.datos?.seguroParoReduccionHoraria ?? "");
+  const [seguroParoAfectaPresentismo, setSeguroParoAfectaPresentismo] = useState(novedadInicial?.datos?.seguroParoAfectaPresentismo ?? true);
+  const [seguroParoPagaBps, setSeguroParoPagaBps] = useState(novedadInicial?.datos?.seguroParoPagaBps ?? true);
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   const t = TIPOS[tipo];
   const v = numeroDecimal(valor);
   const ingresoSueldoValor = numeroDecimal(ingresoSueldo);
+  const seguroParoDias = diasInclusivos(seguroParoDesde, seguroParoHasta);
+  const seguroParoReduccionValor = Number(seguroParoReduccionPorcentaje.replace(/\D/g, ""));
   const requiereValor = !SIN_VALOR_GENERICO.has(tipo);
   const egresoValido = tipo !== "egreso" || /^\d{4}-\d{2}-\d{2}$/.test(egresoFecha);
   const ingresoValido =
     tipo !== "ingreso_mes" ||
     (/^\d{4}-\d{2}-\d{2}$/.test(ingresoFecha) && ingresoCategoria.trim().length > 0 && ingresoSueldoValor > 0 && ["mensual", "jornalero"].includes(ingresoModalidad));
-  const valido = Boolean(empleadoId && egresoValido && ingresoValido && (!requiereValor || v > 0));
+  const seguroParoValido =
+    tipo !== "seguro_paro" || (seguroParoDias > 0 && (seguroParoTipo === "total" || (seguroParoReduccionValor > 0 && seguroParoReduccionValor <= 100)));
+  const valido = Boolean(empleadoId && egresoValido && ingresoValido && seguroParoValido && (!requiereValor || v > 0));
   const editando = !!novedadInicial;
   const seleccionarEmpleado = (id: string) => {
     setEmpleadoId(id);
@@ -124,6 +148,17 @@ export function NovedadForm({
                 ingresoHorario: ingresoHorario.trim() || undefined,
               }
             : {}),
+          ...(tipo === "seguro_paro"
+            ? {
+                seguroParoDesde,
+                seguroParoHasta,
+                seguroParoTipo,
+                seguroParoReduccionPorcentaje: seguroParoTipo === "parcial" ? seguroParoReduccionValor : undefined,
+                seguroParoReduccionHoraria: seguroParoReduccionHoraria.trim() || undefined,
+                seguroParoAfectaPresentismo,
+                seguroParoPagaBps,
+              }
+            : {}),
           ...(tipo === "egreso"
             ? {
                 egresoFecha,
@@ -140,7 +175,7 @@ export function NovedadForm({
           mes,
           empleadoId: empleadoId!,
           tipo,
-          ...(SIN_VALOR_GENERICO.has(tipo) ? {} : t.unidad === "$" ? { importe: v } : { cantidad: v }),
+          ...(tipo === "seguro_paro" ? { cantidad: seguroParoDias } : SIN_VALOR_GENERICO.has(tipo) ? {} : t.unidad === "$" ? { importe: v } : { cantidad: v }),
           nota: nota || undefined,
           adjunto,
           datos: Object.keys(datos).length ? datos : undefined,
@@ -149,7 +184,14 @@ export function NovedadForm({
         };
         try {
           const antes = novedadInicial ? `${TIPOS[novedadInicial.tipo].corto} ${valorNovedad(novedadInicial)}` : undefined;
-          const despues = tipo === "egreso" ? `${TIPOS[tipo].corto} ${egresoFecha}` : `${TIPOS[tipo].corto} ${t.unidad === "$" ? `$ ${v}` : v}`;
+          const despues =
+            tipo === "egreso"
+              ? `${TIPOS[tipo].corto} ${egresoFecha}`
+              : tipo === "ingreso_mes"
+                ? `${TIPOS[tipo].corto} ${ingresoFecha}`
+                : tipo === "seguro_paro"
+                  ? `${TIPOS[tipo].corto} ${seguroParoDesde} a ${seguroParoHasta}`
+                  : `${TIPOS[tipo].corto} ${t.unidad === "$" ? `$ ${v}` : v}`;
           const res = editando
             ? await actualizarNovedadReal({ ...novedad, id: novedadInicial.id, antes, despues })
             : await crearNovedadReal(novedad);
@@ -282,6 +324,43 @@ export function NovedadForm({
           <Campo label="Horario">
             <input className={inputCls} value={ingresoHorario} onChange={(e) => setIngresoHorario(e.target.value)} placeholder="Ej.: lunes a viernes 9 a 18" />
           </Campo>
+        </section>
+      )}
+      {tipo === "seguro_paro" && (
+        <section className="space-y-3 rounded-2xl bg-hundido px-3.5 py-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo label="Desde">
+              <input type="date" className={inputCls} value={seguroParoDesde} onChange={(e) => setSeguroParoDesde(e.target.value)} />
+            </Campo>
+            <Campo label="Hasta">
+              <input type="date" className={inputCls} value={seguroParoHasta} onChange={(e) => setSeguroParoHasta(e.target.value)} />
+            </Campo>
+          </div>
+          <Campo label="Tipo">
+            <select className={inputCls} value={seguroParoTipo} onChange={(e) => setSeguroParoTipo(e.target.value as "total" | "parcial")}>
+              <option value="total">Total</option>
+              <option value="parcial">Parcial</option>
+            </select>
+          </Campo>
+          {seguroParoTipo === "parcial" && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Campo label="Reducción para cálculo" ayuda="Porcentaje del jornal que no paga la empresa">
+                <input className={inputCls} inputMode="numeric" value={seguroParoReduccionPorcentaje} onChange={(e) => setSeguroParoReduccionPorcentaje(e.target.value.replace(/\D/g, ""))} placeholder="50" />
+              </Campo>
+              <Campo label="Reducción horaria">
+                <input className={inputCls} value={seguroParoReduccionHoraria} onChange={(e) => setSeguroParoReduccionHoraria(e.target.value)} placeholder="Ej.: baja a 4 h diarias" />
+              </Campo>
+            </div>
+          )}
+          <p className="text-xs text-apagado">Días calculados: {seguroParoDias || "revisar fechas"}</p>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={seguroParoPagaBps} onChange={(e) => setSeguroParoPagaBps(e.target.checked)} className="size-4 accent-petroleo" />
+            Lo paga BPS/no la empresa
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={seguroParoAfectaPresentismo} onChange={(e) => setSeguroParoAfectaPresentismo(e.target.checked)} className="size-4 accent-petroleo" />
+            Afecta presentismo
+          </label>
         </section>
       )}
       <Campo label="Comentario (opcional)">

@@ -1595,3 +1595,42 @@
 - `tasks/todo.md`
 
 **Estimated scope:** Medium
+
+## Task 53: Specialized Unemployment Insurance Novelty
+
+**Status:** Done  
+**Date:** 2026-10-02  
+**Description:** Replace the generic seguro de paro days input with a range-based form that captures total/partial coverage, reduction details and payroll effects.
+
+**Acceptance criteria:**
+- [x] The seguro de paro novelty asks for desde/hasta and derives the covered days.
+- [x] The form captures total/parcial and percentage reduction for partial unemployment insurance.
+- [x] The form stores optional schedule reduction text, whether it affects presentism and whether BPS/no the company pays those days.
+- [x] The existing attachment control acts as the constancia upload for the novelty.
+- [x] The engine discounts full or partial seguro de paro only when it is marked as paid by BPS/no the company.
+- [x] Seguro de paro can be informational without salary discount and without cutting presentism.
+- [x] Employee novelty history shows the detailed seguro de paro range and settings.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe test -- engine.test.ts`
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrabe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- Partial seguro de paro uses the explicit reduction percentage for payroll calculation. The textual schedule reduction is retained for review until employee schedules become structured data.
+
+**Dependencies:** Task 48, Task 52
+
+**Files touched:**
+- `cierrabe/src/dominio/types.ts`
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+- `cierrafe/src/components/novedad-form.tsx`
+- `cierrafe/src/lib/engine.ts`
+- `cierrafe/src/lib/labels.ts`
+- `cierrafe/src/lib/types.ts`
+- `cierrafe/tests/engine.test.ts`
+- `tasks/todo.md`
+
+**Estimated scope:** Medium
