@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, Paperclip, Plus, Undo2, X } from "lucide-react";
-import { borrarNovedadReal, enviarNovedadesClienteReal } from "@/app/(estudio)/actions";
+import { borrarNovedadReal, enviarNovedadesClienteReal, responderAprobacionReal } from "@/app/(estudio)/actions";
 import { NovedadForm } from "@/components/novedad-form";
 import { Logo } from "@/components/shell";
 import { Avatar, Boton, Drawer, MarcaEmpresa, Panel, inputCls } from "@/components/ui";
@@ -76,6 +76,23 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
       store.enviarNovedadesCliente(p.id, autor, sinNovedades);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No pudimos enviar las novedades.");
+    }
+  };
+  const responderAprobacion = async (aprobada: boolean, comentarioAprobacion = "") => {
+    setError("");
+    try {
+      if (esReal) {
+        const res = await responderAprobacionReal({ periodoId: p.id, empresaId: id, actor: autor, aprobada, comentario: comentarioAprobacion });
+        if (!res.ok) {
+          setError(res.mensaje);
+          return;
+        }
+        router.refresh();
+        return;
+      }
+      store.responderAprobacion(p.id, aprobada, comentarioAprobacion, autor);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos responder la aprobación.");
     }
   };
 
@@ -164,12 +181,12 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
             <textarea id="obs" autoFocus className={clsx(inputCls, "mt-2 h-28 py-3")} value={comentario} onChange={(e) => setComentario(e.target.value)} placeholder="Ej.: a Florencia le corresponden 4 horas extra más" />
             <div className="mt-3 flex gap-2">
               <Boton variante="fantasma" onClick={() => setDevolviendo(false)}>Cancelar</Boton>
-              <Boton disabled={comentario.trim().length < 5} onClick={() => store.responderAprobacion(p.id, false, comentario.trim(), autor)}><Undo2 size={15} /> Devolver al estudio</Boton>
+              <Boton disabled={comentario.trim().length < 5} onClick={() => void responderAprobacion(false, comentario.trim())}><Undo2 size={15} /> Devolver al estudio</Boton>
             </div>
           </Panel>
         ) : (
           <div className="sticky bottom-3 flex flex-col gap-2 rounded-[var(--radius-panel)] bg-[var(--cierra-navy)] p-3 sm:flex-row">
-            <Boton tam="lg" className="flex-1 !bg-sol !text-[#102247] hover:!bg-[#FFE9AD]" onClick={() => store.responderAprobacion(p.id, true, "", autor)}><Check size={17} /> Aprobar sueldos</Boton>
+            <Boton tam="lg" className="flex-1 !bg-sol !text-[#102247] hover:!bg-[#FFE9AD]" onClick={() => void responderAprobacion(true)}><Check size={17} /> Aprobar sueldos</Boton>
             <Boton tam="lg" variante="claro" className="!bg-white/10 !text-white hover:!bg-white/20" onClick={() => setDevolviendo(true)}>Devolver con un comentario</Boton>
           </div>
         )}

@@ -1017,6 +1017,9 @@
 - [x] Period repository maps those fields in both read and save paths.
 - [x] Drizzle migration adds the new period snapshot columns.
 - [x] Study UI persists calculate draft, send for approval, internal approval and close/publish actions through Server Actions.
+- [x] Client portal persists approval and devolution responses through Server Actions.
+- [x] Study UI persists BPS generated/presented state through Server Actions.
+- [x] Study UI persists rectification start through a Server Action.
 - [x] UI still updates immediately using the existing local workflow after the real write succeeds.
 - [x] Demo fallback remains available when the real backend/session is not applicable.
 
@@ -1030,8 +1033,6 @@
 - [x] `corepack pnpm --filter cierrafe build`
 
 **Notes:**
-- [ ] Pending later: persist client approval/devolution from the real portal.
-- [ ] Pending later: persist BPS generated/presented and rectification actions.
 - [ ] Pending later: consider normalizing liquidation versions into a dedicated table if snapshots become too large.
 
 **Dependencies:** Task 33, Task 35

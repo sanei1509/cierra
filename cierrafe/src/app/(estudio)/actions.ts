@@ -86,6 +86,15 @@ export interface PeriodoRealInput {
   actor: string;
 }
 
+export interface ResponderAprobacionRealInput extends PeriodoRealInput {
+  aprobada: boolean;
+  comentario: string;
+}
+
+export interface RectificarPeriodoRealInput extends PeriodoRealInput {
+  motivo: string;
+}
+
 function ahoraIso() {
   return new Date().toISOString();
 }
@@ -109,9 +118,10 @@ function periodoInicial(empresaId: EmpresaId, mes: string): Periodo {
 async function guardarPeriodoReal(
   input: PeriodoRealInput,
   cambio: (actual: Periodo) => Promise<{ periodo: Periodo; auditoria: { accion: string; detalle?: string } }>,
+  actoresPermitidos: Array<"estudio" | "empresa"> = ["estudio"],
 ): Promise<AltaRealResult> {
   const ctx = await contextoOperativoActual();
-  if (!ctx || ctx.actorTipo !== "estudio" || !process.env.DATABASE_URL || !uuidValido(input.periodoId) || !uuidValido(input.empresaId)) {
+  if (!ctx || !actoresPermitidos.includes(ctx.actorTipo as "estudio" | "empresa") || !process.env.DATABASE_URL || !uuidValido(input.periodoId) || !uuidValido(input.empresaId)) {
     return { ok: true, modo: "demo", mensaje: "Accion simulada: falta sesion de estudio o backend real." };
   }
 
@@ -510,6 +520,60 @@ export async function cerrarPeriodoReal(input: PeriodoRealInput): Promise<AltaRe
     return {
       periodo: { ...periodo, etapa: "cerrada", cerrado: { fecha: ahoraIso(), por: input.actor, version } },
       auditoria: { accion: `Cerro el periodo y publico ${publicada} recibos`, detalle: `Version ${version} bloqueada` },
+    };
+  });
+}
+
+export async function responderAprobacionReal(input: ResponderAprobacionRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => {
+    if (!periodo.aprobacion) throw new Error("No hay una aprobacion pendiente para responder.");
+    const estado = input.aprobada ? "aprobada" : "devuelta";
+    return {
+      periodo: {
+        ...periodo,
+        etapa: input.aprobada ? "aprobada" : "devuelta",
+        aprobacion: {
+          ...periodo.aprobacion,
+          estado,
+          comentario: input.comentario || undefined,
+          por: input.actor,
+          fecha: ahoraIso(),
+        },
+      },
+      auditoria: {
+        accion: input.aprobada ? `Aprobo la version ${periodo.aprobacion.version}` : `Devolvio la version ${periodo.aprobacion.version}`,
+        detalle: input.comentario || undefined,
+      },
+    };
+  }, ["estudio", "empresa"]);
+}
+
+export async function generarBpsReal(input: PeriodoRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => ({
+    periodo: { ...periodo, bps: "generado" },
+    auditoria: { accion: "Genero archivo de nomina" },
+  }));
+}
+
+export async function marcarBpsPresentadoReal(input: PeriodoRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => ({
+    periodo: { ...periodo, bps: "presentado" },
+    auditoria: { accion: "Marco la nomina como presentada" },
+  }));
+}
+
+export async function rectificarPeriodoReal(input: RectificarPeriodoRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => {
+    if (!periodo.cerrado) throw new Error("Solo se puede rectificar un periodo cerrado.");
+    return {
+      periodo: {
+        ...periodo,
+        etapa: "borrador",
+        bps: "pendiente",
+        rectificaciones: [...periodo.rectificaciones, { fecha: ahoraIso(), por: input.actor, motivo: input.motivo, desdeVersion: periodo.cerrado.version }],
+        aprobacion: undefined,
+      },
+      auditoria: { accion: `Inicio rectificacion de la version ${periodo.cerrado.version}`, detalle: input.motivo },
     };
   });
 }

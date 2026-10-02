@@ -10,6 +10,9 @@ import {
   calcularLiquidacionReal,
   cerrarPeriodoReal,
   enviarAprobacionReal,
+  generarBpsReal,
+  marcarBpsPresentadoReal,
+  rectificarPeriodoReal,
 } from "@/app/(estudio)/actions";
 import {
   AlertOctagon, AlertTriangle, Info, Check, ChevronRight, Plus, X, Send, Calculator, FileDown, Lock, RefreshCw,
@@ -252,12 +255,12 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
             variante={p.bps === "pendiente" ? "primario" : "secundario"}
             onClick={() => {
               descargar(`nomina-${empresa.nroBps}-${p.mes}.txt`, archivoNomina(empresa, p.mes, empleados, res));
-              if (p.bps === "pendiente") s.generarBps(p.id);
+              if (p.bps === "pendiente") void ejecutar("bps", () => generarBpsReal(periodoInput), () => s.generarBps(p.id));
             }}
           >
             <FileDown size={15} /> Descargar archivo BPS
           </Boton>
-          {p.bps === "generado" && <Boton variante="secundario" disabled={!puede} onClick={() => s.marcarBpsPresentado(p.id)}><Check size={15} /> Marcar como presentada</Boton>}
+          {p.bps === "generado" && <Boton variante="secundario" disabled={!puede || procesando === "bps-presentado"} onClick={() => void ejecutar("bps-presentado", () => marcarBpsPresentadoReal(periodoInput), () => s.marcarBpsPresentado(p.id))}><Check size={15} /> Marcar como presentada</Boton>}
           <Boton variante="fantasma" href={`/recibos/${empresa.id}/${p.mes}`}><Files size={15} /> Todos los recibos en PDF</Boton>
           <Boton variante="fantasma" disabled={!s.puede("reabrir")} onClick={() => setConfirmar("rectificar")} title={!s.puede("reabrir") ? "Solo administradores" : undefined}>
             <Undo2 size={15} /> Rectificar
@@ -296,7 +299,12 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
         <textarea className={clsx(inputCls, "mt-3 h-24 py-3")} placeholder="Motivo, ej.: faltó una comisión de Natalia Píriz" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         <div className="mt-4 flex justify-end gap-2">
           <Boton variante="fantasma" onClick={() => setConfirmar(null)}>Cancelar</Boton>
-          <Boton disabled={motivo.trim().length < 5} onClick={() => { s.rectificar(p.id, motivo.trim()); setConfirmar(null); setMotivo(""); }}>Rectificar</Boton>
+          <Boton
+            disabled={motivo.trim().length < 5 || procesando === "rectificar"}
+            onClick={() => void ejecutar("rectificar", () => rectificarPeriodoReal({ ...periodoInput, motivo: motivo.trim() }), () => { s.rectificar(p.id, motivo.trim()); setConfirmar(null); setMotivo(""); })}
+          >
+            Rectificar
+          </Boton>
         </div>
       </Modal>
       {error && <p className="mt-4 rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}
