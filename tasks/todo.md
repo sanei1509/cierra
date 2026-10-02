@@ -1453,3 +1453,30 @@
 - `cierrafe/tests/engine.test.ts`
 
 **Estimated scope:** Medium
+
+## Task 49: Employee Novelty History
+**Description:** Add a per-employee novelty history inside the employee drawer so the studio can consult past novelties without switching month by month.
+
+**Acceptance criteria:**
+- [x] The employee drawer shows a `Historial de novedades` section.
+- [x] The history lists all loaded novelties for that employee, grouped by month.
+- [x] Each history item shows novelty type, value, origin, author, creation date, comment and attachment marker.
+- [x] Specific novelty data such as justified absence discount and category/salary change is visible in the history.
+- [x] The empty state clearly says when the employee has no recorded novelties.
+
+**Verification:**
+- [x] `corepack pnpm --filter cierrafe typecheck`
+- [x] `corepack pnpm --filter cierrafe lint`
+- [x] `corepack pnpm --filter cierrafe build`
+
+**Notes:**
+- [ ] Pending later: add a dedicated employee history page or server-side paginated query when there are many years of data.
+- [ ] Pending later: include closed receipt/liquidation references next to each novelty once version metadata is searchable by employee.
+
+**Dependencies:** Task 48
+
+**Files touched:**
+- `cierrafe/src/app/(estudio)/empresas/[id]/empresa-client.tsx`
+- `tasks/todo.md`
+
+**Estimated scope:** Small

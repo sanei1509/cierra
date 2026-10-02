@@ -671,6 +671,15 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
   const usuario = useUsuario();
   const puede = s.puede("editar");
   const actual = [...e.sueldos].sort((a, b) => b.desde.localeCompare(a.desde))[0];
+  const novedadesHistoricas = useMemo(
+    () => s.novedades.filter((n) => n.empleadoId === e.id).sort((a, b) => `${b.mes}-${b.fecha}`.localeCompare(`${a.mes}-${a.fecha}`)),
+    [s.novedades, e.id],
+  );
+  const novedadesPorMes = useMemo(() => {
+    const grupos = new Map<string, Novedad[]>();
+    novedadesHistoricas.forEach((n) => grupos.set(n.mes, [...(grupos.get(n.mes) ?? []), n]));
+    return [...grupos.entries()];
+  }, [novedadesHistoricas]);
   const [f, setF] = useState({ ci: e.ci, email: e.email, categoria: e.categoria, sueldo: String(actual?.monto ?? ""), hijos: String(e.hijos), conyuge: e.conyugeFonasa });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -752,6 +761,45 @@ function FichaEmpleado({ e, v, onCerrar }: { e: Empleado; v: Vista; onCerrar: ()
           </dl>
         </section>
       )}
+      <section className="rounded-3xl bg-hundido px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-bold">Historial de novedades</h3>
+          <Chip tono={novedadesHistoricas.length ? "cielo" : "gris"}>{novedadesHistoricas.length}</Chip>
+        </div>
+        {novedadesHistoricas.length === 0 ? (
+          <p className="mt-2 text-sm text-apagado">Todavía no hay novedades registradas para esta persona.</p>
+        ) : (
+          <div className="mt-3 space-y-4">
+            {novedadesPorMes.map(([mes, novedades]) => (
+              <div key={mes}>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-apagado">{nombreMes(mes)}</p>
+                <ul className="divide-y divide-linea overflow-hidden rounded-2xl border border-linea bg-superficie">
+                  {novedades.map((n) => (
+                    <li key={n.id} className="px-3.5 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Chip tono={TIPOS[n.tipo].tono}>{TIPOS[n.tipo].corto}</Chip>
+                        <span className="num text-sm font-bold">{valorNovedad(n)}</span>
+                        <span className="text-xs text-apagado">{n.origen === "cliente" ? "Cliente" : "Estudio"} · {n.autor} · {fechaHora(n.fecha)}</span>
+                        {n.adjunto && <span className="inline-flex items-center gap-1 text-xs font-semibold text-petroleo"><Paperclip size={12} /> Comprobante</span>}
+                      </div>
+                      {n.nota && <p className="mt-1 text-sm text-tinta-2">{n.nota}</p>}
+                      {n.datos?.ausenciaDescuenta !== undefined && (
+                        <p className="mt-1 text-xs text-apagado">{n.datos.ausenciaDescuenta ? "Descuenta jornal" : "No descuenta jornal"}</p>
+                      )}
+                      {(n.datos?.nuevaCategoria || n.datos?.nuevoSueldo) && (
+                        <p className="mt-1 text-xs text-apagado">
+                          {n.datos.nuevaCategoria ? `Nueva categoría: ${n.datos.nuevaCategoria}` : "Cambio de categoría"}
+                          {n.datos.nuevoSueldo ? ` · sueldo base ${fmt(n.datos.nuevoSueldo)}` : ""}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
       {error && <p className="rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}
       {puede && <Boton className="w-full" tam="lg" onClick={() => void guardar()} disabled={guardando}>{guardando ? "Guardando..." : "Guardar cambios"}</Boton>}
     </div>
