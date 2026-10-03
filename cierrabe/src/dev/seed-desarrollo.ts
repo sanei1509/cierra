@@ -17,6 +17,7 @@ import {
   periodos,
   planModulos,
   planes,
+  moduloOverrides,
   pagosEstudio,
   relacionesLaborales,
   resumenesCobro,
@@ -361,12 +362,27 @@ async function seedDesarrollo() {
 
     const estudiosComerciales = ESTUDIOS_COMERCIALES_BASE;
     const mesUsoComercial = "2026-10";
+    const idsEstudiosComerciales = ESTUDIOS_COMERCIALES_BASE.map((estudio) => estudio.id);
+    const idsPlanesComerciales = PLANES_COMERCIALES_BASE.map((plan) => plan.id);
     const mesesHistoricosPereira = ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"];
     const pereiraComercialId = "00000000-0000-4000-8000-000000000001";
-    const estudiosSinHistoricoPereira = ESTUDIOS_COMERCIALES_BASE.map((estudio) => estudio.id).filter((id) => id !== pereiraComercialId);
+    const estudiosSinHistoricoPereira = idsEstudiosComerciales.filter((id) => id !== pereiraComercialId);
     const idsResumenesHistoricosPereira = Array.from({ length: 6 }, (_, index) => `00000000-0000-4000-8000-00000000050${index + 1}`);
     const idsPagosHistoricosPereira = Array.from({ length: 6 }, (_, index) => `00000000-0000-4000-8000-00000000060${index + 1}`);
     const idsAplicacionesHistoricasPereira = Array.from({ length: 6 }, (_, index) => `00000000-0000-4000-8000-00000000070${index + 1}`);
+    if (!idsEstudiosComerciales.includes(config.estudioId)) {
+      const suscripcionesComercialesObsoletas = await tx
+        .select({ id: suscripcionesEstudio.id })
+        .from(suscripcionesEstudio)
+        .where(and(eq(suscripcionesEstudio.estudioId, config.estudioId), inArray(suscripcionesEstudio.planId, idsPlanesComerciales)));
+      const idsSuscripcionesObsoletas = suscripcionesComercialesObsoletas.map((suscripcion) => suscripcion.id);
+      if (idsSuscripcionesObsoletas.length) {
+        await tx.delete(resumenesCobro).where(inArray(resumenesCobro.suscripcionId, idsSuscripcionesObsoletas));
+        await tx.delete(suscripcionAddons).where(inArray(suscripcionAddons.suscripcionId, idsSuscripcionesObsoletas));
+        await tx.delete(moduloOverrides).where(inArray(moduloOverrides.suscripcionId, idsSuscripcionesObsoletas));
+        await tx.delete(suscripcionesEstudio).where(inArray(suscripcionesEstudio.id, idsSuscripcionesObsoletas));
+      }
+    }
     for (const id of idsAplicacionesHistoricasPereira) await tx.delete(aplicacionesPago).where(eq(aplicacionesPago.id, id));
     for (const id of idsPagosHistoricosPereira) await tx.delete(pagosEstudio).where(eq(pagosEstudio.id, id));
     for (const id of idsResumenesHistoricosPereira) await tx.delete(resumenesCobro).where(eq(resumenesCobro.id, id));

@@ -934,28 +934,23 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
                   <FileText size={14} /> Ver factura
                 </Boton>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2">
                 {!resumenGuardado ? (
-                  <Boton type="button" variante="primario" tam="sm" className="flex-1" onClick={() => void emitirFacturaSiHaceFalta()} disabled={confirmandoFactura}>
+                  <Boton type="button" variante="primario" tam="sm" className="w-full" onClick={() => void emitirFacturaSiHaceFalta()} disabled={confirmandoFactura}>
                     <Save size={14} /> {confirmandoFactura ? "Confirmando..." : "Confirmar factura"}
                   </Boton>
-                ) : facturaActualCancelable ? (
-                  <Boton type="button" variante="secundario" tam="sm" className="flex-1" onClick={() => cancelarFactura()} disabled={confirmandoFactura}>
-                    <X size={14} /> Cancelar factura
-                  </Boton>
-                ) : null}
-                {resumenGuardado && estadoPago.saldoPendienteCent > 0 && (
+                ) : estadoPago.saldoPendienteCent > 0 ? (
                   <Boton
                     type="button"
                     variante="primario"
                     tam="sm"
-                    className="flex-1"
+                    className="w-full"
                     onClick={() => registrarPago(estadoPago.saldoPendienteCent, 1, mesCobro)}
                     disabled={pendientePago || confirmandoFactura}
                   >
                     <CreditCard size={14} /> {pendientePago ? "Registrando..." : "Marcar pagado"}
                   </Boton>
-                )}
+                ) : null}
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded-lg bg-superficie px-3 py-2">
@@ -968,7 +963,17 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
                 </div>
               </div>
               {estadoPago.saldoAFavorCent > 0 && <p className="mt-2 text-xs font-semibold text-menta-t">A favor {fmtCent(estadoPago.saldoAFavorCent, resumenVisible.moneda)}</p>}
-              <div className="mt-2">
+              {facturaActualCancelable && (
+                <button
+                  type="button"
+                  onClick={() => cancelarFactura()}
+                  disabled={confirmandoFactura}
+                  className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-apagado transition-colors hover:bg-superficie hover:text-tinta disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <X size={13} /> Cancelar factura
+                </button>
+              )}
+              <div className="mt-1">
                 <Boton
                   type="button"
                   variante="fantasma"
