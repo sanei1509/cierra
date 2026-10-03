@@ -68,7 +68,7 @@ export function ParametrosNormativosPanel() {
   const set = (patch: Partial<Parametros>) => setDraft((actual) => ({ ...actual, ...patch }));
   const guardar = () => {
     actualizar(draft, `Editó parámetros normativos ${draft.id}`);
-    setMensaje("Cambios guardados. Las próximas liquidaciones demo usan esta versión.");
+    setMensaje("Cambios guardados. Las próximas liquidaciones usan esta versión.");
   };
 
   return (

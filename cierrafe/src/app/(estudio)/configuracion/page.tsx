@@ -38,7 +38,7 @@ export default function Configuracion() {
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-apagado">Cambiá de usuario desde el menú superior para probar los permisos.</p>
+            <p className="mt-3 text-xs text-apagado">Los permisos definen qué acciones puede realizar cada integrante dentro del estudio.</p>
           </Panel>
           <Panel className="min-w-0 p-6">
             <h2 className="text-lg font-bold tracking-tight">Alcance soportado</h2>

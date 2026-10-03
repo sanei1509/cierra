@@ -4,14 +4,13 @@ import clsx from "clsx";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, FileText, Home, Search, Settings, ShieldCheck, Users, Eye, RotateCcw, Menu, X, CalendarDays, ListChecks, KeyRound, UserCog, BriefcaseBusiness, UserRound, Monitor, Moon, Sun, LogIn } from "lucide-react";
+import { Building2, FileText, Home, Search, Settings, ShieldCheck, Users, Eye, Menu, X, CalendarDays } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { useHidratado, useStore, useUsuario } from "@/lib/store";
-import { USUARIOS, ESTUDIO } from "@/lib/seed";
+import { useHidratado, useStore } from "@/lib/store";
+import { ESTUDIO } from "@/lib/seed";
 import { MES_ACTUAL, nombreMes } from "@/lib/format";
-import { Avatar } from "./ui";
-import { TEMA_LABELS, type TemaPreferido } from "@/lib/theme";
 import { DelegatedStudyFloat } from "./delegated-study-float";
+import { AccountMenu } from "./account-menu";
 
 const NAV = [
   { href: "/", label: "Inicio", icon: Home },
@@ -21,8 +20,6 @@ const NAV = [
   { href: "/auditoria", label: "Auditoría", icon: ShieldCheck },
   { href: "/configuracion", label: "Configuración", icon: Settings },
 ];
-
-const ROLES = { admin: "Administradora", liquidador: "Liquidador", lectura: "Solo lectura" };
 
 type LogoVariant = "auto" | "full" | "symbol" | "darkSurface";
 
@@ -51,7 +48,6 @@ export function Logo({ claro = false, variant, className }: { claro?: boolean; v
 
 function Sidebar({ onNav, vistaDelegada }: { onNav?: () => void; vistaDelegada?: boolean }) {
   const path = usePathname();
-  const reiniciar = useStore((s) => s.reiniciar);
   return (
     <nav className="flex h-full min-h-0 flex-col overflow-y-auto rounded-[var(--radius-panel)] border border-linea bg-superficie p-4 shadow-[var(--cierra-shadow-soft)]" aria-label="Principal">
       {vistaDelegada ? (
@@ -87,24 +83,6 @@ function Sidebar({ onNav, vistaDelegada }: { onNav?: () => void; vistaDelegada?:
         <Eye size={19} strokeWidth={1.8} />
         Cliente y empleado
       </Link>
-      <Link href="/funciones" onClick={onNav} className={clsx("mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium", path.startsWith("/funciones") ? "bg-petroleo/10 text-tinta" : "text-apagado hover:bg-hundido/70 hover:text-tinta")}>
-        <ListChecks size={19} strokeWidth={1.8} />
-        Guía de funciones
-      </Link>
-
-      <div className="mt-auto overflow-hidden rounded-2xl bg-[linear-gradient(135deg,var(--cierra-navy),var(--cierra-blue))] p-4 text-white">
-        <p className="text-sm font-bold">Estado local</p>
-        <p className="mt-1 text-xs leading-relaxed text-[#DCE9FF]">Reinicia solo lo guardado en este navegador. La base local no se borra.</p>
-        <button
-          onClick={() => {
-            reiniciar();
-            onNav?.();
-          }}
-          className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/12 text-xs font-semibold text-white hover:bg-white/20"
-        >
-          <RotateCcw size={13} /> Reiniciar navegador
-        </button>
-      </div>
     </nav>
   );
 }
@@ -161,100 +139,7 @@ function Busqueda() {
   );
 }
 
-function Usuario() {
-  const u = useUsuario();
-  const setUsuario = useStore((s) => s.setUsuario);
-  return (
-    <label className="relative flex items-center gap-3 rounded-xl border border-linea bg-superficie py-1.5 pl-1.5 pr-4">
-      <Avatar nombre={u.nombre} tono="crema" />
-      <span className="hidden text-left leading-tight sm:block">
-        <span className="block text-sm font-bold">{u.nombre}</span>
-        <span className="block text-xs text-apagado">{ROLES[u.rol]}</span>
-      </span>
-      <select
-        value={u.id}
-        onChange={(e) => setUsuario(e.target.value)}
-        className="absolute inset-0 cursor-pointer opacity-0"
-        aria-label="Cambiar de usuario para probar permisos"
-      >
-        {USUARIOS.map((x) => (
-          <option key={x.id} value={x.id}>
-            {x.nombre} · {ROLES[x.rol]}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-const TEMA_ICONOS = { system: Monitor, light: Sun, dark: Moon };
-
-function SelectorTema() {
-  const u = useUsuario();
-  const tema = useStore((s) => s.temaPorUsuario[u.id] ?? "system");
-  const setTema = useStore((s) => s.setTemaUsuario);
-
-  return (
-    <div className="flex items-center gap-1 rounded-xl border border-linea bg-superficie p-1" aria-label="Tema visual">
-      {(Object.keys(TEMA_LABELS) as TemaPreferido[]).map((t) => {
-        const Icono = TEMA_ICONOS[t];
-        const activo = tema === t;
-        return (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTema(t)}
-            className={clsx("inline-flex size-8 items-center justify-center rounded-lg transition-colors", activo ? "bg-petroleo text-white" : "text-apagado hover:bg-hundido hover:text-tinta")}
-            aria-label={`Usar tema ${TEMA_LABELS[t].toLowerCase()}`}
-            title={TEMA_LABELS[t]}
-            aria-pressed={activo}
-          >
-            <Icono size={15} />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function DevAccessBar() {
-  const router = useRouter();
-  const setUsuario = useStore((s) => s.setUsuario);
-  if (process.env.NODE_ENV === "production") return null;
-
-  const entrarEstudio = (id: string) => {
-    setUsuario(id);
-    router.push("/");
-  };
-
-  return (
-    <section className="flex flex-wrap items-center gap-2 rounded-[var(--radius-panel)] border border-dashed border-petroleo/35 bg-cielo px-3 py-2" aria-label="Accesos rápidos de desarrollo">
-      <span className="flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-[0.08em] text-cielo-t">
-        <KeyRound size={14} /> Dev roles
-      </span>
-      <Link href="/admin" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-transparent bg-petroleo px-3 text-xs font-semibold text-white hover:bg-petroleo-2">
-        <UserCog size={13} /> Admin sistema
-      </Link>
-      <button onClick={() => entrarEstudio("u1")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
-        <ShieldCheck size={13} /> Estudio admin
-      </button>
-      <button onClick={() => entrarEstudio("u2")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
-        <BriefcaseBusiness size={13} /> Liquidador
-      </button>
-      <button onClick={() => entrarEstudio("u3")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
-        <Eye size={13} /> Solo lectura
-      </button>
-      <Link href="/portales" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
-        <Building2 size={13} /> Empresa
-      </Link>
-      <Link href="/portales" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-apagado shadow-[0_1px_1px_rgb(17_26_23/0.08)] hover:bg-hundido hover:text-tinta">
-        <UserRound size={13} /> Empleado
-      </Link>
-    </section>
-  );
-}
-
-export function Shell({ children, vistaDelegada = false }: { children: ReactNode; vistaDelegada?: boolean }) {
+export function Shell({ children, vistaDelegada = false, logoutAction }: { children: ReactNode; vistaDelegada?: boolean; logoutAction: () => Promise<void> }) {
   const ok = useHidratado();
   const [menu, setMenu] = useState(false);
   return (
@@ -281,14 +166,9 @@ export function Shell({ children, vistaDelegada = false }: { children: ReactNode
               <CalendarDays size={16} className="text-petroleo" /> {nombreMes(MES_ACTUAL)}
             </span>
             <span className="hidden rounded-xl border border-linea bg-superficie px-4 py-2.5 text-sm text-apagado xl:block">{ESTUDIO.nombre}</span>
-            {ok && <SelectorTema />}
-            <Link href="/login" className="hidden size-10 items-center justify-center rounded-xl border border-linea bg-superficie text-apagado hover:bg-hundido hover:text-tinta sm:inline-flex" aria-label="Cambiar acceso" title="Cambiar acceso">
-              <LogIn size={16} />
-            </Link>
-            {ok && <Usuario />}
+            {ok && <AccountMenu logoutAction={logoutAction} />}
           </div>
         </header>
-        {ok && <DevAccessBar />}
         <main className="min-w-0 flex-1">{ok ? children : <div className="h-[70vh] animate-pulse rounded-[var(--radius-panel)] bg-superficie/60" />}</main>
       </div>
     </div>

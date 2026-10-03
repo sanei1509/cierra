@@ -15,9 +15,9 @@ export default function PortalesClient({ datosIniciales }: { datosIniciales: Dat
   return (
     <div className="space-y-3">
       <Panel className="px-7 py-6">
-        <h1 className="text-[34px] font-extrabold leading-tight tracking-tight">Ver como cliente o empleado</h1>
+        <h1 className="text-[34px] font-extrabold leading-tight tracking-tight">Portales de acceso</h1>
         <p className="mt-1 max-w-2xl text-[15px] text-apagado">
-          En producción cada persona entra con su propio acceso y ve solo lo suyo. Acá podés abrir cualquier portal para probar el recorrido completo: el cliente carga novedades o aprueba, y el empleado consulta sus recibos.
+          Accesos para que los clientes carguen novedades o aprueben liquidaciones, y para que los empleados consulten sus recibos publicados.
         </p>
       </Panel>
       <div className="grid gap-3 xl:grid-cols-2">

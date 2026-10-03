@@ -69,7 +69,7 @@ function revisar(filas: Fila[], empresa: Empresa, existentes: Empleado[]): Revis
 }
 
 function ejemplo(empresa: Empresa): Fila[] {
-  // Categorías reales del grupo de la empresa, para que la demo muestre casos válidos
+  // Categorías reales del grupo de la empresa, para que el ejemplo muestre casos válidos.
   const cats = categoriasDe(empresa.grupo, empresa.subgrupo);
   const c = (i: number) => cats[i % Math.max(cats.length, 1)];
   return [
@@ -200,7 +200,7 @@ export function ImportarEmpleados({ empresa, onListo }: { empresa: Empresa; onLi
         </label>
         {error && <p className="rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}
         <button className="w-full text-center text-sm font-semibold text-petroleo hover:underline" onClick={() => { setArchivo("ejemplo.xlsx"); setFilas(ejemplo(empresa)); }}>
-          No tengo un archivo: probar con uno de ejemplo
+          No tengo un archivo: usar uno de ejemplo
         </button>
       </div>
     );
