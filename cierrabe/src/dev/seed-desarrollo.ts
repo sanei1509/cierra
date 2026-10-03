@@ -1,6 +1,7 @@
 import "dotenv/config";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { crearPasswordHash } from "../auth";
+import type { EstudioId } from "../datos/contexto";
 import { db, cerrarDb } from "../datos/db";
 import {
   credencialesPassword,
@@ -9,17 +10,21 @@ import {
   empresas,
   estudios,
   eventosUsoFacturable,
+  aplicacionesPago,
   membresiaEmpresas,
   membresias,
   modulos,
   periodos,
   planModulos,
   planes,
+  pagosEstudio,
   relacionesLaborales,
+  resumenesCobro,
   suscripcionAddons,
   suscripcionesEstudio,
   usuarios,
 } from "../datos/schema";
+import { generarResumenCobroEstudio } from "../facturacion";
 import { CATALOGO_MODULOS } from "../modulos";
 import { resolverSeedDesarrollo } from "./seed-config";
 import { addonComercialPorModulo, ESTUDIOS_COMERCIALES_BASE, planComercialPorCodigo, PLANES_COMERCIALES_BASE } from "./seed-comercial";
@@ -354,8 +359,34 @@ async function seedDesarrollo() {
       await tx.insert(planModulos).values(plan.modulos.map((moduloCodigo) => ({ planId: plan.id, moduloCodigo })));
     }
 
-    const estudiosComerciales = ESTUDIOS_COMERCIALES_BASE.map((estudio) => (estudio.id === "00000000-0000-4000-8000-000000000001" ? { ...estudio, id: config.estudioId } : estudio));
+    const estudiosComerciales = ESTUDIOS_COMERCIALES_BASE;
     const mesUsoComercial = "2026-10";
+    const mesesHistoricosPereira = ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"];
+    const pereiraComercialId = "00000000-0000-4000-8000-000000000001";
+    const estudiosSinHistoricoPereira = ESTUDIOS_COMERCIALES_BASE.map((estudio) => estudio.id).filter((id) => id !== pereiraComercialId);
+    const idsResumenesHistoricosPereira = Array.from({ length: 6 }, (_, index) => `00000000-0000-4000-8000-00000000050${index + 1}`);
+    const idsPagosHistoricosPereira = Array.from({ length: 6 }, (_, index) => `00000000-0000-4000-8000-00000000060${index + 1}`);
+    const idsAplicacionesHistoricasPereira = Array.from({ length: 6 }, (_, index) => `00000000-0000-4000-8000-00000000070${index + 1}`);
+    for (const id of idsAplicacionesHistoricasPereira) await tx.delete(aplicacionesPago).where(eq(aplicacionesPago.id, id));
+    for (const id of idsPagosHistoricosPereira) await tx.delete(pagosEstudio).where(eq(pagosEstudio.id, id));
+    for (const id of idsResumenesHistoricosPereira) await tx.delete(resumenesCobro).where(eq(resumenesCobro.id, id));
+    if (estudiosSinHistoricoPereira.length) {
+      const pagosHistoricosNoPereira = await tx
+        .select({ id: pagosEstudio.id })
+        .from(pagosEstudio)
+        .where(and(inArray(pagosEstudio.estudioId, estudiosSinHistoricoPereira), inArray(sql<string>`to_char(${pagosEstudio.fecha}, 'YYYY-MM')`, mesesHistoricosPereira)));
+      await tx
+        .delete(aplicacionesPago)
+        .where(and(inArray(aplicacionesPago.estudioId, estudiosSinHistoricoPereira), inArray(aplicacionesPago.mes, mesesHistoricosPereira)));
+      if (pagosHistoricosNoPereira.length) await tx.delete(pagosEstudio).where(inArray(pagosEstudio.id, pagosHistoricosNoPereira.map((pago) => pago.id)));
+      await tx
+        .delete(resumenesCobro)
+        .where(and(inArray(resumenesCobro.estudioId, estudiosSinHistoricoPereira), inArray(resumenesCobro.mes, mesesHistoricosPereira)));
+      await tx
+        .delete(eventosUsoFacturable)
+        .where(and(inArray(eventosUsoFacturable.estudioId, estudiosSinHistoricoPereira), inArray(eventosUsoFacturable.mes, mesesHistoricosPereira)));
+    }
+
     for (const estudio of estudiosComerciales) {
       const plan = planComercialPorCodigo(estudio.planCodigo);
       await tx
@@ -424,6 +455,134 @@ async function seedDesarrollo() {
           nota: "Seed comercial de desarrollo",
         })),
       );
+
+      if (estudio.nombre === "Estudio Pereira & Asociados") {
+        const mesesHistoricos = [
+          { mes: "2026-04", empresas: 9, empleados: 146, recibos: 146, pagadoCent: 1800000 },
+          { mes: "2026-05", empresas: 10, empleados: 158, recibos: 158, pagadoCent: 1800000 },
+          { mes: "2026-06", empresas: 10, empleados: 164, recibos: 164, pagadoCent: 1800000 },
+          { mes: "2026-07", empresas: 11, empleados: 171, recibos: 171, pagadoCent: 1800000 },
+          { mes: "2026-08", empresas: 11, empleados: 176, recibos: 176, pagadoCent: 1800000 },
+          { mes: "2026-09", empresas: 12, empleados: 181, recibos: 181, pagadoCent: 900000 },
+        ];
+        const planResumen = {
+          id: plan.id,
+          codigo: plan.codigo,
+          nombre: plan.nombre,
+          descripcion: plan.descripcion,
+          estado: "activo" as const,
+          moneda: "UYU" as const,
+          precioMensualCent: plan.precioMensualCent,
+          modulos: plan.modulos,
+        };
+        const suscripcionResumen = {
+          id: estudio.suscripcionId,
+          estudioId: estudio.id,
+          planId: plan.id,
+          estado: estudio.estado,
+          moneda: estudio.moneda,
+          precioMensualCent: plan.precioMensualCent,
+          inicio: "2026-04-01",
+          notasInternas: estudio.notasInternas,
+          addons: estudio.addons.map((moduloCodigo) => ({
+            moduloCodigo,
+            precioMensualCent: addonComercialPorModulo(moduloCodigo)?.precioMensualCent ?? 0,
+            inicio: "2026-04-01",
+          })),
+          overrides: [],
+        };
+
+        for (const [index, historico] of mesesHistoricos.entries()) {
+          const eventosHistoricos = [
+            { id: `00000000-0000-4000-8000-000000001${index}01`, estudioId: estudio.id as EstudioId, mes: historico.mes, tipo: "empresa_activa" as const, cantidad: historico.empresas, nota: "Seed historico comercial" },
+            { id: `00000000-0000-4000-8000-000000001${index}02`, estudioId: estudio.id as EstudioId, mes: historico.mes, tipo: "empleado_activo" as const, cantidad: historico.empleados, nota: "Seed historico comercial" },
+            { id: `00000000-0000-4000-8000-000000001${index}03`, estudioId: estudio.id as EstudioId, mes: historico.mes, tipo: "recibo_generado" as const, cantidad: historico.recibos, nota: "Seed historico comercial" },
+          ];
+          await tx.delete(eventosUsoFacturable).where(and(eq(eventosUsoFacturable.estudioId, estudio.id), eq(eventosUsoFacturable.mes, historico.mes)));
+          await tx.insert(eventosUsoFacturable).values(eventosHistoricos);
+
+          const resumen = generarResumenCobroEstudio({
+            mes: historico.mes,
+            plan: planResumen,
+            suscripcion: { ...suscripcionResumen, estudioId: estudio.id as EstudioId },
+            eventosUso: eventosHistoricos,
+            generado: `${historico.mes}-28T12:00:00.000Z`,
+          });
+
+          await tx
+            .insert(resumenesCobro)
+            .values({
+              id: `00000000-0000-4000-8000-00000000050${index + 1}`,
+              estudioId: resumen.estudioId,
+              mes: resumen.mes,
+              moneda: resumen.moneda,
+              suscripcionId: resumen.suscripcionId,
+              planId: resumen.planId,
+              estadoSuscripcion: resumen.estadoSuscripcion,
+              lineas: resumen.lineas,
+              eventosUso: resumen.eventosUso,
+              totalCent: resumen.totalCent,
+              notasInternas: resumen.notasInternas,
+              generado: new Date(resumen.generado),
+            })
+            .onConflictDoUpdate({
+              target: [resumenesCobro.estudioId, resumenesCobro.mes],
+              set: {
+                moneda: resumen.moneda,
+                suscripcionId: resumen.suscripcionId,
+                planId: resumen.planId,
+                estadoSuscripcion: resumen.estadoSuscripcion,
+                lineas: resumen.lineas,
+                eventosUso: resumen.eventosUso,
+                totalCent: resumen.totalCent,
+                notasInternas: resumen.notasInternas,
+                generado: new Date(resumen.generado),
+              },
+            });
+
+          const pagoId = `00000000-0000-4000-8000-00000000060${index + 1}`;
+          await tx
+            .insert(pagosEstudio)
+            .values({
+              id: pagoId,
+              estudioId: estudio.id,
+              moneda: estudio.moneda,
+              importeCent: historico.pagadoCent,
+              fecha: new Date(`${historico.mes}-29T00:00:00`),
+              medio: "transferencia",
+              referencia: `seed-pereira-${historico.mes}`,
+              nota: `Pago de ${historico.mes}`,
+            })
+            .onConflictDoUpdate({
+              target: pagosEstudio.id,
+              set: {
+                importeCent: historico.pagadoCent,
+                fecha: new Date(`${historico.mes}-29T00:00:00`),
+                medio: "transferencia",
+                referencia: `seed-pereira-${historico.mes}`,
+                nota: `Pago de ${historico.mes}`,
+              },
+            });
+
+          await tx
+            .insert(aplicacionesPago)
+            .values({
+              id: `00000000-0000-4000-8000-00000000070${index + 1}`,
+              pagoId,
+              estudioId: estudio.id,
+              mes: historico.mes,
+              importeCent: historico.pagadoCent,
+              nota: historico.pagadoCent >= resumen.totalCent ? "Pago completo seed" : "Pago parcial seed",
+            })
+            .onConflictDoUpdate({
+              target: aplicacionesPago.id,
+              set: {
+                importeCent: historico.pagadoCent,
+                nota: historico.pagadoCent >= resumen.totalCent ? "Pago completo seed" : "Pago parcial seed",
+              },
+            });
+        }
+      }
     }
   });
 

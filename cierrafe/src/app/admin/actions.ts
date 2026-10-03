@@ -20,8 +20,19 @@ export interface DatosConsolaComercial {
   planes: PlanAdmin[];
   modulos: ModuloAdmin[];
   addonsDisponibles: AddonAdmin[];
+  resumenesPorMes: Record<string, ResumenCobroAdmin>;
+  pagosRegistrados: PagoRegistradoComercial[];
   modo: "real" | "sin_backend";
   mensaje?: string;
+}
+
+export interface PagoRegistradoComercial {
+  id: string;
+  pagoId?: string;
+  estudioId: string;
+  descripcion: string;
+  importeCent: number;
+  aplicaciones: { mes: string; importeCent: number }[];
 }
 
 export interface CrearEstudioInicialInput {
@@ -117,6 +128,8 @@ export async function listarDatosConsolaComercial(): Promise<DatosConsolaComerci
       planes: [],
       modulos: [],
       addonsDisponibles: [],
+      resumenesPorMes: {},
+      pagosRegistrados: [],
       modo: "sin_backend",
       mensaje: "No hay datos comerciales cargados para mostrar la consola.",
     };
@@ -128,12 +141,17 @@ export async function listarDatosConsolaComercial(): Promise<DatosConsolaComerci
   const modulosRepo = crearModulosRepo(db);
   const suscripcionesRepo = crearSuscripcionesRepo(db);
   const usoFacturableRepo = crearUsoFacturableRepo(db);
+  const resumenesCobroRepo = crearResumenesCobroRepo(db);
+  const pagosRepo = crearPagosRepo(db);
 
-  const [estudiosBackend, planesBackend, modulosBackend, eventosUso] = await Promise.all([
+  const [estudiosBackend, planesBackend, modulosBackend, eventosUso, resumenesBackend, pagosBackend, aplicacionesBackend] = await Promise.all([
     estudiosRepo.listar(),
     planesRepo.listar(),
     modulosRepo.listarActivos(),
     usoFacturableRepo.listar({ mes: "2026-10" }),
+    resumenesCobroRepo.listar({}),
+    pagosRepo.listarPagos({}),
+    pagosRepo.listarAplicaciones({}),
   ]);
 
   const planes: PlanAdmin[] = planesBackend.map((plan) => ({
@@ -158,6 +176,29 @@ export async function listarDatosConsolaComercial(): Promise<DatosConsolaComerci
     planes,
     modulos,
     addonsDisponibles,
+    resumenesPorMes: Object.fromEntries(
+      resumenesBackend.map((resumen) => [
+        `${resumen.estudioId}:${resumen.mes}`,
+        {
+          estudioId: resumen.estudioId,
+          mes: resumen.mes,
+          moneda: resumen.moneda,
+          lineas: resumen.lineas.map((linea) => ({ ...linea, concepto: linea.moduloCodigo ? moduloNombre(linea.moduloCodigo, modulos) : linea.concepto })),
+          eventosUso: resumen.eventosUso.map((evento) => ({ tipo: evento.tipo, cantidad: evento.cantidad })),
+          totalCent: resumen.totalCent,
+          notasInternas: resumen.notasInternas,
+          generado: resumen.generado,
+        } satisfies ResumenCobroAdmin,
+      ]),
+    ),
+    pagosRegistrados: pagosBackend.map((pago) => ({
+      id: pago.id ?? `${pago.estudioId}:${pago.fecha}:${pago.importeCent}`,
+      pagoId: pago.id,
+      estudioId: pago.estudioId,
+      descripcion: pago.nota ?? `Pago de ${pago.fecha.slice(0, 7)}`,
+      importeCent: pago.importeCent,
+      aplicaciones: aplicacionesBackend.filter((aplicacion) => aplicacion.pagoId === pago.id).map((aplicacion) => ({ mes: aplicacion.mes, importeCent: aplicacion.importeCent })),
+    })),
     estudios: estudiosBackend
       .map((estudio, index): EstudioAdmin | null => {
         const suscripcion = suscripciones[index];

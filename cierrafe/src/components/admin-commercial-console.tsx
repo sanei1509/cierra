@@ -13,6 +13,7 @@ import {
   type CrearEstudioInicialResult,
   type GenerarResumenCobroResult,
   type GuardarConfiguracionComercialResult,
+  type PagoRegistradoComercial,
   type RegistrarPagoComercialResult,
 } from "@/app/admin/actions";
 import {
@@ -147,14 +148,7 @@ const PRECIOS_MODULO_BASE: Record<string, number> = {
   labor_document_storage: 250000,
 };
 
-interface PagoRegistradoVista {
-  id: string;
-  pagoId?: string;
-  estudioId: string;
-  descripcion: string;
-  importeCent: number;
-  aplicaciones: { mes: string; importeCent: number }[];
-}
+type PagoRegistradoVista = PagoRegistradoComercial;
 
 export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: DatosConsolaComercial }) {
   const [estudios, setEstudios] = useState(datosIniciales.estudios);
@@ -175,6 +169,8 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
   const [modulosAbierto, setModulosAbierto] = useState(false);
   const [facturaAbierta, setFacturaAbierta] = useState(false);
+  const [facturasVencidasAbierto, setFacturasVencidasAbierto] = useState(false);
+  const [historicoPagosAbierto, setHistoricoPagosAbierto] = useState(false);
   const [editandoPrecioPlan, setEditandoPrecioPlan] = useState<string | null>(null);
   const [editandoPreciosModulos, setEditandoPreciosModulos] = useState(false);
   const [errorNuevo, setErrorNuevo] = useState("");
@@ -191,9 +187,18 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
   const [pagoACuentaImporte, setPagoACuentaImporte] = useState("");
   const [pagoACuentaDesdeMes, setPagoACuentaDesdeMes] = useState(() => sumarMesCobro(mesActualCobro(), 1));
   const [pagoACuentaMeses, setPagoACuentaMeses] = useState(1);
-  const [resumenesPorMes, setResumenesPorMes] = useState<Record<string, ResumenCobroAdmin>>({});
-  const [pagosDemo, setPagosDemo] = useState<Record<string, number>>({});
-  const [pagosRegistrados, setPagosRegistrados] = useState<PagoRegistradoVista[]>([]);
+  const [resumenesPorMes, setResumenesPorMes] = useState<Record<string, ResumenCobroAdmin>>(datosIniciales.resumenesPorMes);
+  const [pagosDemo, setPagosDemo] = useState<Record<string, number>>(() => {
+    const pagos: Record<string, number> = {};
+    for (const pago of datosIniciales.pagosRegistrados) {
+      for (const aplicacion of pago.aplicaciones) {
+        const key = `${pago.estudioId}:${aplicacion.mes}`;
+        pagos[key] = (pagos[key] ?? 0) + aplicacion.importeCent;
+      }
+    }
+    return pagos;
+  });
+  const [pagosRegistrados, setPagosRegistrados] = useState<PagoRegistradoVista[]>(datosIniciales.pagosRegistrados);
   const [confirmandoFactura, setConfirmandoFactura] = useState(false);
   const [pendiente, startTransition] = useTransition();
   const [pendienteNuevo, startNuevoTransition] = useTransition();
@@ -261,9 +266,18 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
   const facturasDelEstudio = Object.values(resumenesPorMes)
     .filter((resumen) => resumen.estudioId === seleccionado.id)
     .toSorted((a, b) => b.mes.localeCompare(a.mes));
+  const facturaMesActual = facturasDelEstudio.find((factura) => factura.mes === mesActualCobro());
+  const estadoFacturaMesActual = facturaMesActual ? estadoPagoDemo(facturaMesActual.totalCent, pagosDemo[`${seleccionado.id}:${facturaMesActual.mes}`] ?? 0) : null;
+  const facturaMesActualImpaga = facturaMesActual && estadoFacturaMesActual && estadoFacturaMesActual.estado !== "pagado" && estadoFacturaMesActual.estado !== "saldo_a_favor" ? facturaMesActual : null;
+  const facturasVencidasImpagas = facturasDelEstudio.filter((factura) => {
+    if (factura.mes >= mesActualCobro()) return false;
+    const estado = estadoPagoDemo(factura.totalCent, pagosDemo[`${seleccionado.id}:${factura.mes}`] ?? 0);
+    return estado.estado !== "pagado" && estado.estado !== "saldo_a_favor";
+  });
   const pagosDelEstudio = pagosRegistrados
     .filter((pago) => pago.estudioId === seleccionado.id)
     .toSorted((a, b) => (b.aplicaciones[0]?.mes ?? "").localeCompare(a.aplicaciones[0]?.mes ?? ""));
+  const mesesPagoACuentaSinFactura = mesesPagoACuentaSeleccionados.filter((mes) => !resumenesPorMes[`${seleccionado.id}:${mes}`]);
   const importeDescuentoInput = Math.abs(Number(ajusteMonto.replace(/\./g, "").replace(",", ".")));
   const puedeConfirmarDescuento = Boolean(ajusteDescripcion.trim()) && Number.isFinite(importeDescuentoInput) && importeDescuentoInput > 0;
   const vistaComercialEstudio = (estudio: EstudioAdmin) => {
@@ -504,8 +518,8 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
   };
 
   return (
-    <div className="grid gap-3 xl:grid-cols-[360px_1fr]">
-      <Panel className="overflow-hidden">
+    <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
+      <Panel className="min-w-0 overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-linea px-5 py-4">
           <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
             <ShieldCheck size={18} className="text-petroleo" /> Estudios
@@ -818,7 +832,7 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
           </Panel>
         </div>
 
-        <Panel className="overflow-hidden">
+        <Panel className="min-w-0 overflow-hidden">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-linea px-5 py-3">
             <div>
               <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
@@ -835,9 +849,9 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
             <Chip tono={tonoFactura}>{estadoFactura}</Chip>
           </div>
 
-          <div className="grid items-start gap-4 px-5 py-3 xl:grid-cols-[1fr_344px]">
-            <div>
-              <div className="grid items-end gap-3 lg:grid-cols-[220px_minmax(220px,1fr)_170px_190px]">
+          <div className="grid min-w-0 items-start gap-4 px-5 py-3 2xl:grid-cols-[minmax(0,1fr)_344px]">
+            <div className="min-w-0">
+              <div className="grid min-w-0 items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(180px,220px)_minmax(180px,1fr)_minmax(150px,170px)_minmax(170px,190px)]">
                 <label className="block">
                   <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Mes</span>
                   <select
@@ -894,7 +908,7 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
                     inputMode="decimal"
                   />
                 </label>
-                <div className="w-full sm:w-auto sm:min-w-[190px]">
+                <div className="w-full min-w-0">
                   <Boton
                     type="button"
                     variante={ajusteConfirmado || puedeConfirmarDescuento ? "primario" : "secundario"}
@@ -920,26 +934,28 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
                   <FileText size={14} /> Ver factura
                 </Boton>
               </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {!resumenGuardado ? (
-                  <Boton type="button" variante="primario" tam="sm" className="w-full" onClick={() => void emitirFacturaSiHaceFalta()} disabled={confirmandoFactura}>
+                  <Boton type="button" variante="primario" tam="sm" className="flex-1" onClick={() => void emitirFacturaSiHaceFalta()} disabled={confirmandoFactura}>
                     <Save size={14} /> {confirmandoFactura ? "Confirmando..." : "Confirmar factura"}
                   </Boton>
                 ) : facturaActualCancelable ? (
-                  <Boton type="button" variante="secundario" tam="sm" className="w-full" onClick={() => cancelarFactura()} disabled={confirmandoFactura}>
+                  <Boton type="button" variante="secundario" tam="sm" className="flex-1" onClick={() => cancelarFactura()} disabled={confirmandoFactura}>
                     <X size={14} /> Cancelar factura
                   </Boton>
                 ) : null}
-                <Boton
-                  type="button"
-                  variante="primario"
-                  tam="sm"
-                  className="w-full"
-                  onClick={() => registrarPago(estadoPago.saldoPendienteCent, 1, mesCobro)}
-                  disabled={pendientePago || confirmandoFactura || !resumenGuardado || estadoPago.saldoPendienteCent <= 0}
-                >
-                  <CreditCard size={14} /> {pendientePago ? "Registrando..." : !resumenGuardado ? "Confirmá factura" : estadoPago.saldoPendienteCent <= 0 ? "Factura paga" : "Marcar pagado"}
-                </Boton>
+                {resumenGuardado && estadoPago.saldoPendienteCent > 0 && (
+                  <Boton
+                    type="button"
+                    variante="primario"
+                    tam="sm"
+                    className="flex-1"
+                    onClick={() => registrarPago(estadoPago.saldoPendienteCent, 1, mesCobro)}
+                    disabled={pendientePago || confirmandoFactura}
+                  >
+                    <CreditCard size={14} /> {pendientePago ? "Registrando..." : "Marcar pagado"}
+                  </Boton>
+                )}
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded-lg bg-superficie px-3 py-2">
@@ -1040,6 +1056,11 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
                       </span>
                     ))}
                   </div>
+                  {mesesPagoACuentaSinFactura.length > 0 && (
+                    <p className="mt-3 rounded-lg bg-crema px-3 py-2 text-xs font-semibold text-crema-t">
+                      Falta emitir factura para: {mesesPagoACuentaSinFactura.map(nombreMesCobro).join(", ")}.
+                    </p>
+                  )}
                 </div>
               )}
               <div className="flex justify-end gap-2 border-t border-linea pt-4">
@@ -1063,39 +1084,63 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
                     }
                     registrarPago(importePagoACuentaCent, pagoACuentaMeses, pagoACuentaDesdeMes, `Pago a cuenta desde ${nombreMesCobro(pagoACuentaDesdeMes)}`);
                   }}
-                  disabled={pendientePago || confirmandoFactura || importePagoACuentaCent <= 0}
+                  disabled={pendientePago || confirmandoFactura || importePagoACuentaCent <= 0 || (pagoACuentaEnRevision && mesesPagoACuentaSinFactura.length > 0)}
                 >
-                  <CreditCard size={15} /> {pendientePago ? "Aplicando..." : pagoACuentaEnRevision ? "Confirmar pago" : "Revisar pago"}
+                  <CreditCard size={15} /> {pendientePago ? "Aplicando..." : pagoACuentaEnRevision && mesesPagoACuentaSinFactura.length > 0 ? "Faltan facturas" : pagoACuentaEnRevision ? "Confirmar pago" : "Revisar pago"}
                 </Boton>
               </div>
             </div>
           </Modal>
 
-          <div className="mt-3 rounded-xl border border-linea bg-superficie">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-linea px-4 py-2">
-              <div>
-                <p className="text-sm font-bold">Facturas</p>
-                <p className="mt-0.5 text-xs text-apagado">Facturas emitidas para este estudio.</p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <div className="rounded-xl border border-linea bg-superficie px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold">Facturas impagas vencidas</p>
+                  <p className="mt-0.5 text-xs text-apagado">Facturas anteriores al mes actual pendientes de pago.</p>
+                </div>
+                <Boton type="button" variante="secundario" tam="sm" onClick={() => setFacturasVencidasAbierto(true)} disabled={facturasVencidasImpagas.length === 0}>
+                  <FileText size={14} /> Ver {facturasVencidasImpagas.length}
+                </Boton>
               </div>
-              <span className="rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">
-                {facturasDelEstudio.length} {facturasDelEstudio.length === 1 ? "factura" : "facturas"}
-              </span>
+              {facturaMesActualImpaga && estadoFacturaMesActual && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-linea bg-hundido px-3 py-2 text-sm">
+                  <span>
+                    <span className="block font-semibold">Factura actual: {nombreMesCobro(facturaMesActualImpaga.mes)}</span>
+                    <span className="mt-0.5 block text-xs text-apagado">Pendiente {fmtCent(estadoFacturaMesActual.saldoPendienteCent, facturaMesActualImpaga.moneda)}</span>
+                  </span>
+                  <Boton type="button" variante="primario" tam="sm" onClick={() => registrarPago(estadoFacturaMesActual.saldoPendienteCent, 1, facturaMesActualImpaga.mes)} disabled={pendientePago || estadoFacturaMesActual.saldoPendienteCent <= 0}>
+                    <CreditCard size={14} /> Acreditar pago
+                  </Boton>
+                </div>
+              )}
             </div>
-            {facturasDelEstudio.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-apagado">Todavía no hay facturas emitidas. Cuando confirmes una factura, va a aparecer acá.</p>
+
+            <div className="rounded-xl border border-linea bg-superficie px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold">Histórico de pagos</p>
+                  <p className="mt-0.5 text-xs text-apagado">Pagos registrados y meses cubiertos.</p>
+                </div>
+                <Boton type="button" variante="secundario" tam="sm" onClick={() => setHistoricoPagosAbierto(true)} disabled={pagosDelEstudio.length === 0}>
+                  <CreditCard size={14} /> Ver {pagosDelEstudio.length}
+                </Boton>
+              </div>
+            </div>
+          </div>
+
+          <Modal abierto={facturasVencidasAbierto} onCerrar={() => setFacturasVencidasAbierto(false)} className="max-w-3xl" titulo="Facturas impagas vencidas">
+            {facturasVencidasImpagas.length === 0 ? (
+              <p className="text-sm text-apagado">No hay facturas vencidas pendientes.</p>
             ) : (
-              <div className="divide-y divide-linea">
-                {facturasDelEstudio.map((factura) => {
-                  const pagoFactura = estadoPagoDemo(factura.totalCent, pagosDemo[`${seleccionado.id}:${factura.mes}`] ?? 0);
-                  const estado = pagoFactura.estado === "pagado" || pagoFactura.estado === "saldo_a_favor" ? "paga" : pagoFactura.estado === "parcial" ? "parcial" : "pendiente";
-                  const puedeCancelar = pagoFactura.estado !== "pagado" && pagoFactura.estado !== "saldo_a_favor";
+              <div className="divide-y divide-linea rounded-xl border border-linea">
+                {facturasVencidasImpagas.map((factura) => {
+                  const estado = estadoPagoDemo(factura.totalCent, pagosDemo[`${seleccionado.id}:${factura.mes}`] ?? 0);
                   return (
-                    <div key={factura.mes} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                    <div key={factura.mes} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                       <span>
                         <span className="block font-semibold">Factura de {nombreMesCobro(factura.mes)}</span>
-                        <span className="mt-0.5 block text-xs text-apagado">
-                          {fmtCent(factura.totalCent, factura.moneda)} · {factura.lineas.length} {factura.lineas.length === 1 ? "concepto" : "conceptos"} · {estado}
-                        </span>
+                        <span className="mt-0.5 block text-xs text-apagado">Pendiente {fmtCent(estado.saldoPendienteCent, factura.moneda)} de {fmtCent(factura.totalCent, factura.moneda)}</span>
                       </span>
                       <div className="flex flex-wrap gap-2">
                         <Boton
@@ -1111,41 +1156,33 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
                         >
                           <FileText size={14} /> Ver factura
                         </Boton>
-                        {puedeCancelar && (
-                          <Boton type="button" variante="fantasma" tam="sm" onClick={() => cancelarFactura(factura.mes)}>
-                            <X size={14} /> Cancelar
-                          </Boton>
-                        )}
+                        <Boton type="button" variante="primario" tam="sm" onClick={() => registrarPago(estado.saldoPendienteCent, 1, factura.mes)} disabled={pendientePago || estado.saldoPendienteCent <= 0}>
+                          <CreditCard size={14} /> Acreditar pago
+                        </Boton>
+                        <Boton type="button" variante="fantasma" tam="sm" onClick={() => cancelarFactura(factura.mes)}>
+                          <X size={14} /> Cancelar
+                        </Boton>
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
-          </div>
+          </Modal>
 
-          <div className="mt-3 rounded-xl border border-linea bg-superficie">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-linea px-4 py-2">
-              <div>
-                <p className="text-sm font-bold">Pagos</p>
-                <p className="mt-0.5 text-xs text-apagado">Historial del estudio: meses anteriores, actual y futuros.</p>
-              </div>
-              <span className="rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">
-                {pagosDelEstudio.length} {pagosDelEstudio.length === 1 ? "pago" : "pagos"}
-              </span>
-            </div>
+          <Modal abierto={historicoPagosAbierto} onCerrar={() => setHistoricoPagosAbierto(false)} className="max-w-3xl" titulo="Histórico de pagos">
             {pagosDelEstudio.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-apagado">Todavía no hay pagos registrados para este estudio.</p>
+              <p className="text-sm text-apagado">Todavía no hay pagos registrados para este estudio.</p>
             ) : (
-              <div className="divide-y divide-linea">
+              <div className="divide-y divide-linea rounded-xl border border-linea">
                 {pagosDelEstudio.map((pago) => (
-                  <div key={pago.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-2.5 text-sm">
+                  <div key={pago.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 text-sm">
                     <div>
                       <span className="block font-semibold">{pago.descripcion}</span>
                       <span className="mt-0.5 block text-xs text-apagado">{fmtCent(pago.importeCent, resumenVisible.moneda)} recibidos</span>
                       <span className="mt-2 flex flex-wrap gap-1.5">
                         {pago.aplicaciones.map((aplicacion) => {
-                          const etiqueta = aplicacion.mes === mesCobro ? "actual" : aplicacion.mes > mesCobro ? "futuro" : "anterior";
+                          const etiqueta = aplicacion.mes === mesActualCobro() ? "actual" : aplicacion.mes > mesActualCobro() ? "futuro" : "anterior";
                           return (
                             <span key={aplicacion.mes} className="rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">
                               {nombreMesCobro(aplicacion.mes)} · {etiqueta}
@@ -1166,7 +1203,7 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
                 ))}
               </div>
             )}
-          </div>
+          </Modal>
 
           {resultadoPago && (
             <AvisoAccion ok={resultadoPago.ok} mensaje={resultadoPago.mensaje} onCerrar={() => setResultadoPago(null)} />
@@ -1184,6 +1221,19 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
               <span className="no-print flex items-center justify-between gap-3 px-6 pt-6">
                 <span>Factura</span>
                 <span className="flex items-center gap-2">
+                  {!resumenGuardado && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const ok = await emitirFacturaSiHaceFalta();
+                        if (ok) setFacturaAbierta(false);
+                      }}
+                      disabled={confirmandoFactura}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-petroleo px-3 text-xs font-semibold text-white transition-colors hover:bg-petroleo-2 disabled:bg-hundido disabled:text-apagado"
+                    >
+                      <Save size={13} /> {confirmandoFactura ? "Confirmando..." : "Confirmar factura"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => window.print()}
