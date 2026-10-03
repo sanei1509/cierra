@@ -1,11 +1,28 @@
 import "dotenv/config";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { crearPasswordHash } from "../auth";
 import { db, cerrarDb } from "../datos/db";
-import { credencialesPassword, empleadoVigencias, empleados, empresas, estudios, membresiaEmpresas, membresias, modulos, periodos, planModulos, planes, relacionesLaborales, usuarios } from "../datos/schema";
+import {
+  credencialesPassword,
+  empleadoVigencias,
+  empleados,
+  empresas,
+  estudios,
+  eventosUsoFacturable,
+  membresiaEmpresas,
+  membresias,
+  modulos,
+  periodos,
+  planModulos,
+  planes,
+  relacionesLaborales,
+  suscripcionAddons,
+  suscripcionesEstudio,
+  usuarios,
+} from "../datos/schema";
 import { CATALOGO_MODULOS } from "../modulos";
 import { resolverSeedDesarrollo } from "./seed-config";
-import { PLANES_COMERCIALES_BASE } from "./seed-comercial";
+import { addonComercialPorModulo, ESTUDIOS_COMERCIALES_BASE, planComercialPorCodigo, PLANES_COMERCIALES_BASE } from "./seed-comercial";
 
 async function seedDesarrollo() {
   const config = resolverSeedDesarrollo(process.env);
@@ -336,6 +353,78 @@ async function seedDesarrollo() {
       await tx.delete(planModulos).where(eq(planModulos.planId, plan.id));
       await tx.insert(planModulos).values(plan.modulos.map((moduloCodigo) => ({ planId: plan.id, moduloCodigo })));
     }
+
+    const estudiosComerciales = ESTUDIOS_COMERCIALES_BASE.map((estudio) => (estudio.id === "00000000-0000-4000-8000-000000000001" ? { ...estudio, id: config.estudioId } : estudio));
+    const mesUsoComercial = "2026-10";
+    for (const estudio of estudiosComerciales) {
+      const plan = planComercialPorCodigo(estudio.planCodigo);
+      await tx
+        .insert(estudios)
+        .values({
+          id: estudio.id,
+          nombre: estudio.nombre,
+          nombreVisible: estudio.nombre,
+          ciudad: "Montevideo",
+          emailContacto: estudio.emailContacto,
+        })
+        .onConflictDoUpdate({
+          target: estudios.id,
+          set: {
+            nombre: estudio.nombre,
+            nombreVisible: estudio.nombre,
+            emailContacto: estudio.emailContacto,
+          },
+        });
+
+      await tx
+        .insert(suscripcionesEstudio)
+        .values({
+          id: estudio.suscripcionId,
+          estudioId: estudio.id,
+          planId: plan.id,
+          estado: estudio.estado,
+          moneda: estudio.moneda,
+          precioMensualCent: plan.precioMensualCent,
+          inicio: new Date("2026-10-01T00:00:00"),
+          notasInternas: estudio.notasInternas,
+        })
+        .onConflictDoUpdate({
+          target: suscripcionesEstudio.id,
+          set: {
+            estudioId: estudio.id,
+            planId: plan.id,
+            estado: estudio.estado,
+            moneda: estudio.moneda,
+            precioMensualCent: plan.precioMensualCent,
+            inicio: new Date("2026-10-01T00:00:00"),
+            fin: null,
+            notasInternas: estudio.notasInternas,
+          },
+        });
+
+      await tx.delete(suscripcionAddons).where(eq(suscripcionAddons.suscripcionId, estudio.suscripcionId));
+      if (estudio.addons.length) {
+        await tx.insert(suscripcionAddons).values(
+          estudio.addons.map((moduloCodigo) => ({
+            suscripcionId: estudio.suscripcionId,
+            moduloCodigo,
+            precioMensualCent: addonComercialPorModulo(moduloCodigo)?.precioMensualCent ?? 0,
+            inicio: new Date("2026-10-01T00:00:00"),
+          })),
+        );
+      }
+
+      await tx.delete(eventosUsoFacturable).where(and(eq(eventosUsoFacturable.estudioId, estudio.id), eq(eventosUsoFacturable.mes, mesUsoComercial)));
+      await tx.insert(eventosUsoFacturable).values(
+        estudio.eventosUso.map((evento) => ({
+          estudioId: estudio.id,
+          mes: mesUsoComercial,
+          tipo: evento.tipo,
+          cantidad: evento.cantidad,
+          nota: "Seed comercial de desarrollo",
+        })),
+      );
+    }
   });
 
   console.log("Seed de desarrollo listo:");
@@ -349,6 +438,7 @@ async function seedDesarrollo() {
   console.log("- Credenciales password dev actualizadas");
   console.log(`- Modulos comerciales: ${CATALOGO_MODULOS.length}`);
   console.log(`- Planes comerciales: ${PLANES_COMERCIALES_BASE.map((plan) => plan.codigo).join(", ")}`);
+  console.log(`- Estudios comerciales seed: ${ESTUDIOS_COMERCIALES_BASE.length}`);
 }
 
 seedDesarrollo()

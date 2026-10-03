@@ -115,3 +115,34 @@ export async function registrarPagoEstudioAdmin(
 
   return { ...guardado, estados };
 }
+
+export async function cancelarPagoEstudioAdmin(
+  ctx: AccessContext | null | undefined,
+  repos: {
+    pagos: PagosRepo;
+    auditoria: AuditoriaRepo;
+  },
+  estudioId: EstudioId,
+  pagoId: string,
+) {
+  assertAutenticado(ctx);
+  if (!puedeAdministrarSistema(ctx)) sinPermiso();
+
+  const cancelado = await repos.pagos.cancelarPago({ estudioId, pagoId });
+  if (!cancelado.pago) noEncontrado("No encontramos el pago para cancelar", { estudioId, pagoId });
+
+  await repos.auditoria.registrar(tenantParaEstudio(ctx, estudioId), {
+    actor: ctx.usuarioId,
+    entidad: "PagoEstudio",
+    entidadId: estudioId,
+    accion: "pago_estudio_cancelado",
+    detalle: `Pago cancelado por ${cancelado.pago.moneda} ${cancelado.pago.importeCent / 100}`,
+    antes: JSON.stringify({
+      pagoId,
+      importeCent: cancelado.pago.importeCent,
+      aplicaciones: cancelado.aplicaciones.map((aplicacion) => ({ mes: aplicacion.mes, importeCent: aplicacion.importeCent })),
+    }),
+  });
+
+  return cancelado;
+}

@@ -190,6 +190,27 @@ export function crearPagosRepo(db: Db): PagosRepo {
       });
     },
 
+    async cancelarPago(input) {
+      return db.transaction(async (tx) => {
+        const [pago] = await tx
+          .select()
+          .from(pagosEstudio)
+          .where(and(eq(pagosEstudio.id, input.pagoId), eq(pagosEstudio.estudioId, input.estudioId)));
+
+        if (!pago) return { pago: null, aplicaciones: [] };
+
+        const aplicaciones = await tx
+          .select()
+          .from(aplicacionesPago)
+          .where(and(eq(aplicacionesPago.pagoId, input.pagoId), eq(aplicacionesPago.estudioId, input.estudioId)));
+
+        await tx.delete(aplicacionesPago).where(and(eq(aplicacionesPago.pagoId, input.pagoId), eq(aplicacionesPago.estudioId, input.estudioId)));
+        await tx.delete(pagosEstudio).where(and(eq(pagosEstudio.id, input.pagoId), eq(pagosEstudio.estudioId, input.estudioId)));
+
+        return { pago: mapPago(pago), aplicaciones: aplicaciones.map(mapAplicacion) };
+      });
+    },
+
     async listarPagos(filtros) {
       const rows = await db
         .select()

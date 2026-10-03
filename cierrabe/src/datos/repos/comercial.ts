@@ -1,17 +1,19 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../db";
 import type { EstudioId, UsuarioId } from "../contexto";
-import type { PlanesRepo, SuscripcionesRepo } from "../contratos";
+import type { ModulosRepo, PlanesRepo, SuscripcionesRepo } from "../contratos";
 import { noEncontrado } from "../errores";
 import { moduloOverrides, planModulos, planes, suscripcionAddons, suscripcionesEstudio } from "../schema";
+import { modulos } from "../schema";
 import type { AddonSuscripcion, CrearSuscripcionEstudioInput, Moneda, OverrideModulo, PlanComercial, SuscripcionEstudio } from "../../facturacion";
-import type { CodigoModulo } from "../../modulos";
+import type { CodigoModulo, ModuloCatalogo } from "../../modulos";
 
 type PlanRow = typeof planes.$inferSelect;
 type PlanModuloRow = typeof planModulos.$inferSelect;
 type SuscripcionRow = typeof suscripcionesEstudio.$inferSelect;
 type AddonRow = typeof suscripcionAddons.$inferSelect;
 type OverrideRow = typeof moduloOverrides.$inferSelect;
+type ModuloRow = typeof modulos.$inferSelect;
 
 const fecha = (valor: Date | string | null | undefined) => {
   if (!valor) return undefined;
@@ -83,6 +85,36 @@ export function crearPlanesRepo(db: Db): PlanesRepo {
       if (!plan) return null;
       const modulos = await db.select().from(planModulos).where(eq(planModulos.planId, plan.id));
       return mapPlan(plan, modulos);
+    },
+  };
+}
+
+function mapModulo(row: ModuloRow): ModuloCatalogo {
+  return {
+    codigo: row.codigo as CodigoModulo,
+    nombre: row.nombre,
+    descripcion: row.descripcion,
+    estado: row.estado,
+    alcance: row.alcance,
+    dependeDe: row.dependeDe as CodigoModulo[],
+  };
+}
+
+export function crearModulosRepo(db: Db): ModulosRepo {
+  return {
+    async listarCatalogo() {
+      const rows = await db.select().from(modulos);
+      return rows.map(mapModulo);
+    },
+
+    async listarActivos() {
+      const rows = await db.select().from(modulos).where(inArray(modulos.estado, ["activo", "beta"]));
+      return rows.map(mapModulo);
+    },
+
+    async obtenerPorCodigo(codigo) {
+      const [row] = await db.select().from(modulos).where(eq(modulos.codigo, codigo)).limit(1);
+      return row ? mapModulo(row) : null;
     },
   };
 }

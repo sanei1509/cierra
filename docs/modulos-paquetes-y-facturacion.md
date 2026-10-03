@@ -50,6 +50,7 @@ Ejemplos:
 - Envio automatico por WhatsApp.
 - Importacion masiva desde Excel.
 - Exportacion BPS.
+- Dispersion de sueldos.
 - Auditoria avanzada.
 - Reportes avanzados.
 - Multiusuario dentro del estudio.
@@ -69,6 +70,7 @@ Estos modulos salen del archivo Excel de RRHH usado como referencia inicial:
 | `leave_management` | Licencias | Licencias, licencia gozada y saldos futuros |
 | `salary_history` | Historia laboral/salarial | Historia y vigencias de sueldo/categoria |
 | `accounting_entries` | Asiento de sueldos | Asiento sueldos y cuentas contables |
+| `salary_disbursement` | Dispersion de sueldos | Control de liquidaciones, ordenes de pago y transferencias |
 | `company_portal` | Portal empresa | Carga de novedades y aprobacion de liquidaciones |
 | `employee_portal` | Portal empleado | Consulta personal de recibos y datos |
 | `bulk_import_excel` | Importacion Excel | Alta/carga masiva desde planillas |
@@ -124,6 +126,7 @@ Incluye:
 - Portal empresa
 No incluye:
 - Envio automatico de recibos
+- Dispersion de sueldos
 - Reportes avanzados
 ```
 
@@ -132,6 +135,7 @@ Un modulo que se vende aparte del paquete.
 
 Ejemplos:
 - Envio automatico de recibos.
+- Dispersion de sueldos.
 - WhatsApp.
 - Reportes avanzados.
 - Firma digital.

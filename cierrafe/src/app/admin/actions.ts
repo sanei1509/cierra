@@ -1,16 +1,27 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { configurarSuscripcionEstudio, crearEstudioConAccesoInicial, generarResumenCobroAdmin, registrarPagoEstudioAdmin } from "cierrabe/acciones";
+import { cancelarPagoEstudioAdmin, configurarSuscripcionEstudio, crearEstudioConAccesoInicial, generarResumenCobroAdmin, registrarPagoEstudioAdmin } from "cierrabe/acciones";
 import type { EstudioId } from "cierrabe/datos/contexto";
-import { crearAuditoriaRepo, crearEstudiosRepo, crearPagosRepo, crearPlanesRepo, crearResumenesCobroRepo, crearSuscripcionesRepo, crearUsoFacturableRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
+import { crearAuditoriaRepo, crearEstudiosRepo, crearModulosRepo, crearPagosRepo, crearPlanesRepo, crearResumenesCobroRepo, crearSuscripcionesRepo, crearUsoFacturableRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
 import type { AjusteManualCobro, CrearSuscripcionEstudioInput } from "cierrabe/facturacion";
 import { contextoAdminDesarrollo, uuidValido } from "@/lib/backend-dev-context";
-import { ADDONS_ADMIN, planPorCodigo, resumenCobroDemo, type AjusteCobroAdmin, type CodigoModulo, type EstudioAdmin, type ResumenCobroAdmin } from "@/lib/comercial-demo";
+import { moduloNombre, planPorCodigo, resumenCobroDemo, type AddonAdmin, type AjusteCobroAdmin, type CodigoModulo, type EstudioAdmin, type ModuloAdmin, type PlanAdmin, type ResumenCobroAdmin } from "@/lib/comercial-demo";
 import { obtenerSesionDev } from "@/lib/dev-auth";
 
 export interface GuardarConfiguracionComercialInput {
   estudio: EstudioAdmin;
+  planesDisponibles: PlanAdmin[];
+  addonsDisponibles: AddonAdmin[];
+}
+
+export interface DatosConsolaComercial {
+  estudios: EstudioAdmin[];
+  planes: PlanAdmin[];
+  modulos: ModuloAdmin[];
+  addonsDisponibles: AddonAdmin[];
+  modo: "real" | "sin_backend";
+  mensaje?: string;
 }
 
 export interface CrearEstudioInicialInput {
@@ -32,6 +43,18 @@ export interface RegistrarPagoComercialResult {
   mensaje: string;
   modo: "real" | "demo";
   pagadoCent: number;
+  pagoId?: string;
+}
+
+export interface CancelarPagoComercialInput {
+  estudio: EstudioAdmin;
+  pagoId?: string;
+}
+
+export interface CancelarPagoComercialResult {
+  ok: boolean;
+  mensaje: string;
+  modo: "real" | "demo";
 }
 
 export interface GuardarConfiguracionComercialResult {
@@ -57,16 +80,19 @@ export interface GenerarResumenCobroResult {
   resumen: ResumenCobroAdmin;
 }
 
-function addonInput(codigos: CodigoModulo[], inicio: string) {
-  return ADDONS_ADMIN.filter((addon) => codigos.includes(addon.moduloCodigo)).map((addon) => ({
-    moduloCodigo: addon.moduloCodigo,
-    precioMensualCent: addon.precioMensualCent,
-    inicio,
-  }));
+function addonInput(codigos: CodigoModulo[], inicio: string, addonsDisponibles: AddonAdmin[]) {
+  return addonsDisponibles
+    .filter((addon) => codigos.includes(addon.moduloCodigo))
+    .map((addon) => ({
+      moduloCodigo: addon.moduloCodigo,
+      precioMensualCent: addon.precioMensualCent,
+      inicio,
+    })) as CrearSuscripcionEstudioInput["addons"];
 }
 
-function suscripcionDesdeEstudio(estudio: EstudioAdmin): CrearSuscripcionEstudioInput {
-  const plan = planPorCodigo(estudio.planCodigo);
+function suscripcionDesdeEstudio(estudio: EstudioAdmin, planes: PlanAdmin[], addonsDisponibles: AddonAdmin[]): CrearSuscripcionEstudioInput {
+  const plan = planPorCodigo(estudio.planCodigo, planes);
+  if (!plan) throw new Error("No encontramos el plan comercial seleccionado.");
   const inicio = new Date().toISOString().slice(0, 10);
 
   return {
@@ -77,19 +103,88 @@ function suscripcionDesdeEstudio(estudio: EstudioAdmin): CrearSuscripcionEstudio
     precioMensualCent: plan.precioMensualCent,
     inicio,
     notasInternas: estudio.notas,
-    addons: addonInput(estudio.addons, inicio),
+    addons: addonInput(estudio.addons, inicio, addonsDisponibles),
     overrides: [],
     resumen: `Configuracion comercial de ${estudio.nombre}: ${plan.nombre}`,
   };
 }
 
-export async function guardarConfiguracionComercial(input: GuardarConfiguracionComercialInput): Promise<GuardarConfiguracionComercialResult> {
+export async function listarDatosConsolaComercial(): Promise<DatosConsolaComercial> {
   const adminDesarrollo = contextoAdminDesarrollo(await obtenerSesionDev());
   if (!adminDesarrollo) {
     return {
+      estudios: [],
+      planes: [],
+      modulos: [],
+      addonsDisponibles: [],
+      modo: "sin_backend",
+      mensaje: "No hay datos comerciales cargados para mostrar la consola.",
+    };
+  }
+
+  const { db } = await import("cierrabe/datos/db");
+  const estudiosRepo = crearEstudiosRepo(db);
+  const planesRepo = crearPlanesRepo(db);
+  const modulosRepo = crearModulosRepo(db);
+  const suscripcionesRepo = crearSuscripcionesRepo(db);
+  const usoFacturableRepo = crearUsoFacturableRepo(db);
+
+  const [estudiosBackend, planesBackend, modulosBackend, eventosUso] = await Promise.all([
+    estudiosRepo.listar(),
+    planesRepo.listar(),
+    modulosRepo.listarActivos(),
+    usoFacturableRepo.listar({ mes: "2026-10" }),
+  ]);
+
+  const planes: PlanAdmin[] = planesBackend.map((plan) => ({
+    id: plan.id,
+    codigo: plan.codigo,
+    nombre: plan.nombre,
+    precioMensualCent: plan.precioMensualCent,
+    modulos: plan.modulos,
+  }));
+  const modulos: ModuloAdmin[] = modulosBackend.map((modulo) => ({ codigo: modulo.codigo, nombre: modulo.nombre, estado: modulo.estado }));
+  const suscripciones = await Promise.all(estudiosBackend.map((estudio) => suscripcionesRepo.obtenerVigente(estudio.id)));
+  const addonsDisponibles = [
+    ...new Map(
+      suscripciones
+        .flatMap((suscripcion) => suscripcion?.addons ?? [])
+        .map((addon) => [addon.moduloCodigo, { moduloCodigo: addon.moduloCodigo, precioMensualCent: addon.precioMensualCent }] as const),
+    ).values(),
+  ];
+
+  return {
+    modo: "real",
+    planes,
+    modulos,
+    addonsDisponibles,
+    estudios: estudiosBackend
+      .map((estudio, index): EstudioAdmin | null => {
+        const suscripcion = suscripciones[index];
+        const plan = suscripcion ? planesBackend.find((p) => p.id === suscripcion.planId) : null;
+        if (!suscripcion || !plan) return null;
+        return {
+          id: estudio.id,
+          nombre: estudio.nombreVisible ?? estudio.nombre,
+          estado: suscripcion.estado === "cancelado" || suscripcion.estado === "vencido" ? "pausado" : suscripcion.estado,
+          planCodigo: plan.codigo,
+          addons: suscripcion.addons.map((addon) => addon.moduloCodigo),
+          moneda: suscripcion.moneda,
+          notas: suscripcion.notasInternas ?? "",
+          eventosUso: eventosUso.filter((evento) => evento.estudioId === estudio.id).map((evento) => ({ tipo: evento.tipo, cantidad: evento.cantidad })),
+        };
+      })
+      .filter((estudio): estudio is EstudioAdmin => Boolean(estudio)),
+  };
+}
+
+export async function guardarConfiguracionComercial(input: GuardarConfiguracionComercialInput): Promise<GuardarConfiguracionComercialResult> {
+  const adminDesarrollo = contextoAdminDesarrollo(await obtenerSesionDev());
+  if (!adminDesarrollo || !uuidValido(input.estudio.id)) {
+    return {
       ok: true,
       modo: "demo",
-      mensaje: "Guardado simulado: falta DATABASE_URL o CIERRA_DEV_ADMIN_ID con UUID real.",
+      mensaje: "Guardado en modo demo.",
     };
   }
 
@@ -102,14 +197,14 @@ export async function guardarConfiguracionComercial(input: GuardarConfiguracionC
       auditoria: crearAuditoriaRepo(db),
     },
     input.estudio.id as EstudioId,
-    suscripcionDesdeEstudio(input.estudio),
+    suscripcionDesdeEstudio(input.estudio, input.planesDisponibles, input.addonsDisponibles),
   );
 
   revalidatePath("/admin");
   return {
     ok: true,
     modo: "real",
-    mensaje: "Configuracion comercial guardada en el backend.",
+    mensaje: "Cambios guardados.",
   };
 }
 
@@ -119,7 +214,7 @@ export async function crearEstudioInicialAdmin(input: CrearEstudioInicialInput):
     return {
       ok: true,
       modo: "demo",
-      mensaje: "Estudio creado en demo: falta DATABASE_URL o admin de desarrollo con UUID real.",
+      mensaje: "Estudio creado en modo demo.",
     };
   }
 
@@ -148,7 +243,7 @@ export async function crearEstudioInicialAdmin(input: CrearEstudioInicialInput):
   return {
     ok: true,
     modo: "real",
-    mensaje: `Estudio guardado en backend con acceso inicial para ${res.usuario.email}.`,
+    mensaje: `Estudio creado con acceso inicial para ${res.usuario.email}.`,
     estudioId: res.estudio.id,
   };
 }
@@ -162,13 +257,14 @@ function ajustesBackend(ajustes: AjusteCobroAdmin[] | undefined): AjusteManualCo
 }
 
 export async function generarResumenCobroComercial(input: GenerarResumenCobroInput): Promise<GenerarResumenCobroResult> {
-  const resumenDemo = resumenCobroDemo(input.estudio, input.mes, input.ajustes);
+  const datos = await listarDatosConsolaComercial();
+  const resumenDemo = resumenCobroDemo(input.estudio, input.mes, input.ajustes, datos.planes, datos.addonsDisponibles, datos.modulos);
   const adminDesarrollo = contextoAdminDesarrollo(await obtenerSesionDev());
   if (!adminDesarrollo || !uuidValido(input.estudio.id)) {
     return {
       ok: true,
       modo: "demo",
-      mensaje: "Resumen simulado: falta DATABASE_URL o el estudio demo no tiene UUID real.",
+      mensaje: "Factura preparada en modo demo.",
       resumen: resumenDemo,
     };
   }
@@ -194,17 +290,17 @@ export async function generarResumenCobroComercial(input: GenerarResumenCobroInp
   return {
     ok: true,
     modo: "real",
-    mensaje: "Resumen de cobro generado y guardado en el backend.",
+    mensaje: "Factura emitida.",
     resumen: {
       estudioId: resumen.estudioId,
       mes: resumen.mes,
       moneda: resumen.moneda,
       lineas: resumen.lineas.map((linea) => ({
         tipo: linea.tipo,
-        concepto: linea.concepto,
+        concepto: linea.tipo === "addon" && linea.moduloCodigo ? moduloNombre(linea.moduloCodigo, datos.modulos) : linea.concepto,
         cantidad: linea.cantidad,
         totalCent: linea.totalCent,
-        nota: linea.nota,
+        nota: linea.tipo === "plan" ? "Precio mensual del plan." : linea.tipo === "addon" ? "Módulo adicional contratado." : linea.nota,
       })),
       eventosUso: resumen.eventosUso.map((evento) => ({ tipo: evento.tipo, cantidad: evento.cantidad })),
       totalCent: resumen.totalCent,
@@ -226,7 +322,7 @@ export async function registrarPagoComercial(input: RegistrarPagoComercialInput)
   }
 
   const { db } = await import("cierrabe/datos/db");
-  await registrarPagoEstudioAdmin(
+  const guardado = await registrarPagoEstudioAdmin(
     adminDesarrollo,
     {
       pagos: crearPagosRepo(db),
@@ -249,7 +345,37 @@ export async function registrarPagoComercial(input: RegistrarPagoComercialInput)
   return {
     ok: true,
     modo: "real",
-    mensaje: "Pago registrado en el backend.",
+    mensaje: "Pago registrado.",
     pagadoCent: input.importeCent,
+    pagoId: guardado.pago.id,
+  };
+}
+
+export async function cancelarPagoComercial(input: CancelarPagoComercialInput): Promise<CancelarPagoComercialResult> {
+  const adminDesarrollo = contextoAdminDesarrollo(await obtenerSesionDev());
+  if (!adminDesarrollo || !uuidValido(input.estudio.id) || !input.pagoId) {
+    return {
+      ok: true,
+      modo: "demo",
+      mensaje: "Pago cancelado.",
+    };
+  }
+
+  const { db } = await import("cierrabe/datos/db");
+  await cancelarPagoEstudioAdmin(
+    adminDesarrollo,
+    {
+      pagos: crearPagosRepo(db),
+      auditoria: crearAuditoriaRepo(db),
+    },
+    input.estudio.id as EstudioId,
+    input.pagoId,
+  );
+
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    modo: "real",
+    mensaje: "Pago cancelado.",
   };
 }

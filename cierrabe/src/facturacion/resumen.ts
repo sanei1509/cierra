@@ -93,18 +93,18 @@ export function generarResumenCobroEstudio(input: GenerarResumenCobroInput): Res
       importeUnitarioCent: input.suscripcion.precioMensualCent,
       totalCent: input.suscripcion.precioMensualCent,
       planId: input.plan.id,
-      nota: "Precio fijo mensual acordado en la suscripcion.",
+      nota: "Precio mensual del plan.",
     });
 
     for (const addon of input.suscripcion.addons) {
       lineas.push({
         tipo: "addon",
-        concepto: `Add-on ${addon.moduloCodigo}`,
+        concepto: "Modulo adicional",
         cantidad: 1,
         importeUnitarioCent: addon.precioMensualCent,
         totalCent: addon.precioMensualCent,
         moduloCodigo: addon.moduloCodigo,
-        nota: "Precio fijo mensual acordado para el modulo adicional.",
+        nota: "Modulo adicional contratado.",
       });
     }
   }

@@ -146,7 +146,7 @@ export function Drawer({ abierto, onCerrar, titulo, subtitulo, children, ancho =
   );
 }
 
-export function Modal({ abierto, onCerrar, titulo, children }: { abierto: boolean; onCerrar: () => void; titulo: ReactNode; children: ReactNode }) {
+export function Modal({ abierto, onCerrar, titulo, children, className }: { abierto: boolean; onCerrar: () => void; titulo: ReactNode; children: ReactNode; className?: string }) {
   useEffect(() => {
     if (!abierto) return;
     const f = (e: KeyboardEvent) => e.key === "Escape" && onCerrar();
@@ -156,8 +156,8 @@ export function Modal({ abierto, onCerrar, titulo, children }: { abierto: boolea
   if (!abierto) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal>
-      <button className="entra-fade absolute inset-0 bg-[#0B1220]/50 backdrop-blur-[2px]" aria-label="Cerrar" onClick={onCerrar} />
-      <div className="entra-fade relative w-full max-w-md rounded-[var(--radius-panel)] border border-linea bg-superficie p-6 shadow-xl">
+      <button className="no-print entra-fade absolute inset-0 bg-[#0B1220]/50 backdrop-blur-[2px]" aria-label="Cerrar" onClick={onCerrar} />
+      <div className={clsx("entra-fade relative w-full max-w-md rounded-[var(--radius-panel)] border border-linea bg-superficie p-6 shadow-xl", className)}>
         <h2 className="text-lg font-bold tracking-tight">{titulo}</h2>
         <div className="mt-3">{children}</div>
       </div>

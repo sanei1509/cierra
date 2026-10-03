@@ -154,6 +154,11 @@ function mapPeriodo(row: PeriodoRow): Periodo {
 
 export function crearEstudiosRepo(db: Db): EstudiosRepo {
   return {
+    async listar() {
+      const rows = await db.select().from(estudios).orderBy(desc(estudios.creado));
+      return rows.map(mapEstudio);
+    },
+
     async crear(input: CrearEstudioInput) {
       const [row] = await db
         .insert(estudios)

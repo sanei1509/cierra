@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowLeft, Building2, Layers3, ReceiptText, ShieldCheck, Users, UserCog } from "lucide-react";
-import { entrarComoDesarrollo } from "../login/actions";
+import { Building2, Layers3, LogOut, Menu, ReceiptText, ShieldCheck, Users, UserCog } from "lucide-react";
+import { listarDatosConsolaComercial } from "./actions";
+import { cerrarSesion, entrarComoDesarrollo } from "../login/actions";
 import { AdminCommercialConsole } from "@/components/admin-commercial-console";
 import { Boton, Panel } from "@/components/ui";
 import { Logo } from "@/components/shell";
@@ -12,29 +13,39 @@ const accesos = [
   { href: "/documentos", titulo: "Recibos y BPS", detalle: "Documentos publicados y archivo de nomina.", icon: ReceiptText },
 ];
 
-export default function AdminSistema() {
+export default async function AdminSistema() {
   const actuarComoEstudio = entrarComoDesarrollo.bind(null, "admin_as_study");
+  const datosComerciales = await listarDatosConsolaComercial();
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl space-y-3 p-3">
-      <Panel className="flex flex-wrap items-center justify-between gap-4 px-6 py-5">
-        <Logo />
-        <Boton variante="secundario" href="/">
-          <ArrowLeft size={15} /> Volver al estudio
-        </Boton>
-      </Panel>
+    <main className="min-h-screen space-y-3 px-3 py-2 sm:px-4">
+      <header className="flex h-14 items-center justify-between gap-3">
+        <Logo className="w-[132px]" />
+        <details className="group relative">
+          <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-xl border border-linea bg-superficie text-tinta shadow-[0_1px_2px_rgb(16_34_71/0.05)] transition-colors hover:bg-hundido [&::-webkit-details-marker]:hidden" aria-label="Abrir menú de cuenta">
+            <Menu size={18} />
+          </summary>
+          <div className="absolute right-0 top-12 z-20 w-44 rounded-xl border border-linea bg-superficie p-1.5 shadow-[var(--cierra-shadow-soft)]">
+            <form action={cerrarSesion}>
+              <button type="submit" className="flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-tinta-2 hover:bg-hundido hover:text-tinta">
+                <LogOut size={15} /> Salir
+              </button>
+            </form>
+          </div>
+        </details>
+      </header>
 
-      <Panel className="px-7 py-6">
+      <section className="rounded-[var(--radius-panel)] border border-linea/80 bg-superficie px-5 py-4">
         <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.08em] text-petroleo">
           <ShieldCheck size={16} /> Admin sistema
         </p>
-        <h1 className="mt-2 text-[34px] font-extrabold leading-tight tracking-tight">Control general de Cierra</h1>
-        <p className="mt-2 max-w-3xl text-[15px] text-apagado">
-          Pantalla provisoria para desarrollo. Este rol va a administrar estudios, accesos, modulos contratados, precios, actividad global y soporte.
+        <h1 className="mt-1 text-[28px] font-extrabold leading-tight tracking-tight">Control general de Cierra</h1>
+        <p className="mt-1 max-w-3xl text-sm leading-relaxed text-apagado">
+          Administrá estudios, accesos, módulos contratados, precios, actividad global y soporte desde un único lugar.
         </p>
-      </Panel>
+      </section>
 
-      <AdminCommercialConsole />
+      <AdminCommercialConsole datosIniciales={datosComerciales} />
 
       <div className="grid gap-3 md:grid-cols-2">
         <Panel className="p-5">

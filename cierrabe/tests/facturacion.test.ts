@@ -101,6 +101,19 @@ describe("planes y suscripciones", () => {
     ).toEqual(["rrhh_core", "salary_history", "payroll_core", "employee_portal", "automatic_receipt_email"]);
   });
 
+  it("habilita todos los modulos activos y beta mientras el estudio esta en prueba", () => {
+    const habilitados = modulosContratados(plan, { ...suscripcion, estado: "prueba", addons: [], overrides: [] });
+
+    expect(habilitados).toContain("payroll_core");
+    expect(habilitados).toContain("salary_disbursement");
+    expect(habilitados).toContain("advanced_reports");
+    expect(habilitados).not.toContain("automatic_receipt_whatsapp");
+  });
+
+  it("deja una suscripcion pausada sin modulos operativos", () => {
+    expect(modulosContratados(plan, { ...suscripcion, estado: "pausado" })).toEqual([]);
+  });
+
   it("calcula precio mensual fijo del plan mas add-ons", () => {
     expect(totalMensualContratado(suscripcion)).toBe(185000);
   });

@@ -157,6 +157,7 @@ export interface RegistrarReciboVistaInput {
 }
 
 export interface EstudiosRepo {
+  listar(): Promise<Estudio[]>;
   crear(input: CrearEstudioInput): Promise<Estudio>;
   obtener(ctx: Pick<TenantContext, "estudioId">): Promise<Estudio | null>;
   actualizarPerfil(ctx: TenantContext, input: ActualizarPerfilEstudioInput): Promise<Estudio>;
@@ -238,6 +239,7 @@ export interface ResumenesCobroRepo {
 
 export interface PagosRepo {
   registrarPago(input: PagoEstudio, aplicaciones: Omit<AplicacionPago, "pagoId">[]): Promise<{ pago: PagoEstudio; aplicaciones: AplicacionPago[] }>;
+  cancelarPago(input: { estudioId: EstudioId; pagoId: string }): Promise<{ pago: PagoEstudio | null; aplicaciones: AplicacionPago[] }>;
   listarPagos(filtros: { estudioId?: EstudioId }): Promise<PagoEstudio[]>;
   listarAplicaciones(filtros: { estudioId?: EstudioId; mes?: string }): Promise<AplicacionPago[]>;
 }

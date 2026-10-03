@@ -1,7 +1,7 @@
 import type { EstudioId, UsuarioId } from "../datos/contexto";
 import type { PlanesRepo, SuscripcionesRepo } from "../datos/contratos";
 import { moduloNoContratado, noEncontrado, suscripcionInactiva, validacion } from "../datos/errores";
-import { expandirDependencias, moduloParaFuncion, obtenerModulo, type CodigoFuncionOpcional, type CodigoModulo } from "../modulos";
+import { CATALOGO_MODULOS, expandirDependencias, moduloParaFuncion, obtenerModulo, type CodigoFuncionOpcional, type CodigoModulo } from "../modulos";
 
 export type Moneda = "UYU" | "USD";
 export type EstadoPlan = "activo" | "oculto" | "discontinuado";
@@ -110,6 +110,9 @@ export function validarSuscripcionEstudio(input: CrearSuscripcionEstudioInput) {
 
 export function modulosContratados(plan: PlanComercial, suscripcion: Pick<SuscripcionEstudio, "estado" | "addons" | "overrides">) {
   if (["pausado", "cancelado", "vencido"].includes(suscripcion.estado)) return [];
+  if (suscripcion.estado === "prueba") {
+    return CATALOGO_MODULOS.filter((modulo) => modulo.estado === "activo" || modulo.estado === "beta").map((modulo) => modulo.codigo);
+  }
 
   const habilitados = new Set(expandirDependencias([...plan.modulos, ...suscripcion.addons.map((addon) => addon.moduloCodigo)]));
   for (const override of suscripcion.overrides) {

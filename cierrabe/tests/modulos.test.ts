@@ -17,6 +17,7 @@ const modulosExcel: CodigoModulo[] = [
   "leave_management",
   "salary_history",
   "accounting_entries",
+  "salary_disbursement",
 ];
 
 describe("catalogo de modulos", () => {
@@ -50,6 +51,7 @@ describe("catalogo de modulos", () => {
 
   it("conecta funciones opcionales con codigos de modulo", () => {
     expect(moduloParaFuncion("emitir_recibos")).toBe("payroll_receipts");
+    expect(moduloParaFuncion("gestionar_dispersion_sueldos")).toBe("salary_disbursement");
     expect(obtenerModulo(moduloParaFuncion("enviar_recibos_email"))?.estado).toBe("beta");
   });
 });

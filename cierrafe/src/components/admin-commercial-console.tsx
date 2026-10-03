@@ -1,34 +1,35 @@
 "use client";
 
 import clsx from "clsx";
-import { Calculator, Check, CircleDollarSign, ClipboardList, CreditCard, FileClock, Layers3, Plus, Save, Settings2, ShieldCheck } from "lucide-react";
+import { Calculator, CircleDollarSign, ClipboardList, CreditCard, FileClock, FileText, Layers3, Pencil, Plus, Printer, Save, ShieldCheck, Undo2, X } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import {
   generarResumenCobroComercial,
   guardarConfiguracionComercial,
   crearEstudioInicialAdmin,
+  cancelarPagoComercial,
   registrarPagoComercial,
+  type DatosConsolaComercial,
   type CrearEstudioInicialResult,
   type GenerarResumenCobroResult,
   type GuardarConfiguracionComercialResult,
   type RegistrarPagoComercialResult,
 } from "@/app/admin/actions";
 import {
-  ADDONS_ADMIN,
   estadoPagoDemo,
-  ESTUDIOS_ADMIN,
   fmtCent,
-  modulosHabilitados,
   moduloNombre,
-  PLANES_ADMIN,
   planPorCodigo,
   resumenCobroDemo,
   totalMensualCent,
   type AjusteCobroAdmin,
   type CodigoModulo,
   type EstudioAdmin,
+  type PlanAdmin,
+  type ResumenCobroAdmin,
 } from "@/lib/comercial-demo";
-import { Boton, Campo, Chip, Drawer, Panel, inputCls } from "./ui";
+import { Logo } from "./shell";
+import { Boton, Campo, Chip, Drawer, Modal, Panel, inputCls } from "./ui";
 
 function slugId(s: string) {
   return s
@@ -42,7 +43,7 @@ function slugId(s: string) {
 
 function estadoChip(estado: EstudioAdmin["estado"]) {
   if (estado === "activo") return <Chip tono="menta">Activo</Chip>;
-  if (estado === "prueba") return <Chip tono="crema">Prueba</Chip>;
+  if (estado === "prueba") return <Chip tono="crema">En prueba</Chip>;
   return <Chip tono="rosa">Pausado</Chip>;
 }
 
@@ -58,39 +59,221 @@ function usoNombre(tipo: string) {
   return tipo;
 }
 
-export function AdminCommercialConsole() {
-  const [estudios, setEstudios] = useState(ESTUDIOS_ADMIN);
-  const [seleccionadoId, setSeleccionadoId] = useState(estudios[0].id);
+function AvisoAccion({ ok, mensaje, onCerrar }: { ok: boolean; mensaje: string; onCerrar: () => void }) {
+  return (
+    <div className={clsx("mt-4 flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold", ok ? "bg-menta text-menta-t" : "bg-rosa text-rosa-t")} role={ok ? "status" : "alert"}>
+      <span>{mensaje}</span>
+      <button type="button" onClick={onCerrar} className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg hover:bg-white/45" aria-label="Cerrar aviso">
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+function mismaConfiguracion(a: EstudioAdmin | undefined, b: EstudioAdmin | undefined) {
+  if (!a || !b) return false;
+  return (
+    a.planCodigo === b.planCodigo &&
+    a.estado === b.estado &&
+    a.moneda === b.moneda &&
+    a.notas === b.notas &&
+    [...a.addons].sort().join("|") === [...b.addons].sort().join("|")
+  );
+}
+
+function ayudaEstado(estado: EstudioAdmin["estado"]) {
+  if (estado === "activo") return "Funciona todo lo contratado y guarda los cambios en la base.";
+  if (estado === "prueba") return "Puede probar todos los modulos con datos de prueba; lo que cargue no deberia quedar como trabajo definitivo.";
+  return "Queda solo en modo consulta: no opera modulos ni guarda cambios de trabajo.";
+}
+
+function modulosIncrementales(indice: number, planes: { modulos: CodigoModulo[] }[]) {
+  if (indice === 0) return planes[0]?.modulos ?? [];
+  const previos = new Set(planes.slice(0, indice).flatMap((plan) => plan.modulos));
+  return planes[indice]?.modulos.filter((modulo) => !previos.has(modulo)) ?? [];
+}
+
+function pesosDesdeCent(cent: number) {
+  return String(Math.round(cent / 100));
+}
+
+function nombreMesCobro(mes: string) {
+  const [anio, mesNumero] = mes.split("-").map(Number);
+  if (!anio || !mesNumero) return mes;
+  return new Intl.DateTimeFormat("es-UY", { month: "long", year: "numeric" }).format(new Date(anio, mesNumero - 1, 1));
+}
+
+function mesActualCobro() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function sumarMesCobro(mes: string, cantidad: number) {
+  const [anio, mesNumero] = mes.split("-").map(Number);
+  if (!anio || !mesNumero) return mesActualCobro();
+  const fecha = new Date(Date.UTC(anio, mesNumero - 1 + cantidad, 1));
+  return `${fecha.getUTCFullYear()}-${String(fecha.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function mesesResumenDisponibles(mesBase: string) {
+  return Array.from({ length: 13 }, (_, index) => sumarMesCobro(mesBase, -index));
+}
+
+function mesesFuturosDisponibles(mesBase: string) {
+  return Array.from({ length: 12 }, (_, index) => sumarMesCobro(mesBase, index + 1));
+}
+
+function centDesdePesos(valor: string) {
+  const numero = Number(valor.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(numero) && numero >= 0 ? Math.round(numero * 100) : 0;
+}
+
+const PRECIOS_MODULO_BASE: Record<string, number> = {
+  rrhh_core: 250000,
+  salary_history: 150000,
+  bulk_import_excel: 180000,
+  payroll_core: 420000,
+  payroll_receipts: 220000,
+  bps_exports: 280000,
+  irpf_calculation: 240000,
+  leave_management: 180000,
+  accounting_entries: 260000,
+  salary_disbursement: 500000,
+  company_portal: 260000,
+  employee_portal: 220000,
+  audit_basic: 120000,
+  automatic_receipt_email: 350000,
+  advanced_reports: 450000,
+  digital_receipt_acceptance: 300000,
+  labor_document_storage: 250000,
+};
+
+interface PagoRegistradoVista {
+  id: string;
+  pagoId?: string;
+  estudioId: string;
+  descripcion: string;
+  importeCent: number;
+  aplicaciones: { mes: string; importeCent: number }[];
+}
+
+export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: DatosConsolaComercial }) {
+  const [estudios, setEstudios] = useState(datosIniciales.estudios);
+  const [estudiosGuardados, setEstudiosGuardados] = useState(datosIniciales.estudios);
+  const [planes, setPlanes] = useState(datosIniciales.planes);
+  const [planesGuardados, setPlanesGuardados] = useState(datosIniciales.planes);
+  const modulosCatalogo = datosIniciales.modulos;
+  const [preciosModulo, setPreciosModulo] = useState<Record<string, number>>(() =>
+    Object.fromEntries(
+      datosIniciales.modulos.map((modulo) => [
+        modulo.codigo,
+        datosIniciales.addonsDisponibles.find((addon) => addon.moduloCodigo === modulo.codigo)?.precioMensualCent ?? PRECIOS_MODULO_BASE[modulo.codigo] ?? 200000,
+      ]),
+    ),
+  );
+  const [preciosModuloGuardados, setPreciosModuloGuardados] = useState(preciosModulo);
+  const [seleccionadoId, setSeleccionadoId] = useState(estudios[0]?.id ?? "");
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
+  const [modulosAbierto, setModulosAbierto] = useState(false);
+  const [facturaAbierta, setFacturaAbierta] = useState(false);
+  const [editandoPrecioPlan, setEditandoPrecioPlan] = useState<string | null>(null);
+  const [editandoPreciosModulos, setEditandoPreciosModulos] = useState(false);
   const [errorNuevo, setErrorNuevo] = useState("");
   const [resultadoNuevo, setResultadoNuevo] = useState<CrearEstudioInicialResult | null>(null);
   const [resultado, setResultado] = useState<GuardarConfiguracionComercialResult | null>(null);
   const [resultadoResumen, setResultadoResumen] = useState<GenerarResumenCobroResult | null>(null);
   const [resultadoPago, setResultadoPago] = useState<RegistrarPagoComercialResult | null>(null);
-  const [mesCobro, setMesCobro] = useState("2026-10");
+  const [mesCobro, setMesCobro] = useState(mesActualCobro());
   const [ajusteDescripcion, setAjusteDescripcion] = useState("");
   const [ajusteMonto, setAjusteMonto] = useState("");
-  const [ajusteNota, setAjusteNota] = useState("");
-  const [mesesAdelantados, setMesesAdelantados] = useState(1);
+  const [ajusteConfirmado, setAjusteConfirmado] = useState<AjusteCobroAdmin | null>(null);
+  const [pagoACuentaAbierto, setPagoACuentaAbierto] = useState(false);
+  const [pagoACuentaEnRevision, setPagoACuentaEnRevision] = useState(false);
+  const [pagoACuentaImporte, setPagoACuentaImporte] = useState("");
+  const [pagoACuentaDesdeMes, setPagoACuentaDesdeMes] = useState(() => sumarMesCobro(mesActualCobro(), 1));
+  const [pagoACuentaMeses, setPagoACuentaMeses] = useState(1);
+  const [resumenesPorMes, setResumenesPorMes] = useState<Record<string, ResumenCobroAdmin>>({});
   const [pagosDemo, setPagosDemo] = useState<Record<string, number>>({});
+  const [pagosRegistrados, setPagosRegistrados] = useState<PagoRegistradoVista[]>([]);
+  const [confirmandoFactura, setConfirmandoFactura] = useState(false);
   const [pendiente, startTransition] = useTransition();
   const [pendienteNuevo, startNuevoTransition] = useTransition();
-  const [pendienteResumen, startResumenTransition] = useTransition();
   const [pendientePago, startPagoTransition] = useTransition();
   const seleccionado = estudios.find((e) => e.id === seleccionadoId) ?? estudios[0];
-  const plan = planPorCodigo(seleccionado.planCodigo);
-  const modulos = useMemo(() => modulosHabilitados(seleccionado), [seleccionado]);
-  const total = totalMensualCent(seleccionado);
+  const seleccionadoGuardado = estudiosGuardados.find((e) => e.id === seleccionadoId);
+  const plan = seleccionado ? planPorCodigo(seleccionado.planCodigo, planes) : undefined;
+  const planPruebaInicial = planes.find((p) => p.codigo === "full") ?? planes.at(-1) ?? plan;
+  const addonsDisponiblesParaPlan = (planBase: PlanAdmin | undefined) => {
+    const incluidos = new Set(planBase?.modulos ?? []);
+    return modulosCatalogo
+      .filter((modulo) => !incluidos.has(modulo.codigo))
+      .map((modulo) => ({
+        moduloCodigo: modulo.codigo,
+        precioMensualCent: preciosModulo[modulo.codigo] ?? 0,
+      }));
+  };
+  const addonsCodigosParaPlan = (planBase: PlanAdmin | undefined) => addonsDisponiblesParaPlan(planBase).map((addon) => addon.moduloCodigo);
+  const addonsVisibles = seleccionado?.addons ?? [];
+  const modulosVisibles = useMemo(() => (seleccionado && plan ? [...new Set([...plan.modulos, ...addonsVisibles])] : []), [addonsVisibles, plan, seleccionado]);
+  const modulosFueraDelPlan = useMemo(() => {
+    const incluidos = new Set(plan?.modulos ?? []);
+    return modulosCatalogo
+      .filter((modulo) => !incluidos.has(modulo.codigo))
+      .map((modulo) => ({
+        moduloCodigo: modulo.codigo,
+        precioMensualCent: preciosModulo[modulo.codigo] ?? 0,
+      }));
+  }, [modulosCatalogo, plan, preciosModulo]);
+  const total = seleccionado ? totalMensualCent(seleccionado, planes, modulosFueraDelPlan) : 0;
+  const hayCambiosPreciosPlanes = JSON.stringify(planes.map((p) => [p.id, p.precioMensualCent])) !== JSON.stringify(planesGuardados.map((p) => [p.id, p.precioMensualCent]));
+  const hayCambiosPreciosModulos = JSON.stringify(preciosModulo) !== JSON.stringify(preciosModuloGuardados);
+  const hayCambiosModulos =
+    [...(seleccionado?.addons ?? [])].sort().join("|") !== [...(seleccionadoGuardado?.addons ?? [])].sort().join("|") || hayCambiosPreciosModulos;
+  const hayCambiosComerciales = !mismaConfiguracion(seleccionado, seleccionadoGuardado) || hayCambiosPreciosPlanes || hayCambiosPreciosModulos;
   const ajustes = useMemo<AjusteCobroAdmin[]>(() => {
-    const importe = Number(ajusteMonto.replace(",", "."));
-    if (!ajusteDescripcion.trim() || !Number.isFinite(importe)) return [];
-    return [{ descripcion: ajusteDescripcion.trim(), importeCent: Math.round(importe * 100), nota: ajusteNota.trim() || undefined }];
-  }, [ajusteDescripcion, ajusteMonto, ajusteNota]);
-  const resumenPreview = useMemo(() => resumenCobroDemo(seleccionado, mesCobro, ajustes), [seleccionado, mesCobro, ajustes]);
-  const resumenVisible = resultadoResumen?.resumen ?? resumenPreview;
+    return ajusteConfirmado ? [ajusteConfirmado] : [];
+  }, [ajusteConfirmado]);
+  const resumenPreview = useMemo(
+    () => (seleccionado ? resumenCobroDemo(seleccionado, mesCobro, ajustes, planes, modulosFueraDelPlan, modulosCatalogo) : null),
+    [ajustes, mesCobro, modulosCatalogo, modulosFueraDelPlan, planes, seleccionado],
+  );
+  if (!seleccionado || !plan || !resumenPreview) {
+    return (
+      <Panel className="p-5">
+        <h2 className="text-lg font-bold tracking-tight">Comercial</h2>
+        <p className="mt-2 text-sm text-apagado">{datosIniciales.mensaje ?? "No hay estudios comerciales cargados. Corré el seed de desarrollo para inicializar la consola."}</p>
+      </Panel>
+    );
+  }
+  const resumenKey = `${seleccionado.id}:${mesCobro}`;
+  const resumenGuardado = resumenesPorMes[resumenKey];
+  const resumenVisible = resumenGuardado ?? resumenPreview;
+  const mesesConResumen = Object.keys(resumenesPorMes).filter((key) => key.startsWith(`${seleccionado.id}:`)).map((key) => key.split(":")[1]);
+  const mesesSelector = [...new Set([...mesesConResumen, ...mesesResumenDisponibles(mesActualCobro())])].sort().reverse();
+  const mesesPagoACuenta = [...new Set([pagoACuentaDesdeMes, ...mesesFuturosDisponibles(mesCobro)])].sort();
+  const importePagoACuentaCent = centDesdePesos(pagoACuentaImporte);
+  const mesesPagoACuentaSeleccionados = Array.from({ length: pagoACuentaMeses }).map((_, index) => sumarMesCobro(pagoACuentaDesdeMes, index));
   const pagoKey = `${seleccionado.id}:${mesCobro}`;
   const pagadoDemoCent = pagosDemo[pagoKey] ?? 0;
   const estadoPago = estadoPagoDemo(resumenVisible.totalCent, pagadoDemoCent);
+  const estadoFactura = !resumenGuardado ? "Factura en borrador" : estadoPago.estado === "pagado" || estadoPago.estado === "saldo_a_favor" ? "Factura paga" : "Factura emitida";
+  const tonoFactura = !resumenGuardado ? "gris" : estadoPago.estado === "pagado" || estadoPago.estado === "saldo_a_favor" ? "menta" : "cielo";
+  const facturaActualCancelable = Boolean(resumenGuardado) && estadoPago.estado !== "pagado" && estadoPago.estado !== "saldo_a_favor";
+  const facturasDelEstudio = Object.values(resumenesPorMes)
+    .filter((resumen) => resumen.estudioId === seleccionado.id)
+    .toSorted((a, b) => b.mes.localeCompare(a.mes));
+  const pagosDelEstudio = pagosRegistrados
+    .filter((pago) => pago.estudioId === seleccionado.id)
+    .toSorted((a, b) => (b.aplicaciones[0]?.mes ?? "").localeCompare(a.aplicaciones[0]?.mes ?? ""));
+  const importeDescuentoInput = Math.abs(Number(ajusteMonto.replace(/\./g, "").replace(",", ".")));
+  const puedeConfirmarDescuento = Boolean(ajusteDescripcion.trim()) && Number.isFinite(importeDescuentoInput) && importeDescuentoInput > 0;
+  const vistaComercialEstudio = (estudio: EstudioAdmin) => {
+    const planBase = planPorCodigo(estudio.planCodigo, planes);
+    const addonsDisponibles = addonsDisponiblesParaPlan(planBase);
+    return {
+      plan: planBase,
+      total: totalMensualCent(estudio, planes, addonsDisponibles),
+    };
+  };
 
   const actualizar = (cambios: Partial<EstudioAdmin>) => {
     setResultado(null);
@@ -99,14 +282,21 @@ export function AdminCommercialConsole() {
     setEstudios((actuales) => actuales.map((e) => (e.id === seleccionado.id ? { ...e, ...cambios } : e)));
   };
 
+  const cambiarPlan = (codigo: string) => {
+    const planNuevo = planPorCodigo(codigo, planes);
+    const extrasPermitidos = new Set(addonsCodigosParaPlan(planNuevo));
+    actualizar({ planCodigo: codigo, addons: seleccionado.addons.filter((addon) => extrasPermitidos.has(addon)) });
+  };
+
   const crearEstudio = (form: FormData) => {
     setErrorNuevo("");
     setResultadoNuevo(null);
     const nombre = String(form.get("nombre") ?? "").trim();
     const duenoNombre = String(form.get("duenoNombre") ?? "").trim();
     const duenoEmail = String(form.get("duenoEmail") ?? "").trim().toLowerCase();
-    const planCodigo = String(form.get("planCodigo") ?? PLANES_ADMIN[0].codigo);
+    const planCodigoForm = String(form.get("planCodigo") ?? planes[0]?.codigo ?? "");
     const estado = String(form.get("estado") ?? "prueba") as EstudioAdmin["estado"];
+    const planCodigo = estado === "prueba" && planPruebaInicial ? planPruebaInicial.codigo : planCodigoForm;
     const moneda = String(form.get("moneda") ?? "UYU") as EstudioAdmin["moneda"];
     const notas = String(form.get("notas") ?? "").trim();
     if (!nombre || !duenoNombre || !/^\S+@\S+\.\S+$/.test(duenoEmail)) {
@@ -123,7 +313,7 @@ export function AdminCommercialConsole() {
           nombre,
           estado,
           planCodigo,
-          addons: [],
+          addons: estado === "prueba" ? addonsCodigosParaPlan(planPruebaInicial) : [],
           moneda,
           notas: [`Dueno inicial: ${duenoNombre} <${duenoEmail}>`, notas].filter(Boolean).join(" · "),
         };
@@ -151,53 +341,163 @@ export function AdminCommercialConsole() {
     setSeleccionadoId(id);
   };
 
-  const guardar = () => {
+  const guardar = (onOk?: () => void) => {
+    if (!hayCambiosComerciales) return;
     startTransition(async () => {
       try {
-        setResultado(await guardarConfiguracionComercial({ estudio: seleccionado }));
+        const codigosExtras = new Set(modulosFueraDelPlan.map((addon) => addon.moduloCodigo));
+        const estudioAGuardar = { ...seleccionado, addons: seleccionado.addons.filter((codigo) => codigosExtras.has(codigo)) };
+        const guardado = await guardarConfiguracionComercial({ estudio: estudioAGuardar, planesDisponibles: planes, addonsDisponibles: modulosFueraDelPlan });
+        setResultado(guardado);
+        if (guardado.ok) {
+          setEstudios((actuales) => actuales.map((e) => (e.id === seleccionado.id ? estudioAGuardar : e)));
+          setEstudiosGuardados((actuales) => actuales.map((e) => (e.id === seleccionado.id ? { ...estudioAGuardar, addons: [...estudioAGuardar.addons] } : e)));
+          setPlanesGuardados(planes);
+          setPreciosModuloGuardados(preciosModulo);
+          onOk?.();
+        }
       } catch (error) {
+        console.error(error);
         setResultado({
           ok: false,
           modo: "real",
-          mensaje: error instanceof Error ? error.message : "No pudimos guardar la configuracion comercial.",
+          mensaje: "No pudimos guardar la configuracion comercial. Revisa los datos del estudio y volve a intentar.",
         });
       }
     });
   };
 
-  const generarResumen = () => {
-    startResumenTransition(async () => {
-      try {
-        setResultadoResumen(await generarResumenCobroComercial({ estudio: seleccionado, mes: mesCobro, ajustes }));
-      } catch (error) {
-        setResultadoResumen({
-          ok: false,
-          modo: "real",
-          mensaje: error instanceof Error ? error.message : "No pudimos generar el resumen de cobro.",
-          resumen: resumenPreview,
-        });
-      }
+  const confirmarDescuento = () => {
+    if (!puedeConfirmarDescuento) return;
+    setAjusteConfirmado({
+      descripcion: ajusteDescripcion.trim(),
+      importeCent: -Math.round(importeDescuentoInput * 100),
     });
+    setResultadoResumen(null);
   };
 
-  const registrarPago = (importeCent: number, meses: number) => {
+  const quitarDescuento = () => {
+    setAjusteDescripcion("");
+    setAjusteMonto("");
+    setAjusteConfirmado(null);
+    setResultadoResumen(null);
+  };
+
+  const cancelarFactura = (mes = mesCobro) => {
+    const key = `${seleccionado.id}:${mes}`;
+    const resumen = resumenesPorMes[key];
+    if (!resumen) return;
+    const pago = estadoPagoDemo(resumen.totalCent, pagosDemo[key] ?? 0);
+    if (pago.estado === "pagado" || pago.estado === "saldo_a_favor") {
+      setResultadoResumen({ ok: false, modo: "demo", mensaje: "No se puede cancelar una factura paga. Cancelá primero el pago asociado.", resumen });
+      return;
+    }
+    setResumenesPorMes((actual) => {
+      const siguiente = { ...actual };
+      delete siguiente[key];
+      return siguiente;
+    });
+    if (mes === mesCobro) {
+      setFacturaAbierta(false);
+      setResultadoResumen({ ok: true, modo: "demo", mensaje: "Factura cancelada.", resumen: resumenPreview });
+    }
+  };
+
+  const emitirFacturaSiHaceFalta = async () => {
+    if (resumenesPorMes[resumenKey]) return true;
+    setConfirmandoFactura(true);
+    try {
+      const generado = await generarResumenCobroComercial({ estudio: seleccionado, mes: mesCobro, ajustes });
+      setResultadoResumen(generado);
+      if (!generado.ok) return false;
+      setResumenesPorMes((actual) => ({ ...actual, [resumenKey]: generado.resumen }));
+      return true;
+    } catch (error) {
+      setResultadoResumen({
+        ok: false,
+        modo: "real",
+        mensaje: error instanceof Error ? error.message : "No pudimos emitir la factura.",
+        resumen: resumenPreview,
+      });
+      return false;
+    } finally {
+      setConfirmandoFactura(false);
+    }
+  };
+
+  const registrarPago = (importeCent: number, meses: number, desdeMes = mesCobro, nota?: string) => {
+    if (importeCent <= 0) return;
     startPagoTransition(async () => {
       try {
         const resultadoPagoNuevo = await registrarPagoComercial({
           estudio: seleccionado,
-          mes: mesCobro,
+          mes: desdeMes,
           importeCent,
           mesesCubiertos: meses,
-          nota: meses > 1 ? `Pago adelantado por ${meses} meses` : "Pago mensual marcado desde consola admin",
+          nota: nota ?? (meses > 1 ? `Pago a cuenta por ${meses} meses` : "Pago mensual marcado desde consola admin"),
         });
         setResultadoPago(resultadoPagoNuevo);
-        setPagosDemo((actual) => ({ ...actual, [pagoKey]: (actual[pagoKey] ?? 0) + importeCent }));
+        const esPagoACuenta = nota?.startsWith("Pago a cuenta");
+        const aplicaciones = Array.from({ length: meses }).map((_, index) => ({
+          mes: sumarMesCobro(desdeMes, index),
+          importeCent: esPagoACuenta ? resumenVisible.totalCent : importeCent,
+        }));
+        setPagosDemo((actual) => {
+          const siguiente = { ...actual };
+          aplicaciones.forEach((aplicacion) => {
+            const key = `${seleccionado.id}:${aplicacion.mes}`;
+            siguiente[key] = esPagoACuenta ? Math.max(siguiente[key] ?? 0, aplicacion.importeCent) : (siguiente[key] ?? 0) + aplicacion.importeCent;
+          });
+          return siguiente;
+        });
+        setPagosRegistrados((actual) => [
+          {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            pagoId: resultadoPagoNuevo.pagoId,
+            estudioId: seleccionado.id,
+            descripcion: esPagoACuenta ? `Pago a cuenta desde ${nombreMesCobro(desdeMes)} · ${meses} ${meses === 1 ? "mes" : "meses"}` : `Pago de ${nombreMesCobro(desdeMes)}`,
+            importeCent,
+            aplicaciones,
+          },
+          ...actual,
+        ]);
+        if (esPagoACuenta) {
+          setPagoACuentaImporte("");
+          setPagoACuentaAbierto(false);
+          setPagoACuentaEnRevision(false);
+        }
       } catch (error) {
         setResultadoPago({
           ok: false,
           modo: "real",
           mensaje: error instanceof Error ? error.message : "No pudimos registrar el pago.",
           pagadoCent: pagadoDemoCent,
+        });
+      }
+    });
+  };
+
+  const cancelarPago = (pago: PagoRegistradoVista) => {
+    startPagoTransition(async () => {
+      try {
+        const cancelado = await cancelarPagoComercial({ estudio: seleccionado, pagoId: pago.pagoId });
+        setPagosDemo((actual) => {
+          const siguiente = { ...actual };
+          pago.aplicaciones.forEach((aplicacion) => {
+            const key = `${pago.estudioId}:${aplicacion.mes}`;
+            siguiente[key] = Math.max(0, (siguiente[key] ?? 0) - aplicacion.importeCent);
+            if (siguiente[key] === 0) delete siguiente[key];
+          });
+          return siguiente;
+        });
+        setPagosRegistrados((actual) => actual.filter((p) => p.id !== pago.id));
+        setResultadoPago({ ok: cancelado.ok, modo: cancelado.modo, mensaje: cancelado.mensaje, pagadoCent: 0 });
+      } catch (error) {
+        setResultadoPago({
+          ok: false,
+          modo: "real",
+          mensaje: error instanceof Error ? error.message : "No pudimos cancelar el pago.",
+          pagadoCent: 0,
         });
       }
     });
@@ -223,6 +523,7 @@ export function AdminCommercialConsole() {
         <div className="divide-y divide-linea">
           {estudios.map((estudio) => {
             const activo = estudio.id === seleccionado.id;
+            const vista = vistaComercialEstudio(estudio);
             return (
               <button
                 key={estudio.id}
@@ -233,7 +534,7 @@ export function AdminCommercialConsole() {
                 <span className="flex items-start justify-between gap-3">
                   <span>
                     <span className="block text-sm font-bold">{estudio.nombre}</span>
-                    <span className="mt-1 block text-xs text-apagado">{planPorCodigo(estudio.planCodigo).nombre} · {fmtCent(totalMensualCent(estudio), estudio.moneda)}</span>
+                    <span className="mt-1 block text-xs text-apagado">{vista.plan?.nombre} · {fmtCent(vista.total, estudio.moneda)}</span>
                   </span>
                   {estadoChip(estudio.estado)}
                 </span>
@@ -252,13 +553,13 @@ export function AdminCommercialConsole() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Campo label="Plan inicial">
-              <select name="planCodigo" className={inputCls} defaultValue="basico">
-                {PLANES_ADMIN.map((p) => <option key={p.codigo} value={p.codigo}>{p.nombre} · {fmtCent(p.precioMensualCent)}</option>)}
+              <select name="planCodigo" className={inputCls} defaultValue={planPruebaInicial?.codigo ?? "full"}>
+                {planes.map((p) => <option key={p.codigo} value={p.codigo}>{p.nombre} · {fmtCent(p.precioMensualCent)}</option>)}
               </select>
             </Campo>
             <Campo label="Estado">
               <select name="estado" className={inputCls} defaultValue="prueba">
-                <option value="prueba">Prueba</option>
+                <option value="prueba">En prueba</option>
                 <option value="activo">Activo</option>
                 <option value="pausado">Pausado</option>
               </select>
@@ -285,59 +586,190 @@ export function AdminCommercialConsole() {
                 <CircleDollarSign size={16} /> Comercial
               </p>
               <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{seleccionado.nombre}</h2>
-              <p className="mt-1 text-sm text-apagado">{modulos.length} modulos habilitados · {fmtCent(total, seleccionado.moneda)} mensuales</p>
+              <p className="mt-1 text-sm text-apagado">{modulosVisibles.length} modulos habilitados · {fmtCent(total, seleccionado.moneda)} mensuales</p>
             </div>
-            <Boton type="button" onClick={guardar} disabled={pendiente}>
-              <Save size={15} /> {pendiente ? "Guardando..." : "Guardar configuracion"}
-            </Boton>
           </div>
-          {resultado && (
-            <p className={clsx("mt-4 rounded-xl px-3 py-2 text-sm font-semibold", resultado.ok ? "bg-menta text-menta-t" : "bg-rosa text-rosa-t")} role="status">
-              {resultado.mensaje}
-            </p>
-          )}
         </Panel>
 
         <div className="grid gap-3 lg:grid-cols-3">
           <Panel className="p-5 lg:col-span-2">
             <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-              <Layers3 size={18} className="text-petroleo" /> Paquete y add-ons
+              <Layers3 size={18} className="text-petroleo" /> Plan y módulos
             </h3>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {PLANES_ADMIN.map((p) => (
-                <button
+            <div className="mt-4 grid items-stretch gap-3 md:grid-cols-3">
+              {planes.map((p, indice) => {
+                const extras = modulosIncrementales(indice, planes);
+                return (
+                <div
                   key={p.codigo}
-                  type="button"
-                  onClick={() => actualizar({ planCodigo: p.codigo })}
-                  className={clsx("rounded-2xl border px-4 py-3 text-left transition-colors", p.codigo === plan.codigo ? "border-petroleo bg-menta text-menta-t" : "border-linea bg-superficie hover:bg-hundido")}
+                  className={clsx("relative flex overflow-hidden rounded-2xl border text-left transition-colors", p.codigo === plan.codigo ? "border-petroleo bg-menta text-menta-t" : "border-linea bg-superficie hover:bg-hundido")}
                 >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="font-bold">{p.nombre}</span>
-                    {p.codigo === plan.codigo && <Check size={16} />}
-                  </span>
-                  <span className="mt-1 block text-xs">{fmtCent(p.precioMensualCent)}</span>
-                  <span className="mt-2 block text-xs text-apagado">{p.modulos.length} modulos incluidos</span>
-                </button>
-              ))}
+                  {editandoPrecioPlan === p.id ? (
+                    <>
+                      <label className="block px-4 py-3 pr-12">
+                        <span className="block font-bold">{p.nombre}</span>
+                        <input
+                          className="mt-1 h-8 w-full rounded-lg border border-linea bg-superficie px-2.5 text-sm font-semibold text-tinta outline-none focus:border-petroleo-3 focus:ring-2 focus:ring-petroleo-3/15"
+                          inputMode="numeric"
+                          value={pesosDesdeCent(p.precioMensualCent)}
+                          onChange={(e) =>
+                            setPlanes((actuales) =>
+                              actuales.map((planActual) => (planActual.id === p.id ? { ...planActual, precioMensualCent: centDesdePesos(e.target.value) } : planActual)),
+                            )
+                          }
+                          onBlur={() => setEditandoPrecioPlan(null)}
+                          onKeyDown={(e) => e.key === "Enter" && setEditandoPrecioPlan(null)}
+                          aria-label={`Precio mensual de ${p.nombre}`}
+                          autoFocus
+                        />
+                      </label>
+                      <button type="button" onClick={() => cambiarPlan(p.codigo)} className="block w-full px-4 pb-3 pr-12 text-left">
+                        <span className="mt-2 block text-xs text-apagado">{p.modulos.length} modulos incluidos</span>
+                        <span className="mt-3 block text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">
+                          {indice === 0 ? "Incluye" : indice === 1 ? "Basico mas" : "Profesional mas"}
+                        </span>
+                        <span className="mt-1.5 flex flex-wrap gap-1.5">
+                          {extras.slice(0, 6).map((modulo) => (
+                            <span key={modulo} className="rounded-full bg-superficie/80 px-2 py-0.5 text-[11px] font-semibold text-tinta-2 ring-1 ring-linea/70">
+                              {moduloNombre(modulo, modulosCatalogo)}
+                            </span>
+                          ))}
+                          {extras.length > 6 && (
+                            <span className="rounded-full bg-superficie/80 px-2 py-0.5 text-[11px] font-semibold text-apagado ring-1 ring-linea/70">
+                              +{extras.length - 6}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    </>
+                  ) : (
+                    <button type="button" onClick={() => cambiarPlan(p.codigo)} className="flex h-full w-full flex-col items-start justify-start px-4 py-3 pr-12 text-left">
+                      <span className="block font-bold">{p.nombre}</span>
+                      <span className="mt-1 block text-xs">{fmtCent(p.precioMensualCent)}</span>
+                      <span className="mt-2 block text-xs text-apagado">{p.modulos.length} modulos incluidos</span>
+                      <span className="mt-3 block text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">
+                        {indice === 0 ? "Incluye" : indice === 1 ? "Basico mas" : "Profesional mas"}
+                      </span>
+                      <span className="mt-1.5 flex flex-wrap gap-1.5">
+                        {extras.slice(0, 6).map((modulo) => (
+                          <span key={modulo} className="rounded-full bg-superficie/80 px-2 py-0.5 text-[11px] font-semibold text-tinta-2 ring-1 ring-linea/70">
+                            {moduloNombre(modulo, modulosCatalogo)}
+                          </span>
+                        ))}
+                        {extras.length > 6 && (
+                          <span className="rounded-full bg-superficie/80 px-2 py-0.5 text-[11px] font-semibold text-apagado ring-1 ring-linea/70">
+                            +{extras.length - 6}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setEditandoPrecioPlan(editandoPrecioPlan === p.id ? null : p.id)}
+                    className="absolute right-3 top-5 inline-flex size-8 items-center justify-center rounded-lg text-apagado hover:bg-superficie/70 hover:text-tinta"
+                    aria-label={editandoPrecioPlan === p.id ? `Cerrar edición de precio de ${p.nombre}` : `Editar precio mensual de ${p.nombre}`}
+                    title={editandoPrecioPlan === p.id ? "Cerrar edición" : "Editar precio"}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                </div>
+                );
+              })}
             </div>
 
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
-              {ADDONS_ADMIN.map((addon) => (
-                <label key={addon.moduloCodigo} className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-linea bg-superficie px-4 py-3 hover:bg-hundido">
-                  <span>
-                    <span className="block text-sm font-bold">{moduloNombre(addon.moduloCodigo)}</span>
-                    <span className="block text-xs text-apagado">{fmtCent(addon.precioMensualCent)} mensual</span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={seleccionado.addons.includes(addon.moduloCodigo)}
-                    onChange={() => actualizar({ addons: toggleAddon(seleccionado.addons, addon.moduloCodigo) })}
-                    className="size-4 accent-petroleo"
-                  />
-                </label>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setModulosAbierto(true)}
+              className="mt-5 flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl border border-linea bg-superficie px-4 py-3 text-left transition-colors hover:bg-hundido"
+            >
+              <span>
+                <span className="block text-sm font-bold">Agregar módulos fuera del paquete</span>
+                <span className="block text-xs text-apagado">
+                  {addonsVisibles.length}
+                  {addonsVisibles.length === 1 ? " módulo seleccionado" : " módulos seleccionados"} · elegí módulos individuales y editá su precio mensual
+                </span>
+              </span>
+              <span className="inline-flex h-8 items-center rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-tinta-2">Editar</span>
+            </button>
           </Panel>
+
+          <Modal
+            abierto={modulosAbierto}
+            onCerrar={() => {
+              setModulosAbierto(false);
+              setEditandoPreciosModulos(false);
+            }}
+            titulo={
+              <span className="flex items-center justify-between gap-3">
+                <span>Módulos adicionales</span>
+                <span className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditandoPreciosModulos((actual) => !actual)}
+                    className={clsx("inline-flex size-8 items-center justify-center rounded-lg border border-linea text-apagado hover:bg-hundido hover:text-tinta", editandoPreciosModulos && "bg-petroleo text-white hover:bg-petroleo-2 hover:text-white")}
+                    aria-label={editandoPreciosModulos ? "Bloquear edición de precios" : "Editar precios de módulos"}
+                    title={editandoPreciosModulos ? "Bloquear precios" : "Editar precios"}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => guardar(() => setModulosAbierto(false))}
+                    disabled={pendiente || !hayCambiosModulos}
+                    className={clsx(
+                      "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed",
+                      hayCambiosModulos ? "border-petroleo bg-petroleo text-white hover:bg-petroleo-2" : "border-linea bg-hundido text-apagado",
+                    )}
+                  >
+                    <Save size={13} /> {pendiente ? "Guardando..." : "Guardar"}
+                  </button>
+                </span>
+              </span>
+            }
+          >
+            <div className="grid max-h-[60vh] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+              {[...modulosFueraDelPlan]
+                .sort((a, b) => Number(addonsVisibles.includes(b.moduloCodigo)) - Number(addonsVisibles.includes(a.moduloCodigo)))
+                .map((addon) => {
+                  const activo = addonsVisibles.includes(addon.moduloCodigo);
+                  return (
+                <div
+                  key={addon.moduloCodigo}
+                  className={clsx(
+                    "rounded-xl border px-3 py-2.5 transition-colors",
+                    activo ? "border-petroleo bg-menta text-menta-t" : "border-linea bg-superficie hover:bg-hundido/60",
+                  )}
+                >
+                  <label className="flex cursor-pointer items-start justify-between gap-3">
+                    <span>
+                      <span className="block text-sm font-bold">{moduloNombre(addon.moduloCodigo, modulosCatalogo)}</span>
+                      {editandoPreciosModulos ? (
+                        <input
+                          className="mt-1 h-8 w-36 rounded-lg border border-linea bg-superficie px-2.5 text-sm font-semibold text-tinta outline-none focus:border-petroleo-3 focus:ring-2 focus:ring-petroleo-3/15"
+                          inputMode="numeric"
+                          value={pesosDesdeCent(addon.precioMensualCent)}
+                          onChange={(e) => setPreciosModulo((actual) => ({ ...actual, [addon.moduloCodigo]: centDesdePesos(e.target.value) }))}
+                          aria-label={`Precio mensual de ${moduloNombre(addon.moduloCodigo, modulosCatalogo)}`}
+                        />
+                      ) : (
+                        <span className={clsx("mt-0.5 block text-xs font-semibold", activo ? "text-menta-t" : "text-apagado")}>{fmtCent(addon.precioMensualCent)} mensual</span>
+                      )}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={activo}
+                      onChange={() => {
+                        actualizar({ addons: toggleAddon(seleccionado.addons, addon.moduloCodigo) });
+                      }}
+                      className={clsx("mt-0.5 size-4", activo ? "accent-menta-t" : "accent-petroleo")}
+                    />
+                  </label>
+                </div>
+                  );
+                })}
+            </div>
+          </Modal>
 
           <Panel className="p-5">
             <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
@@ -346,129 +778,500 @@ export function AdminCommercialConsole() {
             <div className="mt-4 space-y-3">
               <label className="block">
                 <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Estado</span>
-                <select className={inputCls} value={seleccionado.estado} onChange={(e) => actualizar({ estado: e.target.value as EstudioAdmin["estado"] })}>
-                  <option value="prueba">Prueba</option>
+                <select
+                  className={inputCls}
+                  value={seleccionado.estado}
+                  onChange={(e) => {
+                    const estado = e.target.value as EstudioAdmin["estado"];
+                    if (estado === "prueba" && planPruebaInicial) {
+                      actualizar({ estado, planCodigo: planPruebaInicial.codigo, addons: addonsCodigosParaPlan(planPruebaInicial) });
+                      return;
+                    }
+                    actualizar({ estado });
+                  }}
+                >
+                  <option value="prueba">En prueba</option>
                   <option value="activo">Activo</option>
                   <option value="pausado">Pausado</option>
                 </select>
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Notas internas</span>
-                <textarea className={clsx(inputCls, "min-h-28 py-3")} value={seleccionado.notas} onChange={(e) => actualizar({ notas: e.target.value })} />
+                <textarea
+                  className={clsx(inputCls, "min-h-28 py-3 placeholder:text-tinta")}
+                  value={seleccionado.notas}
+                  onChange={(e) => actualizar({ notas: e.target.value })}
+                  placeholder={ayudaEstado(seleccionado.estado)}
+                />
               </label>
+              {resultado && (
+                <p className={clsx("rounded-xl px-3 py-2 text-sm font-semibold", resultado.ok ? "bg-menta text-menta-t" : "bg-rosa text-rosa-t")} role="status">
+                  {resultado.mensaje}
+                </p>
+              )}
+              <div className="flex justify-end">
+                <Boton type="button" onClick={() => guardar()} disabled={pendiente || !hayCambiosComerciales} variante={hayCambiosComerciales ? "primario" : "secundario"}>
+                  <Save size={15} /> {pendiente ? "Guardando..." : hayCambiosComerciales ? "Guardar configuracion" : "Sin cambios"}
+                </Boton>
+              </div>
             </div>
           </Panel>
         </div>
 
-        <Panel className="p-5">
-          <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-            <Settings2 size={18} className="text-petroleo" /> Modulos habilitados
-          </h3>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {modulos.map((m) => (
-              <Chip key={m} tono={seleccionado.addons.includes(m) ? "lila" : "gris"}>
-                {moduloNombre(m)}
-              </Chip>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel className="p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+        <Panel className="overflow-hidden">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-linea px-5 py-3">
             <div>
               <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-                <Calculator size={18} className="text-petroleo" /> Resumen de cobro
+                <Calculator size={18} className="text-petroleo" /> Factura mensual
               </h3>
-              <p className="mt-1 text-sm text-apagado">{fmtCent(resumenVisible.totalCent, resumenVisible.moneda)} para {resumenVisible.mes}</p>
+              <div className="mt-2 flex flex-wrap items-end gap-x-3 gap-y-2">
+                <span className="text-xl font-extrabold text-tinta">{fmtCent(resumenVisible.totalCent, resumenVisible.moneda)}</span>
+                <span className="inline-flex rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">{nombreMesCobro(resumenVisible.mes)}</span>
+                <span className="inline-flex rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">
+                  {resumenVisible.lineas.length} {resumenVisible.lineas.length === 1 ? "concepto" : "conceptos"}
+                </span>
+              </div>
             </div>
-            <Boton type="button" variante="secundario" onClick={generarResumen} disabled={pendienteResumen}>
-              <Calculator size={15} /> {pendienteResumen ? "Generando..." : "Generar resumen"}
-            </Boton>
+            <Chip tono={tonoFactura}>{estadoFactura}</Chip>
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-[180px_1fr_160px]">
-            <label className="block">
-              <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Mes</span>
-              <input className={inputCls} type="month" value={mesCobro} onChange={(e) => setMesCobro(e.target.value)} />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Ajuste manual</span>
-              <input className={inputCls} value={ajusteDescripcion} onChange={(e) => setAjusteDescripcion(e.target.value)} placeholder="Ej. Descuento piloto" />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Importe</span>
-              <input className={inputCls} value={ajusteMonto} onChange={(e) => setAjusteMonto(e.target.value)} placeholder="-1500" inputMode="decimal" />
-            </label>
-          </div>
-          <label className="mt-3 block">
-            <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Nota del ajuste</span>
-            <input className={inputCls} value={ajusteNota} onChange={(e) => setAjusteNota(e.target.value)} placeholder="Motivo interno visible para administracion" />
-          </label>
+          <div className="grid items-start gap-4 px-5 py-3 xl:grid-cols-[1fr_344px]">
+            <div>
+              <div className="grid items-end gap-3 lg:grid-cols-[220px_minmax(220px,1fr)_170px_190px]">
+                <label className="block">
+                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Mes</span>
+                  <select
+                    className={inputCls}
+                    value={mesCobro}
+                    onChange={(e) => {
+                      const mes = e.target.value;
+                      setMesCobro(mes);
+                      setPagoACuentaDesdeMes(sumarMesCobro(mes, 1));
+                      quitarDescuento();
+                      setResultadoResumen(null);
+                      setResultadoPago(null);
+                    }}
+                  >
+                    {mesesSelector.map((mes) => (
+                      <option key={mes} value={mes}>
+                        {nombreMesCobro(mes)}
+                        {resumenesPorMes[`${seleccionado.id}:${mes}`] ? " · factura emitida" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Motivo del ajuste</span>
+                  <input
+                    className={inputCls}
+                    value={ajusteDescripcion}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      setAjusteDescripcion(valor);
+                      if (!valor.trim()) {
+                        setAjusteConfirmado(null);
+                        setResultadoResumen(null);
+                      }
+                    }}
+                    placeholder="Ej. Cortesia"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Importe a descontar</span>
+                  <input
+                    className={inputCls}
+                    value={ajusteMonto}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      const importe = Math.abs(Number(valor.replace(/\./g, "").replace(",", ".")));
+                      setAjusteMonto(valor);
+                      if (!Number.isFinite(importe) || importe <= 0) {
+                        setAjusteConfirmado(null);
+                        setResultadoResumen(null);
+                      }
+                    }}
+                    placeholder="1500"
+                    inputMode="decimal"
+                  />
+                </label>
+                <div className="w-full sm:w-auto sm:min-w-[190px]">
+                  <Boton
+                    type="button"
+                    variante={ajusteConfirmado || puedeConfirmarDescuento ? "primario" : "secundario"}
+                    tam="md"
+                    className="w-full whitespace-nowrap"
+                    onClick={ajusteConfirmado ? quitarDescuento : confirmarDescuento}
+                    disabled={!ajusteConfirmado && !puedeConfirmarDescuento}
+                  >
+                    {ajusteConfirmado ? <X size={14} /> : <Save size={14} />}
+                    {ajusteConfirmado ? "Eliminar descuento" : "Confirmar descuento"}
+                  </Boton>
+                </div>
+              </div>
+            </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
-            <div className="rounded-xl border border-linea bg-hundido px-4 py-3">
-              <p className="text-xs font-bold uppercase tracking-[0.06em] text-apagado">Estado de pago</p>
-              <p className="mt-1 text-lg font-extrabold capitalize">{estadoPago.estado.replaceAll("_", " ")}</p>
-              <p className="mt-1 text-sm text-apagado">
-                Pagado {fmtCent(estadoPago.pagadoCent, resumenVisible.moneda)} · Pendiente {fmtCent(estadoPago.saldoPendienteCent, resumenVisible.moneda)}
-                {estadoPago.saldoAFavorCent > 0 ? ` · A favor ${fmtCent(estadoPago.saldoAFavorCent, resumenVisible.moneda)}` : ""}
+            <div className="rounded-xl border border-linea bg-hundido px-3 py-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.06em] text-apagado">Estado de pago</p>
+                  <p className="mt-0.5 text-lg font-extrabold capitalize">{estadoPago.estado.replaceAll("_", " ")}</p>
+                </div>
+                <Boton type="button" variante="secundario" tam="sm" onClick={() => setFacturaAbierta(true)} disabled={!resumenVisible.lineas.length}>
+                  <FileText size={14} /> Ver factura
+                </Boton>
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {!resumenGuardado ? (
+                  <Boton type="button" variante="primario" tam="sm" className="w-full" onClick={() => void emitirFacturaSiHaceFalta()} disabled={confirmandoFactura}>
+                    <Save size={14} /> {confirmandoFactura ? "Confirmando..." : "Confirmar factura"}
+                  </Boton>
+                ) : facturaActualCancelable ? (
+                  <Boton type="button" variante="secundario" tam="sm" className="w-full" onClick={() => cancelarFactura()} disabled={confirmandoFactura}>
+                    <X size={14} /> Cancelar factura
+                  </Boton>
+                ) : null}
+                <Boton
+                  type="button"
+                  variante="primario"
+                  tam="sm"
+                  className="w-full"
+                  onClick={() => registrarPago(estadoPago.saldoPendienteCent, 1, mesCobro)}
+                  disabled={pendientePago || confirmandoFactura || !resumenGuardado || estadoPago.saldoPendienteCent <= 0}
+                >
+                  <CreditCard size={14} /> {pendientePago ? "Registrando..." : !resumenGuardado ? "Confirmá factura" : estadoPago.saldoPendienteCent <= 0 ? "Factura paga" : "Marcar pagado"}
+                </Boton>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-lg bg-superficie px-3 py-2">
+                  <p className="text-xs text-apagado">Pagado</p>
+                  <p className="font-bold">{fmtCent(estadoPago.pagadoCent, resumenVisible.moneda)}</p>
+                </div>
+                <div className="rounded-lg bg-superficie px-3 py-2">
+                  <p className="text-xs text-apagado">Pendiente</p>
+                  <p className="font-bold">{fmtCent(estadoPago.saldoPendienteCent, resumenVisible.moneda)}</p>
+                </div>
+              </div>
+              {estadoPago.saldoAFavorCent > 0 && <p className="mt-2 text-xs font-semibold text-menta-t">A favor {fmtCent(estadoPago.saldoAFavorCent, resumenVisible.moneda)}</p>}
+              <div className="mt-2">
+                <Boton
+                  type="button"
+                  variante="fantasma"
+                  tam="sm"
+                  onClick={() => {
+                    setPagoACuentaEnRevision(false);
+                    setPagoACuentaAbierto(true);
+                  }}
+                >
+                  <Plus size={14} /> Pago a cuenta
+                </Boton>
+              </div>
+            </div>
+          </div>
+
+          <Modal
+            abierto={pagoACuentaAbierto}
+            onCerrar={() => {
+              setPagoACuentaAbierto(false);
+              setPagoACuentaEnRevision(false);
+            }}
+            className="max-w-xl"
+            titulo="Pago a cuenta"
+          >
+            <div className="space-y-4">
+              <p className="text-sm leading-6 text-apagado">
+                El importe recibido es el total del pago a cuenta, no un valor mensual. Se va a acreditar desde el mes seleccionado y por la cantidad de meses cubiertos que indiques.
               </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block sm:col-span-2">
+                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Importe recibido</span>
+                  <input
+                    className={inputCls}
+                    value={pagoACuentaImporte}
+                    onChange={(e) => {
+                      setPagoACuentaImporte(e.target.value);
+                      setPagoACuentaEnRevision(false);
+                    }}
+                    placeholder="UYU 35.000"
+                    inputMode="decimal"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Primer mes</span>
+                  <select
+                    className={inputCls}
+                    value={pagoACuentaDesdeMes}
+                    onChange={(e) => {
+                      setPagoACuentaDesdeMes(e.target.value);
+                      setPagoACuentaEnRevision(false);
+                    }}
+                  >
+                    {mesesPagoACuenta.map((mes) => (
+                      <option key={mes} value={mes}>
+                        {nombreMesCobro(mes)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Meses cubiertos</span>
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={1}
+                    max={24}
+                    value={pagoACuentaMeses}
+                    onChange={(e) => {
+                      setPagoACuentaMeses(Math.max(1, Number(e.target.value) || 1));
+                      setPagoACuentaEnRevision(false);
+                    }}
+                  />
+                </label>
+              </div>
+              {pagoACuentaEnRevision && (
+                <div className="rounded-xl border border-linea bg-hundido px-4 py-3">
+                  <p className="text-sm font-bold">Confirmá este pago</p>
+                  <p className="mt-1 text-sm text-apagado">
+                    Se registrará {fmtCent(importePagoACuentaCent, resumenVisible.moneda)} y quedarán marcados como pagos estos meses:
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {mesesPagoACuentaSeleccionados.map((mes) => (
+                      <span key={mes} className="rounded-full bg-superficie px-3 py-1 text-xs font-semibold text-tinta-2">
+                        {nombreMesCobro(mes)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end gap-2 border-t border-linea pt-4">
+                <Boton
+                  type="button"
+                  variante="fantasma"
+                  onClick={() => {
+                    setPagoACuentaAbierto(false);
+                    setPagoACuentaEnRevision(false);
+                  }}
+                >
+                  Cancelar
+                </Boton>
+                <Boton
+                  type="button"
+                  variante="primario"
+                  onClick={() => {
+                    if (!pagoACuentaEnRevision) {
+                      setPagoACuentaEnRevision(true);
+                      return;
+                    }
+                    registrarPago(importePagoACuentaCent, pagoACuentaMeses, pagoACuentaDesdeMes, `Pago a cuenta desde ${nombreMesCobro(pagoACuentaDesdeMes)}`);
+                  }}
+                  disabled={pendientePago || confirmandoFactura || importePagoACuentaCent <= 0}
+                >
+                  <CreditCard size={15} /> {pendientePago ? "Aplicando..." : pagoACuentaEnRevision ? "Confirmar pago" : "Revisar pago"}
+                </Boton>
+              </div>
             </div>
-            <label className="block">
-              <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Meses adelantados</span>
-              <input className={inputCls} type="number" min={1} max={24} value={mesesAdelantados} onChange={(e) => setMesesAdelantados(Math.max(1, Number(e.target.value) || 1))} />
-            </label>
-            <div className="flex items-end">
-              <Boton
-                type="button"
-                variante="secundario"
-                className="w-full"
-                onClick={() => registrarPago(resumenVisible.totalCent * mesesAdelantados, mesesAdelantados)}
-                disabled={pendientePago || resumenVisible.totalCent <= 0}
-              >
-                <CreditCard size={15} /> {pendientePago ? "Registrando..." : mesesAdelantados > 1 ? "Pago adelantado" : "Marcar pagado"}
-              </Boton>
+          </Modal>
+
+          <div className="mt-3 rounded-xl border border-linea bg-superficie">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-linea px-4 py-2">
+              <div>
+                <p className="text-sm font-bold">Facturas</p>
+                <p className="mt-0.5 text-xs text-apagado">Facturas emitidas para este estudio.</p>
+              </div>
+              <span className="rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">
+                {facturasDelEstudio.length} {facturasDelEstudio.length === 1 ? "factura" : "facturas"}
+              </span>
             </div>
+            {facturasDelEstudio.length === 0 ? (
+              <p className="px-4 py-4 text-sm text-apagado">Todavía no hay facturas emitidas. Cuando confirmes una factura, va a aparecer acá.</p>
+            ) : (
+              <div className="divide-y divide-linea">
+                {facturasDelEstudio.map((factura) => {
+                  const pagoFactura = estadoPagoDemo(factura.totalCent, pagosDemo[`${seleccionado.id}:${factura.mes}`] ?? 0);
+                  const estado = pagoFactura.estado === "pagado" || pagoFactura.estado === "saldo_a_favor" ? "paga" : pagoFactura.estado === "parcial" ? "parcial" : "pendiente";
+                  const puedeCancelar = pagoFactura.estado !== "pagado" && pagoFactura.estado !== "saldo_a_favor";
+                  return (
+                    <div key={factura.mes} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                      <span>
+                        <span className="block font-semibold">Factura de {nombreMesCobro(factura.mes)}</span>
+                        <span className="mt-0.5 block text-xs text-apagado">
+                          {fmtCent(factura.totalCent, factura.moneda)} · {factura.lineas.length} {factura.lineas.length === 1 ? "concepto" : "conceptos"} · {estado}
+                        </span>
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        <Boton
+                          type="button"
+                          variante="secundario"
+                          tam="sm"
+                          onClick={() => {
+                            setMesCobro(factura.mes);
+                            setPagoACuentaDesdeMes(sumarMesCobro(factura.mes, 1));
+                            quitarDescuento();
+                            setFacturaAbierta(true);
+                          }}
+                        >
+                          <FileText size={14} /> Ver factura
+                        </Boton>
+                        {puedeCancelar && (
+                          <Boton type="button" variante="fantasma" tam="sm" onClick={() => cancelarFactura(factura.mes)}>
+                            <X size={14} /> Cancelar
+                          </Boton>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3 rounded-xl border border-linea bg-superficie">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-linea px-4 py-2">
+              <div>
+                <p className="text-sm font-bold">Pagos</p>
+                <p className="mt-0.5 text-xs text-apagado">Historial del estudio: meses anteriores, actual y futuros.</p>
+              </div>
+              <span className="rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">
+                {pagosDelEstudio.length} {pagosDelEstudio.length === 1 ? "pago" : "pagos"}
+              </span>
+            </div>
+            {pagosDelEstudio.length === 0 ? (
+              <p className="px-4 py-4 text-sm text-apagado">Todavía no hay pagos registrados para este estudio.</p>
+            ) : (
+              <div className="divide-y divide-linea">
+                {pagosDelEstudio.map((pago) => (
+                  <div key={pago.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-2.5 text-sm">
+                    <div>
+                      <span className="block font-semibold">{pago.descripcion}</span>
+                      <span className="mt-0.5 block text-xs text-apagado">{fmtCent(pago.importeCent, resumenVisible.moneda)} recibidos</span>
+                      <span className="mt-2 flex flex-wrap gap-1.5">
+                        {pago.aplicaciones.map((aplicacion) => {
+                          const etiqueta = aplicacion.mes === mesCobro ? "actual" : aplicacion.mes > mesCobro ? "futuro" : "anterior";
+                          return (
+                            <span key={aplicacion.mes} className="rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">
+                              {nombreMesCobro(aplicacion.mes)} · {etiqueta}
+                            </span>
+                          );
+                        })}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => cancelarPago(pago)}
+                      disabled={pendientePago}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-tinta-2 hover:bg-hundido hover:text-tinta"
+                    >
+                      <Undo2 size={13} /> {pendientePago ? "Cancelando..." : "Cancelar"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {resultadoPago && (
-            <p className={clsx("mt-4 rounded-xl px-3 py-2 text-sm font-semibold", resultadoPago.ok ? "bg-menta text-menta-t" : "bg-rosa text-rosa-t")} role="status">
-              {resultadoPago.mensaje}
-            </p>
+            <AvisoAccion ok={resultadoPago.ok} mensaje={resultadoPago.mensaje} onCerrar={() => setResultadoPago(null)} />
           )}
 
           {resultadoResumen && (
-            <p className={clsx("mt-4 rounded-xl px-3 py-2 text-sm font-semibold", resultadoResumen.ok ? "bg-menta text-menta-t" : "bg-rosa text-rosa-t")} role="status">
-              {resultadoResumen.mensaje}
-            </p>
+            <AvisoAccion ok={resultadoResumen.ok} mensaje={resultadoResumen.mensaje} onCerrar={() => setResultadoResumen(null)} />
           )}
 
-          <div className="mt-4 overflow-hidden rounded-xl border border-linea">
-            <div className="grid grid-cols-[1fr_110px] bg-hundido px-3 py-2 text-xs font-bold uppercase tracking-[0.06em] text-apagado">
-              <span>Concepto</span>
-              <span className="text-right">Importe</span>
-            </div>
-            <div className="divide-y divide-linea bg-superficie">
-              {resumenVisible.lineas.map((linea, index) => (
-                <div key={`${linea.tipo}-${linea.concepto}-${index}`} className="grid grid-cols-[1fr_110px] gap-3 px-3 py-3 text-sm">
-                  <span>
-                    <span className="block font-semibold">{linea.concepto}</span>
-                    {linea.nota && <span className="mt-0.5 block text-xs text-apagado">{linea.nota}</span>}
-                  </span>
-                  <span className={clsx("text-right font-bold", linea.totalCent < 0 && "text-rosa-t")}>{fmtCent(linea.totalCent, resumenVisible.moneda)}</span>
+          <Modal
+            abierto={facturaAbierta}
+            onCerrar={() => setFacturaAbierta(false)}
+            className="max-w-4xl p-0 print:fixed print:inset-0 print:m-0 print:max-h-none print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:bg-white print:p-0 print:shadow-none"
+            titulo={
+              <span className="no-print flex items-center justify-between gap-3 px-6 pt-6">
+                <span>Factura</span>
+                <span className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-tinta hover:bg-hundido"
+                  >
+                    <Printer size={13} /> Imprimir / PDF
+                  </button>
+                </span>
+              </span>
+            }
+          >
+            <article className="print-document-active document-surface mx-auto max-h-[72vh] overflow-y-auto rounded-2xl border border-linea bg-white p-8 text-sm text-tinta shadow-[0_8px_24px_rgb(16_34_71/0.08)] print:max-h-none print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:p-10 print:shadow-none">
+              <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-tinta pb-5">
+                <div>
+                  <Logo variant="full" className="w-[132px] print:w-[120px]" />
+                  <p className="mt-3 text-sm text-tinta-2">Resumen de servicios Cierra</p>
                 </div>
-              ))}
-              {!resumenVisible.lineas.length && <p className="px-3 py-4 text-sm text-apagado">No hay cargos para este estado de contrato.</p>}
-            </div>
-          </div>
+                <div className="text-right">
+                  <p className="text-2xl font-extrabold tracking-tight">Factura</p>
+                  <p className="mt-1 text-sm text-apagado">Periodo {nombreMesCobro(resumenVisible.mes)}</p>
+                  <p className="mt-1 text-xs text-apagado">Ref. {seleccionado.id}-{resumenVisible.mes}</p>
+                </div>
+              </header>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {resumenVisible.eventosUso.map((evento) => (
-              <Chip key={evento.tipo} tono="gris">
-                {usoNombre(evento.tipo)}: {evento.cantidad}
-              </Chip>
-            ))}
-          </div>
+              <section className="grid gap-4 border-b border-linea py-5 sm:grid-cols-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Cliente</p>
+                  <p className="mt-1 font-bold">{seleccionado.nombre}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Plan</p>
+                  <p className="mt-1 font-bold">{plan.nombre}</p>
+                </div>
+                <div className="sm:text-right">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Estado de pago</p>
+                  <p className="mt-1 font-bold capitalize">{estadoPago.estado.replaceAll("_", " ")}</p>
+                </div>
+              </section>
+
+              <table className="mt-5 w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-linea text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">
+                    <th className="py-2 text-left">Concepto</th>
+                    <th className="w-36 py-2 text-right">Importe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumenVisible.lineas.map((linea, index) => (
+                    <tr key={`${linea.tipo}-${linea.concepto}-${index}`} className="border-b border-linea align-top">
+                      <td className="py-3 pr-4">
+                        <p className="font-semibold">{linea.concepto}</p>
+                        {linea.nota && <p className="mt-0.5 text-xs text-apagado">{linea.nota}</p>}
+                      </td>
+                      <td className={clsx("py-3 text-right font-bold", linea.totalCent < 0 && "text-rosa-t")}>{fmtCent(linea.totalCent, resumenVisible.moneda)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="ml-auto mt-6 w-full max-w-sm rounded-2xl bg-petroleo px-5 py-4 text-white print:border-2 print:border-tinta print:bg-white print:text-tinta">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-semibold">Total a cobrar</span>
+                  <span className="text-2xl font-extrabold">{fmtCent(resumenVisible.totalCent, resumenVisible.moneda)}</span>
+                </div>
+                <p className="mt-1 text-xs text-white/80 print:text-apagado">
+                  Pagado {fmtCent(estadoPago.pagadoCent, resumenVisible.moneda)} · Pendiente {fmtCent(estadoPago.saldoPendienteCent, resumenVisible.moneda)}
+                </p>
+              </div>
+
+              {resumenVisible.eventosUso.length > 0 && (
+                <section className="mt-6 rounded-2xl border border-linea bg-hundido/50 px-4 py-3 print:bg-white">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Uso del mes</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    {resumenVisible.eventosUso.map((evento) => (
+                      <div key={evento.tipo} className="rounded-xl bg-superficie px-3 py-2 print:border print:border-linea">
+                        <p className="text-xs text-apagado">{usoNombre(evento.tipo)}</p>
+                        <p className="text-base font-extrabold">{evento.cantidad}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              <footer className="mt-8 border-t border-linea pt-4 text-xs text-apagado">
+                <p>Documento generado desde Cierra para control administrativo del servicio mensual.</p>
+              </footer>
+            </article>
+          </Modal>
         </Panel>
 
         <Panel className="p-5">
@@ -478,7 +1281,7 @@ export function AdminCommercialConsole() {
           <div className="mt-4 rounded-2xl bg-hundido px-4 py-3 text-sm">
             <p className="font-semibold">Cambio pendiente de guardar</p>
             <p className="mt-1 text-apagado">
-              {seleccionado.nombre}: {plan.nombre}, {seleccionado.addons.length} add-ons, total {fmtCent(total, seleccionado.moneda)}.
+              {seleccionado.nombre}: {plan.nombre}, {addonsVisibles.length} modulos extra, total {fmtCent(total, seleccionado.moneda)}.
             </p>
           </div>
         </Panel>

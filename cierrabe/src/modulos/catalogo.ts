@@ -7,6 +7,7 @@ export type CodigoModulo =
   | "leave_management"
   | "salary_history"
   | "accounting_entries"
+  | "salary_disbursement"
   | "company_portal"
   | "employee_portal"
   | "bulk_import_excel"
@@ -95,6 +96,14 @@ export const CATALOGO_MODULOS = [
     dependeDe: ["payroll_core"],
   },
   {
+    codigo: "salary_disbursement",
+    nombre: "Dispersion de sueldos",
+    descripcion: "Control de liquidaciones, ordenes de pago y seguimiento de transferencias de sueldos.",
+    estado: "beta",
+    alcance: "estudio",
+    dependeDe: ["payroll_core", "payroll_receipts"],
+  },
+  {
     codigo: "company_portal",
     nombre: "Portal empresa",
     descripcion: "Carga de novedades, revision y aprobacion por parte de empresas cliente.",
@@ -178,6 +187,7 @@ export type CodigoFuncionOpcional =
   | "calcular_irpf"
   | "gestionar_licencias"
   | "generar_asiento_sueldos"
+  | "gestionar_dispersion_sueldos"
   | "enviar_recibos_email";
 
 export const MODULO_POR_FUNCION: Record<CodigoFuncionOpcional, CodigoModulo> = {
@@ -190,6 +200,7 @@ export const MODULO_POR_FUNCION: Record<CodigoFuncionOpcional, CodigoModulo> = {
   calcular_irpf: "irpf_calculation",
   gestionar_licencias: "leave_management",
   generar_asiento_sueldos: "accounting_entries",
+  gestionar_dispersion_sueldos: "salary_disbursement",
   enviar_recibos_email: "automatic_receipt_email",
 };
 
