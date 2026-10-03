@@ -155,11 +155,16 @@ export function Modal({ abierto, onCerrar, titulo, children, className }: { abie
   }, [abierto, onCerrar]);
   if (!abierto) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal>
       <button className="no-print entra-fade absolute inset-0 bg-[#0B1220]/50 backdrop-blur-[2px]" aria-label="Cerrar" onClick={onCerrar} />
-      <div className={clsx("entra-fade relative w-full max-w-md rounded-[var(--radius-panel)] border border-linea bg-superficie p-6 shadow-xl", className)}>
-        <h2 className="text-lg font-bold tracking-tight">{titulo}</h2>
-        <div className="mt-3">{children}</div>
+      <div className={clsx("entra-fade relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[var(--modal-max,28rem)] flex-col overflow-hidden rounded-[var(--radius-panel)] border border-linea bg-superficie shadow-xl", className)}>
+        <div className="flex items-center justify-between gap-3 border-b border-linea px-5 py-4">
+          <h2 className="text-lg font-bold tracking-tight">{titulo}</h2>
+          <button type="button" onClick={onCerrar} className="no-print inline-flex size-9 items-center justify-center rounded-lg text-apagado transition-colors hover:bg-hundido hover:text-tinta" aria-label="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
       </div>
     </div>
   );

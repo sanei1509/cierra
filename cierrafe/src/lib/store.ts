@@ -6,7 +6,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import type { AuditEvent, Empleado, Empresa, Novedad, Periodo, VersionLiquidacion } from "./types";
 import { crearSeed, USUARIOS } from "./seed";
 import { calcularEmpresa, hashDe } from "./engine";
-import { MOTOR_VERSION, parametrosVigentes } from "./params";
+import { clonarParametrosIniciales, MOTOR_VERSION, parametrosVigentesEn, type Parametros } from "./params";
 import { MES_ACTUAL } from "./format";
 import { validar, pendientes } from "./validations";
 import { estadoVisible } from "./status";
@@ -20,6 +20,7 @@ interface Datos {
   audit: AuditEvent[];
   usuarioId: string;
   temaPorUsuario: Record<string, TemaPreferido>;
+  parametrosNormativos: Parametros[];
   /** Recibos vistos por el empleado: `${empleadoId}|${mes}` -> fecha ISO */
   vistas: Record<string, string>;
 }
@@ -57,6 +58,8 @@ interface Acciones {
   agregarEmpleado: (empleado: Empleado, usuarioAcceso?: { nombre: string; email: string }) => void;
   agregarEmpleados: (empleados: Empleado[], empresaId: string) => void;
   actualizarEmpresa: (id: string, cambios: Partial<Empresa>, resumen: string) => void;
+  actualizarParametroNormativo: (parametro: Parametros, resumen: string) => void;
+  restaurarParametrosNormativos: () => void;
   marcarVisto: (empleadoId: string, mes: string) => void;
   reiniciar: () => void;
 }
@@ -65,15 +68,20 @@ const ahora = () => new Date().toISOString();
 let seq = 0;
 const uid = (p: string) => `${p}${Date.now().toString(36)}${(seq++).toString(36)}`;
 
-function versionDe(d: Pick<Datos, "empresas" | "empleados" | "novedades">, periodo: Periodo, por: string, numero: number): VersionLiquidacion {
+function parametrosDe(d: Partial<Pick<Datos, "parametrosNormativos">>, mes: string) {
+  return parametrosVigentesEn(d.parametrosNormativos?.length ? d.parametrosNormativos : clonarParametrosIniciales(), mes);
+}
+
+function versionDe(d: Pick<Datos, "empresas" | "empleados" | "novedades"> & Partial<Pick<Datos, "parametrosNormativos">>, periodo: Periodo, por: string, numero: number): VersionLiquidacion {
   const empresa = d.empresas.find((e) => e.id === periodo.empresaId)!;
-  const resultados = calcularEmpresa(empresa, d.empleados, periodo.mes, d.novedades);
+  const parametros = parametrosDe(d, periodo.mes);
+  const resultados = calcularEmpresa(empresa, d.empleados, periodo.mes, d.novedades, parametros);
   return {
     version: numero,
     creada: ahora(),
     por,
     motor: MOTOR_VERSION,
-    parametros: parametrosVigentes(periodo.mes).id,
+    parametros: parametros.id,
     resultados,
     hash: hashDe(resultados),
   };
@@ -81,6 +89,7 @@ function versionDe(d: Pick<Datos, "empresas" | "empleados" | "novedades">, perio
 
 function estadoInicial(): Datos {
   const s = crearSeed();
+  const parametrosNormativos = clonarParametrosIniciales();
   const fechas: Record<string, string> = {
     espiga: "2026-09-19T12:00:00",
     delprado: "2026-09-20T18:00:00",
@@ -93,7 +102,7 @@ function estadoInicial(): Datos {
   const periodos = s.periodos.map((p) => {
     if (["novedades", "recibidas"].includes(p.etapa)) return p;
     const por = p.empresaId === "delprado" || p.empresaId === "atlantida" || p.empresaId === "brio" ? "Martín Suárez" : "Lucía Pereira";
-    const v = { ...versionDe(s, p, por, 1), creada: fechas[p.empresaId] };
+    const v = { ...versionDe({ ...s, parametrosNormativos }, p, por, 1), creada: fechas[p.empresaId] };
     const np: Periodo = { ...p, versiones: [v] };
     if (p.etapa === "enviada") np.aprobacion = { version: 1, estado: "pendiente", enviada: "2026-09-22T13:40:00" };
     if (p.etapa === "devuelta")
@@ -115,6 +124,7 @@ function estadoInicial(): Datos {
     periodos,
     usuarioId: "u1",
     temaPorUsuario: {},
+    parametrosNormativos,
     vistas: { "espiga-1|2026-09": "2026-09-19T20:14:00", "espiga-2|2026-09": "2026-09-20T08:02:00", "delprado-1|2026-09": "2026-09-21T12:40:00" },
   };
 }
@@ -285,6 +295,14 @@ export const useStore = create<Datos & Acciones>()(
           set((s) => ({ empresas: s.empresas.map((e) => (e.id === id ? { ...e, ...cambios } : e)) }));
           log({ empresaId: id, entidad: "Empresa", accion: resumen });
         },
+        actualizarParametroNormativo: (parametro, resumen) => {
+          set((s) => ({ parametrosNormativos: s.parametrosNormativos.map((p) => (p.id === parametro.id ? parametro : p)) }));
+          log({ entidad: "Parámetros normativos", accion: resumen, detalle: `${parametro.id} · ${parametro.fuente}` });
+        },
+        restaurarParametrosNormativos: () => {
+          set({ parametrosNormativos: clonarParametrosIniciales() });
+          log({ entidad: "Parámetros normativos", accion: "Restauró los valores referenciales iniciales" });
+        },
         marcarVisto: (empleadoId, mes) => {
           const k = `${empleadoId}|${mes}`;
           if (get().vistas[k]) return;
@@ -297,7 +315,7 @@ export const useStore = create<Datos & Acciones>()(
     },
     {
       name: "cierra-demo-v1",
-      version: 4,
+      version: 5,
       // Cambió el modelo de datos: se regeneran los datos de ejemplo
       migrate: () => estadoInicial() as never,
     },
@@ -328,16 +346,17 @@ export function usePeriodoVista(empresaId: string, mes = MES_ACTUAL) {
   const empleados = useStore((s) => s.empleados);
   const novedades = useStore((s) => s.novedades);
   const periodos = useStore((s) => s.periodos);
+  const parametrosNormativos = useStore((s) => s.parametrosNormativos);
   return useMemo(
-    () => vistaPeriodo(empresaId, mes, { empresas, empleados, novedades, periodos }),
-    [empresaId, mes, empresas, empleados, novedades, periodos],
+    () => vistaPeriodo(empresaId, mes, { empresas, empleados, novedades, periodos, parametrosNormativos }),
+    [empresaId, mes, empresas, empleados, novedades, periodos, parametrosNormativos],
   );
 }
 
 export function vistaPeriodo(
   empresaId: string,
   mes: string,
-  d: Pick<Datos, "empresas" | "empleados" | "novedades" | "periodos">,
+  d: Pick<Datos, "empresas" | "empleados" | "novedades" | "periodos"> & Partial<Pick<Datos, "parametrosNormativos">>,
 ) {
   const empresa = d.empresas.find((e) => e.id === empresaId)!;
   const periodo =
@@ -361,7 +380,8 @@ export function vistaPeriodo(
     periodo.etapa === "cerrada" && periodo.cerrado
       ? periodo.versiones.find((v) => v.version === periodo.cerrado!.version)
       : ultima;
-  const resultados = vigente?.resultados ?? (periodo.etapa === "cerrada" ? calcularEmpresa(empresa, d.empleados, mes, d.novedades) : undefined);
+  const parametros = parametrosDe(d, mes);
+  const resultados = vigente?.resultados ?? (periodo.etapa === "cerrada" ? calcularEmpresa(empresa, d.empleados, mes, d.novedades, parametros) : undefined);
   const alertas = periodo.etapa === "cerrada" ? [] : validar(empresa, d.empleados, periodo, d.novedades, resultados);
   const pend = pendientes(alertas, periodo);
   const estado = estadoVisible(periodo, alertas);
@@ -370,7 +390,7 @@ export function vistaPeriodo(
   const desactualizada =
     !!ultima &&
     periodo.etapa !== "cerrada" &&
-    hashDe(calcularEmpresa(empresa, d.empleados, mes, d.novedades)) !== ultima.hash;
+    hashDe(calcularEmpresa(empresa, d.empleados, mes, d.novedades, parametros)) !== ultima.hash;
   return { empresa, periodo, resultados, vigente, alertas, pend, estado, novedadesMes, desactualizada };
 }
 
@@ -379,9 +399,10 @@ export function useVistas(mes = MES_ACTUAL) {
   const empleados = useStore((s) => s.empleados);
   const novedades = useStore((s) => s.novedades);
   const periodos = useStore((s) => s.periodos);
+  const parametrosNormativos = useStore((s) => s.parametrosNormativos);
   return useMemo(
-    () => empresas.map((e) => vistaPeriodo(e.id, mes, { empresas, empleados, novedades, periodos })),
-    [mes, empresas, empleados, novedades, periodos],
+    () => empresas.map((e) => vistaPeriodo(e.id, mes, { empresas, empleados, novedades, periodos, parametrosNormativos })),
+    [mes, empresas, empleados, novedades, periodos, parametrosNormativos],
   );
 }
 

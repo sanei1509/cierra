@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Building2, KeyRound, ReceiptText, Users, ClipboardCheck } from "lucide-react";
+import { BellDot, Building2, KeyRound, ReceiptText, Users, ClipboardCheck } from "lucide-react";
 import { LoginForm } from "./login-form";
 import { Panel } from "@/components/ui";
 import { Logo } from "@/components/shell";
@@ -7,6 +7,7 @@ import { Logo } from "@/components/shell";
 const conceptos = [
   { label: "Empresas", icon: Building2 },
   { label: "Empleados", icon: Users },
+  { label: "Novedades", icon: BellDot },
   { label: "Liquidaciones", icon: ClipboardCheck },
   { label: "Recibos", icon: ReceiptText },
 ];
@@ -26,8 +27,8 @@ export default function LoginPage() {
   const devPassword = process.env.CIERRA_DEV_PASSWORD ?? "CierraDemo123";
 
   return (
-    <main className="h-screen overflow-hidden bg-[linear-gradient(135deg,#FFFFFF_0%,#F7FAFF_52%,#EAF2FF_100%)] text-[#102247]">
-      <div className="relative grid h-full w-full min-w-0 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_430px] xl:grid-cols-[minmax(0,1fr)_480px]">
+    <main className="min-h-screen overflow-x-hidden bg-[linear-gradient(135deg,#FFFFFF_0%,#F7FAFF_52%,#EAF2FF_100%)] text-[#102247] lg:h-screen lg:overflow-hidden">
+      <div className="relative grid min-h-screen w-full min-w-0 grid-cols-1 lg:h-full lg:grid-cols-[minmax(0,1fr)_430px] lg:overflow-hidden xl:grid-cols-[minmax(0,1fr)_480px]">
         <section className="relative hidden min-h-0 overflow-hidden px-12 py-8 lg:flex lg:flex-col xl:px-16">
           <div className="relative z-20">
             <Logo variant="full" className="w-[168px]" />
@@ -38,17 +39,17 @@ export default function LoginPage() {
               Todo el trabajo mensual de tu estudio, en un solo lugar.
             </h1>
             <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-[#667592] xl:text-lg">
-              Empresas, empleados, novedades, liquidaciones y recibos organizados en una plataforma clara, segura y moderna.
+              Centralizá empresas, empleados, novedades, liquidaciones y recibos, sin depender de planillas dispersas.
             </p>
           </div>
 
-          <div className="relative z-20 mt-6 grid max-w-[515px] grid-cols-4 gap-4">
+          <div className="relative z-20 mt-6 grid max-w-[620px] grid-cols-5 gap-3 xl:gap-4">
             {conceptos.map((item) => (
-              <div key={item.label} className="flex flex-col items-center gap-2 rounded-2xl border border-white bg-white/82 px-3 py-4 text-center shadow-[0_10px_24px_rgba(16,34,71,0.08)]">
-                <span className="flex size-11 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#2F6BFF]">
-                  <item.icon size={20} />
+              <div key={item.label} className="flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-white bg-white/82 px-2.5 py-3.5 text-center shadow-[0_10px_24px_rgba(16,34,71,0.08)] xl:px-3 xl:py-4">
+                <span className="flex size-10 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#2F6BFF] xl:size-11">
+                  <item.icon size={19} />
                 </span>
-                <span className="text-xs font-bold text-[#1B315F]">{item.label}</span>
+                <span className="text-[11px] font-bold leading-tight text-[#1B315F] xl:text-xs">{item.label}</span>
               </div>
             ))}
           </div>
@@ -98,15 +99,16 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <section className="relative z-20 flex min-w-0 items-center justify-center overflow-hidden px-3 py-6 sm:px-8 lg:bg-transparent">
-          <div className="min-w-0 max-w-[394px] space-y-3" style={{ width: "min(394px, calc(100vw - 48px))" }}>
+        <section className="relative z-20 flex min-w-0 items-center justify-center overflow-x-hidden px-3 py-6 sm:px-8 lg:max-h-screen lg:overflow-y-auto lg:bg-transparent">
+          <div className="min-w-0 max-w-[394px] space-y-3 lg:my-auto" style={{ width: "min(394px, calc(100vw - 48px))" }}>
             <div className="px-1 lg:hidden">
               <Logo variant="full" className="w-[154px]" />
               <p className="mt-5 text-2xl font-extrabold leading-tight text-[#102247]">Todo el trabajo mensual de tu estudio, en un solo lugar.</p>
             </div>
 
-            <Panel className="rounded-[24px] border-[rgba(16,34,71,0.10)] bg-white p-6 shadow-[0_16px_50px_rgba(16,34,71,0.10)] sm:p-7">
+            <Panel className="rounded-[24px] border-[#E3EAF6] bg-white p-6 shadow-[0_22px_60px_rgba(16,34,71,0.12)] sm:p-7">
               <p className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-[0.08em] text-[#2F6BFF]">
+                <span className="cierra-loader-symbol flex size-7 shrink-0 items-center justify-center rounded-xl bg-[#EAF2FF]" aria-hidden />
                 <KeyRound size={16} /> Acceso
               </p>
               <h2 className="mt-3 text-[29px] font-extrabold leading-tight tracking-tight text-[#102247]">Entrar a Cierra</h2>
@@ -118,10 +120,11 @@ export default function LoginPage() {
                 href="https://nmbtech.net"
                 target="_blank"
                 rel="noreferrer"
-                className="mt-5 block rounded-[14px] bg-[#EAF2FF] px-4 py-3 text-center transition-colors hover:bg-[#DCEBFF] focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/25"
+                className="mt-5 block cursor-pointer rounded-[14px] border border-[#D8E1F0] bg-[#F7FAFF] px-4 py-3 text-center transition-colors hover:border-[#2F6BFF]/30 hover:bg-[#EAF2FF] focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/25"
               >
                 <p className="text-sm font-bold text-[#102247]">¿Necesitás acceso?</p>
-                <p className="text-xs font-medium text-[#667592]">Conectá con un administrador.</p>
+                <p className="text-xs font-semibold text-[#2459E6]">Contactá a NM BTech</p>
+                <p className="mt-0.5 text-[11px] font-medium text-[#667592]">Solicitá información o acceso a Cierra.</p>
               </a>
             </Panel>
           </div>

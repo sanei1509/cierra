@@ -1,8 +1,8 @@
 import type { AccessContext, EstudioId } from "../datos/contexto";
 import type { AjusteManualCobro, PagoEstudio, ResumenCobroEstudio } from "../facturacion";
-import { calcularEstadoCobro, crearAplicacionesPagoAdelantado, validarPagoEstudio } from "../facturacion";
+import { calcularEstadoCobro, validarPagoEstudio } from "../facturacion";
 import type { AuditoriaRepo, PagosRepo, PlanesRepo, ResumenesCobroRepo, SuscripcionesRepo, UsoFacturableRepo } from "../datos/contratos";
-import { noEncontrado, sinPermiso } from "../datos/errores";
+import { noEncontrado, sinPermiso, validacion } from "../datos/errores";
 import { generarResumenCobroEstudio } from "../facturacion";
 import { assertAutenticado, puedeAdministrarSistema } from "../permisos";
 import { tenantParaEstudio } from "./contexto";
@@ -16,6 +16,12 @@ export interface GenerarResumenCobroAdminInput {
 export interface RegistrarPagoEstudioAdminInput extends Omit<PagoEstudio, "estudioId"> {
   desdeMes: string;
   mesesCubiertos?: number;
+}
+
+function sumarMesFacturacion(mes: string, cantidad: number) {
+  const [anio, mesNumero] = mes.split("-").map(Number);
+  const fecha = new Date(Date.UTC(anio, mesNumero - 1 + cantidad, 1));
+  return `${fecha.getUTCFullYear()}-${String(fecha.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 export async function generarResumenCobroAdmin(
@@ -82,17 +88,22 @@ export async function registrarPagoEstudioAdmin(
 
   const pago = validarPagoEstudio({ ...input, estudioId });
   const mesesCubiertos = input.mesesCubiertos ?? 1;
-  const aplicaciones = crearAplicacionesPagoAdelantado({
-    estudioId,
-    pagoId: input.id,
-    desdeMes: input.desdeMes,
-    meses: mesesCubiertos,
-    importeTotalCent: pago.importeCent,
-    nota: pago.nota,
+  const resumenes = await repos.resumenesCobro.listar({ estudioId });
+  const resumenesPorMes = new Map(resumenes.map((resumen) => [resumen.mes, resumen]));
+  const meses = Array.from({ length: mesesCubiertos }, (_, index) => sumarMesFacturacion(input.desdeMes, index));
+  const aplicaciones = meses.map((mes) => {
+    const resumen = resumenesPorMes.get(mes);
+    if (!resumen) validacion(`Primero tenes que emitir la factura de ${mes} para registrar el pago`);
+    return {
+      estudioId,
+      pagoId: input.id,
+      mes,
+      importeCent: resumen.totalCent,
+      nota: pago.nota,
+    };
   });
 
   const guardado = await repos.pagos.registrarPago(pago, aplicaciones);
-  const resumenes = await repos.resumenesCobro.listar({ estudioId });
   const estados = resumenes.map((resumen) => ({
     mes: resumen.mes,
     ...calcularEstadoCobro(resumen, guardado.aplicaciones),

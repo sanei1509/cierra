@@ -682,11 +682,11 @@ export function calcularEmpleado(
   };
 }
 
-export function calcularEmpresa(empresa: Empresa, empleados: Empleado[], mes: string, novedades: Novedad[]) {
+export function calcularEmpresa(empresa: Empresa, empleados: Empleado[], mes: string, novedades: Novedad[], P: Parametros = parametrosVigentes(mes)) {
   const novsMes = novedades.filter((n) => n.empresaId === empresa.id && n.mes === mes);
   return empleados
     .filter((e) => e.empresaId === empresa.id && activoEn(e, mes))
-    .map((e) => calcularEmpleado(empresa, e, mes, novsMes));
+    .map((e) => calcularEmpleado(empresa, e, mes, novsMes, P));
 }
 
 export function totales(rs: ResultadoEmpleado[]) {

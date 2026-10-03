@@ -8,8 +8,8 @@ import {
   crearEmpleadoConAccesoInicial,
   crearEmpresaConAccesoInicial,
 } from "cierrabe/acciones";
-import { tenantContextDesdeAcceso, type EmpleadoId, type EmpresaId, type NovedadId, type PeriodoId } from "cierrabe/datos/contexto";
-import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo, crearReciboVistasRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
+import { tenantContextDesdeAcceso, type AccessContext, type EmpleadoId, type EmpresaId, type NovedadId, type PeriodoId } from "cierrabe/datos/contexto";
+import { crearAuditoriaRepo, crearEmpleadosRepo, crearEmpresasRepo, crearNovedadesRepo, crearPeriodosRepo, crearReciboVistasRepo, crearSuscripcionesRepo, crearUsuariosRepo } from "cierrabe/datos/repos";
 import { contextoEstudioDesarrollo, uuidValido } from "@/lib/backend-dev-context";
 import { contextoOperativoActual } from "@/lib/backend-operativo";
 import { obtenerSesionDev } from "@/lib/dev-auth";
@@ -413,6 +413,31 @@ function periodoInicial(empresaId: EmpresaId, mes: string): Periodo {
   };
 }
 
+async function validarEscrituraPorContrato(ctx: AccessContext, accion: string): Promise<AltaRealResult | null> {
+  if (!process.env.DATABASE_URL || ctx.actorTipo === "sistema") return null;
+
+  const { db } = await import("cierrabe/datos/db");
+  const suscripcion = await crearSuscripcionesRepo(db).obtenerVigente(ctx.estudioId);
+  if (!suscripcion) {
+    return { ok: false, modo: "real", mensaje: "No encontramos una suscripcion vigente para este estudio." };
+  }
+  if (suscripcion.estado === "prueba") {
+    return {
+      ok: true,
+      modo: "demo",
+      mensaje: `${accion} simulada: el estudio esta en prueba y los cambios no se guardan en la base real.`,
+    };
+  }
+  if (["pausado", "cancelado", "vencido"].includes(suscripcion.estado)) {
+    return {
+      ok: false,
+      modo: "real",
+      mensaje: "Contrato pausado: el estudio queda en modo consulta y no permite guardar cambios.",
+    };
+  }
+  return null;
+}
+
 async function guardarPeriodoReal(
   input: PeriodoRealInput,
   cambio: (actual: Periodo) => Promise<{ periodo: Periodo; auditoria: { accion: string; detalle?: string } }>,
@@ -422,6 +447,8 @@ async function guardarPeriodoReal(
   if (!ctx || !actoresPermitidos.includes(ctx.actorTipo as "estudio" | "empresa") || !process.env.DATABASE_URL || !uuidValido(input.periodoId) || !uuidValido(input.empresaId)) {
     return { ok: true, modo: "demo", mensaje: "Accion simulada: falta sesion de estudio o backend real." };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Accion");
+  if (bloqueoContrato) return bloqueoContrato;
 
   const tenant = tenantContextDesdeAcceso(ctx);
   if (!tenant) return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
@@ -460,6 +487,8 @@ export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Prom
       mensaje: "Alta simulada: falta DATABASE_URL, CIERRA_DEV_ESTUDIO_ID o CIERRA_DEV_USUARIO_ID con UUID real.",
     };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Alta de empresa");
+  if (bloqueoContrato) return bloqueoContrato;
 
   const { db } = await import("cierrabe/datos/db");
   const res = await crearEmpresaConAccesoInicial(
@@ -509,6 +538,8 @@ export async function crearEmpleadoInicial(input: CrearEmpleadoInicialInput): Pr
       mensaje: "Alta simulada: falta backend real o la empresa demo no tiene UUID real.",
     };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Alta de empleado");
+  if (bloqueoContrato) return bloqueoContrato;
 
   const empresaId = input.empresaId as EmpresaId;
   const { db } = await import("cierrabe/datos/db");
@@ -555,6 +586,8 @@ export async function importarEmpleadosReal(input: ImportarEmpleadosRealInput): 
   if (!ctx || ctx.actorTipo !== "estudio" || !process.env.DATABASE_URL || !uuidValido(input.empresaId)) {
     return { ok: true, modo: "demo", mensaje: "Importacion simulada: falta sesion de estudio o backend real." };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Importacion de empleados");
+  if (bloqueoContrato) return { ...bloqueoContrato, ids: [] };
   if (!input.empleados.length) {
     return { ok: false, modo: "real", mensaje: "No hay empleados validos para importar." };
   }
@@ -641,6 +674,8 @@ export async function actualizarEmpresaReal(input: ActualizarEmpresaRealInput): 
   if (!ctx || ctx.actorTipo !== "estudio" || !process.env.DATABASE_URL || !uuidValido(input.empresaId)) {
     return { ok: true, modo: "demo", mensaje: "Empresa actualizada solo en demo: falta sesion de estudio o backend real." };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Edicion de empresa");
+  if (bloqueoContrato) return bloqueoContrato;
 
   const { db } = await import("cierrabe/datos/db");
   const empresaId = input.empresaId as EmpresaId;
@@ -667,6 +702,8 @@ export async function actualizarEmpleadoReal(input: ActualizarEmpleadoRealInput)
   if (!ctx || ctx.actorTipo !== "estudio" || !process.env.DATABASE_URL || !uuidValido(input.empresaId) || !uuidValido(input.empleadoId)) {
     return { ok: true, modo: "demo", mensaje: "Empleado actualizado solo en demo: falta sesion de estudio o backend real." };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Edicion de empleado");
+  if (bloqueoContrato) return bloqueoContrato;
 
   const { db } = await import("cierrabe/datos/db");
   const empresaId = input.empresaId as EmpresaId;
@@ -700,6 +737,8 @@ export async function crearNovedadReal(input: CrearNovedadRealInput): Promise<Al
       mensaje: "Novedad simulada: falta backend real o IDs UUID.",
     };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Novedad");
+  if (bloqueoContrato) return bloqueoContrato;
 
   const tenant = tenantContextDesdeAcceso(ctx);
   if (!tenant) {
@@ -768,6 +807,8 @@ export async function actualizarNovedadReal(input: ActualizarNovedadRealInput): 
       mensaje: "Novedad actualizada solo en demo: falta backend real o IDs UUID.",
     };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Edicion de novedad");
+  if (bloqueoContrato) return bloqueoContrato;
 
   const tenant = tenantContextDesdeAcceso(ctx);
   if (!tenant) {
@@ -826,6 +867,8 @@ export async function borrarNovedadReal(input: BorrarNovedadRealInput): Promise<
       mensaje: "Novedad eliminada solo en demo: falta backend real o IDs UUID.",
     };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Eliminacion de novedad");
+  if (bloqueoContrato) return bloqueoContrato;
 
   const tenant = tenantContextDesdeAcceso(ctx);
   if (!tenant) {
@@ -906,6 +949,8 @@ export async function enviarNovedadesClienteReal(input: EnviarNovedadesClienteRe
       mensaje: "Envio simulado: falta backend real o empresa UUID.",
     };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Envio de novedades");
+  if (bloqueoContrato) return bloqueoContrato;
 
   const tenant = tenantContextDesdeAcceso(ctx);
   if (!tenant) {
@@ -1104,6 +1149,8 @@ export async function marcarReciboVistoReal(input: MarcarReciboVistoRealInput): 
   if (!ctx || ctx.actorTipo !== "empleado" || !process.env.DATABASE_URL || !uuidValido(input.empleadoId) || !uuidValido(input.empresaId)) {
     return { ok: true, modo: "demo", mensaje: "Vista simulada: falta sesion de empleado o backend real." };
   }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Vista de recibo");
+  if (bloqueoContrato) return bloqueoContrato;
   if (ctx.empleadoId !== input.empleadoId || ctx.empresaId !== input.empresaId) {
     return { ok: false, modo: "real", mensaje: "No podés marcar un recibo de otra persona." };
   }

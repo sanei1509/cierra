@@ -5,6 +5,8 @@ export const REAL_SESSION_COOKIE = "cierra_session";
 
 export interface RealSessionPayload {
   usuarioId: string;
+  email?: string;
+  nombre?: string;
   exp: number;
   espacio: EspacioAcceso;
 }
@@ -33,6 +35,8 @@ export function serializarSesionReal(sesion: SesionAutenticada) {
 
   const payload: RealSessionPayload = {
     usuarioId: sesion.usuario.id,
+    email: sesion.usuario.email,
+    nombre: sesion.usuario.nombre,
     exp: sesion.expira.getTime(),
     espacio: sesion.espacio,
   };

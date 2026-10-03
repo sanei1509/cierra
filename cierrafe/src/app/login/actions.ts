@@ -28,7 +28,9 @@ const realCookieOptions = {
 async function guardarSesion(accesoId: DevAccessId) {
   const acceso = ACCESOS_DESARROLLO.find((a) => a.id === accesoId);
   if (!acceso) return null;
-  (await cookies()).set(DEV_SESSION_COOKIE, serializarSesionDev(acceso), cookieOptions);
+  const cookieStore = await cookies();
+  cookieStore.set(DEV_SESSION_COOKIE, serializarSesionDev(acceso), cookieOptions);
+  cookieStore.delete(REAL_SESSION_COOKIE);
   return acceso.href;
 }
 

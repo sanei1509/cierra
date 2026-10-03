@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Calculator, CircleDollarSign, ClipboardList, CreditCard, FileClock, FileText, Layers3, Pencil, Plus, Printer, Save, ShieldCheck, Undo2, X } from "lucide-react";
+import { ArrowLeft, Building2, Calculator, CircleDollarSign, ClipboardList, CreditCard, FileClock, FileText, Layers3, Pencil, Plus, Printer, Save, Search, ShieldCheck, Undo2, UserCog, X } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import {
   generarResumenCobroComercial,
@@ -31,6 +31,9 @@ import {
 } from "@/lib/comercial-demo";
 import { Logo } from "./shell";
 import { Boton, Campo, Chip, Drawer, Modal, Panel, inputCls } from "./ui";
+import { fechaHora } from "@/lib/format";
+import { ESTUDIO } from "@/lib/seed";
+import { useStore } from "@/lib/store";
 
 function slugId(s: string) {
   return s
@@ -104,6 +107,36 @@ function nombreMesCobro(mes: string) {
   return new Intl.DateTimeFormat("es-UY", { month: "long", year: "numeric" }).format(new Date(anio, mesNumero - 1, 1));
 }
 
+function tituloPagoVista(pago: { descripcion: string; aplicaciones: { mes: string; importeCent: number }[] }, totalMesCent?: number) {
+  const meses = pago.aplicaciones.map((aplicacion) => aplicacion.mes).sort();
+  if (pago.descripcion.startsWith("Pago a cuenta")) {
+    if (meses.length > 1) return `Pago a cuenta desde ${nombreMesCobro(meses[0])} · ${meses.length} meses`;
+    if (meses[0]) return `Pago a cuenta de ${nombreMesCobro(meses[0])}`;
+    return pago.descripcion;
+  }
+  if (meses.length === 1) {
+    const esParcial = totalMesCent !== undefined && pago.aplicaciones[0].importeCent < totalMesCent;
+    return `${esParcial ? "Pago parcial de" : "Pago de"} ${nombreMesCobro(meses[0])}`;
+  }
+  if (meses.length > 1) return `Pago de ${meses.length} meses desde ${nombreMesCobro(meses[0])}`;
+
+  const mesTecnico = pago.descripcion.match(/^Pago de (\d{4}-\d{2})$/);
+  if (mesTecnico) return `Pago de ${nombreMesCobro(mesTecnico[1])}`;
+  if (pago.descripcion.includes("consola admin")) return "Pago mensual";
+  return pago.descripcion;
+}
+
+function fechaAuditoriaPago(pago: { id: string; aplicaciones: { mes: string }[] }) {
+  const timestamp = pago.id.match(/^(\d{13})(?:-|$)/)?.[1];
+  if (timestamp) {
+    const fecha = new Date(Number(timestamp));
+    if (Number.isFinite(fecha.getTime())) return fecha.toISOString();
+  }
+  const primerMes = pago.aplicaciones.map((aplicacion) => aplicacion.mes).sort()[0];
+  if (primerMes && /^\d{4}-\d{2}$/.test(primerMes)) return `${primerMes}-01T12:00:00.000Z`;
+  return new Date().toISOString();
+}
+
 function mesActualCobro() {
   return new Date().toISOString().slice(0, 7);
 }
@@ -149,8 +182,28 @@ const PRECIOS_MODULO_BASE: Record<string, number> = {
 };
 
 type PagoRegistradoVista = PagoRegistradoComercial;
+type AuditoriaVista = "inicio" | "admin" | "estudio" | "empresa";
+type AuditoriaEmpresaModo = "por_estudio" | "directa" | null;
+type EventoAuditoriaAdmin = {
+  id: string;
+  fecha: string;
+  actor: string;
+  estudioId?: string;
+  empresaId?: string;
+  entidad: string;
+  accion: string;
+  detalle?: string;
+};
 
-export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: DatosConsolaComercial }) {
+export function AdminCommercialConsole({
+  datosIniciales,
+  auditoriaActor,
+  actuarComoEstudioAction,
+}: {
+  datosIniciales: DatosConsolaComercial;
+  auditoriaActor?: string;
+  actuarComoEstudioAction?: () => Promise<void>;
+}) {
   const [estudios, setEstudios] = useState(datosIniciales.estudios);
   const [estudiosGuardados, setEstudiosGuardados] = useState(datosIniciales.estudios);
   const [planes, setPlanes] = useState(datosIniciales.planes);
@@ -179,6 +232,7 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
   const [resultadoResumen, setResultadoResumen] = useState<GenerarResumenCobroResult | null>(null);
   const [resultadoPago, setResultadoPago] = useState<RegistrarPagoComercialResult | null>(null);
   const [mesCobro, setMesCobro] = useState(mesActualCobro());
+  const [descuentoAbierto, setDescuentoAbierto] = useState(false);
   const [ajusteDescripcion, setAjusteDescripcion] = useState("");
   const [ajusteMonto, setAjusteMonto] = useState("");
   const [ajusteConfirmado, setAjusteConfirmado] = useState<AjusteCobroAdmin | null>(null);
@@ -187,6 +241,17 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
   const [pagoACuentaImporte, setPagoACuentaImporte] = useState("");
   const [pagoACuentaDesdeMes, setPagoACuentaDesdeMes] = useState(() => sumarMesCobro(mesActualCobro(), 1));
   const [pagoACuentaMeses, setPagoACuentaMeses] = useState(1);
+  const [auditoriaVista, setAuditoriaVista] = useState<AuditoriaVista>("inicio");
+  const [auditoriaEstudioId, setAuditoriaEstudioId] = useState("");
+  const [auditoriaEmpresaModo, setAuditoriaEmpresaModo] = useState<AuditoriaEmpresaModo>(null);
+  const [auditoriaEmpresaId, setAuditoriaEmpresaId] = useState("");
+  const [busquedaEmpresaAudit, setBusquedaEmpresaAudit] = useState("");
+  const [auditoriaDesde, setAuditoriaDesde] = useState("");
+  const [auditoriaHasta, setAuditoriaHasta] = useState("");
+  const [auditoriaAccion, setAuditoriaAccion] = useState("");
+  const [auditoriaUsuario, setAuditoriaUsuario] = useState("");
+  const [auditoriaEntidad, setAuditoriaEntidad] = useState("todas");
+  const [auditoriaPagina, setAuditoriaPagina] = useState(1);
   const [resumenesPorMes, setResumenesPorMes] = useState<Record<string, ResumenCobroAdmin>>(datosIniciales.resumenesPorMes);
   const [pagosDemo, setPagosDemo] = useState<Record<string, number>>(() => {
     const pagos: Record<string, number> = {};
@@ -203,6 +268,8 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
   const [pendiente, startTransition] = useTransition();
   const [pendienteNuevo, startNuevoTransition] = useTransition();
   const [pendientePago, startPagoTransition] = useTransition();
+  const auditOperativa = useStore((s) => s.audit);
+  const empresasOperativas = useStore((s) => s.empresas);
   const seleccionado = estudios.find((e) => e.id === seleccionadoId) ?? estudios[0];
   const seleccionadoGuardado = estudiosGuardados.find((e) => e.id === seleccionadoId);
   const plan = seleccionado ? planPorCodigo(seleccionado.planCodigo, planes) : undefined;
@@ -277,6 +344,71 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
   const pagosDelEstudio = pagosRegistrados
     .filter((pago) => pago.estudioId === seleccionado.id)
     .toSorted((a, b) => (b.aplicaciones[0]?.mes ?? "").localeCompare(a.aplicaciones[0]?.mes ?? ""));
+  const actorAuditoriaAdmin = auditoriaActor ?? "admin@cierra.local";
+  const auditoriaEstudioSeleccionadoId = auditoriaEstudioId || seleccionado.id;
+  const eventosAuditoriaAdmin: EventoAuditoriaAdmin[] = (() => {
+    const eventosFacturas = Object.values(resumenesPorMes).map((resumen) => ({
+      id: `factura:${resumen.estudioId}:${resumen.mes}`,
+      fecha: resumen.generado,
+      actor: actorAuditoriaAdmin,
+      estudioId: resumen.estudioId,
+      entidad: "Factura",
+      accion: `Emitio factura de ${nombreMesCobro(resumen.mes)}`,
+      detalle: `${fmtCent(resumen.totalCent, resumen.moneda)} - ${resumen.lineas.length} ${resumen.lineas.length === 1 ? "concepto" : "conceptos"}`,
+    }));
+    const eventosPagos = pagosRegistrados.map((pago) => ({
+      id: `pago:${pago.id}`,
+      fecha: fechaAuditoriaPago(pago),
+      actor: actorAuditoriaAdmin,
+      estudioId: pago.estudioId,
+      entidad: "Pago",
+      accion: tituloPagoVista(pago),
+      detalle: `${fmtCent(pago.importeCent, estudios.find((estudio) => estudio.id === pago.estudioId)?.moneda ?? "UYU")} - ${pago.aplicaciones.length} ${pago.aplicaciones.length === 1 ? "mes" : "meses"}`,
+    }));
+    const eventosConfiguracion = estudios.map((estudio) => {
+      const planEstudio = planPorCodigo(estudio.planCodigo, planes);
+      return {
+        id: `config:${estudio.id}`,
+        fecha: new Date().toISOString(),
+        actor: actorAuditoriaAdmin,
+        estudioId: estudio.id,
+        entidad: "Configuracion comercial",
+        accion: "Configuro plan, modulos y estado comercial",
+        detalle: `${planEstudio?.nombre ?? estudio.planCodigo} - ${estudio.addons.length} ${estudio.addons.length === 1 ? "modulo extra" : "modulos extra"} - ${fmtCent(totalMensualCent(estudio, planes, addonsDisponiblesParaPlan(planEstudio)), estudio.moneda)}`,
+      };
+    });
+    return [...eventosPagos, ...eventosFacturas, ...eventosConfiguracion].toSorted((a, b) => b.fecha.localeCompare(a.fecha));
+  })();
+  const eventosAuditoriaEstudio = eventosAuditoriaAdmin.filter((evento) => evento.estudioId === auditoriaEstudioSeleccionadoId);
+  const estudioOperativoSeleccionado = estudios.find((estudio) => estudio.id === auditoriaEstudioSeleccionadoId)?.nombre === ESTUDIO.nombre;
+  const empresasBaseAuditoria = auditoriaEmpresaModo === "por_estudio" ? (estudioOperativoSeleccionado ? empresasOperativas : []) : empresasOperativas;
+  const empresasAudit = empresasBaseAuditoria.filter((empresa) => empresa.nombre.toLowerCase().includes(busquedaEmpresaAudit.trim().toLowerCase()));
+  const empresaAuditSeleccionada = empresasOperativas.find((empresa) => empresa.id === auditoriaEmpresaId);
+  const eventosAuditoriaEmpresa = auditOperativa.filter((evento) => evento.empresaId === auditoriaEmpresaId);
+  const filtrarEventosAuditoria = (eventos: EventoAuditoriaAdmin[]) => {
+    const accion = auditoriaAccion.trim().toLowerCase();
+    const usuario = auditoriaUsuario.trim().toLowerCase();
+    return eventos.filter((evento) => {
+      const dia = evento.fecha.slice(0, 10);
+      if (auditoriaDesde && dia < auditoriaDesde) return false;
+      if (auditoriaHasta && dia > auditoriaHasta) return false;
+      if (auditoriaEntidad !== "todas" && evento.entidad !== auditoriaEntidad) return false;
+      if (usuario && !evento.actor.toLowerCase().includes(usuario)) return false;
+      if (accion) {
+        const texto = `${evento.entidad} ${evento.accion} ${evento.detalle ?? ""}`.toLowerCase();
+        if (!texto.includes(accion)) return false;
+      }
+      return true;
+    });
+  };
+  const eventosAdminFiltrados = filtrarEventosAuditoria(eventosAuditoriaAdmin);
+  const eventosEstudioFiltrados = filtrarEventosAuditoria(eventosAuditoriaEstudio);
+  const eventosEmpresaFiltrados = filtrarEventosAuditoria(eventosAuditoriaEmpresa);
+  const entidadesAuditoria = [
+    ...new Set(
+      (auditoriaVista === "empresa" ? eventosAuditoriaEmpresa : auditoriaVista === "estudio" ? eventosAuditoriaEstudio : eventosAuditoriaAdmin).map((evento) => evento.entidad),
+    ),
+  ].sort();
   const mesesPagoACuentaSinFactura = mesesPagoACuentaSeleccionados.filter((mes) => !resumenesPorMes[`${seleccionado.id}:${mes}`]);
   const importeDescuentoInput = Math.abs(Number(ajusteMonto.replace(/\./g, "").replace(",", ".")));
   const puedeConfirmarDescuento = Boolean(ajusteDescripcion.trim()) && Number.isFinite(importeDescuentoInput) && importeDescuentoInput > 0;
@@ -448,7 +580,7 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
           mes: desdeMes,
           importeCent,
           mesesCubiertos: meses,
-          nota: nota ?? (meses > 1 ? `Pago a cuenta por ${meses} meses` : "Pago mensual marcado desde consola admin"),
+          nota: nota ?? (meses > 1 ? `Pago a cuenta por ${meses} meses` : `Pago de ${nombreMesCobro(desdeMes)}`),
         });
         setResultadoPago(resultadoPagoNuevo);
         const esPagoACuenta = nota?.startsWith("Pago a cuenta");
@@ -515,6 +647,174 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
         });
       }
     });
+  };
+
+  const limpiarFiltrosAuditoria = () => {
+    setAuditoriaDesde("");
+    setAuditoriaHasta("");
+    setAuditoriaAccion("");
+    setAuditoriaUsuario("");
+    setAuditoriaEntidad("todas");
+    setAuditoriaPagina(1);
+  };
+
+  const volverAuditoriaInicio = () => {
+    setAuditoriaVista("inicio");
+    setAuditoriaEmpresaModo(null);
+    setAuditoriaEmpresaId("");
+    setBusquedaEmpresaAudit("");
+    setAuditoriaPagina(1);
+    limpiarFiltrosAuditoria();
+  };
+
+  const abrirVistaAuditoria = (vista: AuditoriaVista) => {
+    setAuditoriaVista(vista);
+    if (vista === "estudio" && !auditoriaEstudioId) setAuditoriaEstudioId(seleccionado.id);
+    if (vista === "empresa") {
+      setAuditoriaEmpresaModo(null);
+      setAuditoriaEmpresaId("");
+    }
+    setAuditoriaPagina(1);
+    limpiarFiltrosAuditoria();
+  };
+
+  const cambiarFiltroAuditoria = (accion: () => void) => {
+    accion();
+    setAuditoriaPagina(1);
+  };
+
+  const tituloModalAuditoria =
+    auditoriaVista === "admin" ? "Auditoria admin" : auditoriaVista === "estudio" ? "Auditoria estudio" : auditoriaVista === "empresa" ? "Auditoria empresa" : "Auditoria";
+
+  const renderFiltrosAuditoria = () => (
+    <div className="grid gap-2 rounded-xl border border-linea bg-hundido p-3 md:grid-cols-5">
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Desde</span>
+        <input className={inputCls} type="date" value={auditoriaDesde} onChange={(e) => cambiarFiltroAuditoria(() => setAuditoriaDesde(e.target.value))} />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Hasta</span>
+        <input className={inputCls} type="date" value={auditoriaHasta} onChange={(e) => cambiarFiltroAuditoria(() => setAuditoriaHasta(e.target.value))} />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Accion o detalle</span>
+        <input className={inputCls} value={auditoriaAccion} onChange={(e) => cambiarFiltroAuditoria(() => setAuditoriaAccion(e.target.value))} placeholder="Ej. factura, pago" />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Usuario</span>
+        <input className={inputCls} value={auditoriaUsuario} onChange={(e) => cambiarFiltroAuditoria(() => setAuditoriaUsuario(e.target.value))} placeholder="Ej. Lucia" />
+      </label>
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] md:contents">
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Tipo</span>
+          <select className={inputCls} value={auditoriaEntidad} onChange={(e) => cambiarFiltroAuditoria(() => setAuditoriaEntidad(e.target.value))}>
+            <option value="todas">Todos</option>
+            {entidadesAuditoria.map((entidad) => (
+              <option key={entidad} value={entidad}>
+                {entidad}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex items-end">
+          <Boton type="button" variante="fantasma" tam="md" className="w-full whitespace-nowrap" onClick={limpiarFiltrosAuditoria}>
+            Limpiar
+          </Boton>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderEventosAuditoria = (eventos: EventoAuditoriaAdmin[], vacio: string) => {
+    const porPagina = 8;
+    const totalPaginas = Math.max(1, Math.ceil(eventos.length / porPagina));
+    const paginaActual = Math.min(auditoriaPagina, totalPaginas);
+    const desde = (paginaActual - 1) * porPagina;
+    const eventosPagina = eventos.slice(desde, desde + porPagina);
+    return (
+      <div className="overflow-hidden rounded-xl border border-linea bg-superficie">
+        {eventos.length === 0 ? (
+          <p className="px-4 py-5 text-sm text-apagado">{vacio}</p>
+        ) : (
+          <>
+            <div className="divide-y divide-linea md:hidden">
+              {eventosPagina.map((evento) => (
+                <article key={evento.id} className="grid gap-3 px-4 py-3 text-sm lg:grid-cols-[150px_minmax(0,1fr)]">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Fecha</p>
+                    <p className="num mt-1 text-xs font-semibold text-tinta-2">{fechaHora(evento.fecha)}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Que se hizo</p>
+                        <p className="mt-1 font-bold">{evento.accion}</p>
+                      </div>
+                      <span className="rounded-full bg-hundido px-2 py-0.5 text-[11px] font-semibold text-tinta-2">{evento.entidad}</span>
+                    </div>
+                    <div className="mt-2 grid gap-2 text-xs text-apagado sm:grid-cols-[180px_minmax(0,1fr)]">
+                      <span>
+                        <span className="block font-bold uppercase tracking-[0.06em]">Quien lo hizo</span>
+                        <span className="mt-0.5 block text-tinta-2">{evento.actor}</span>
+                      </span>
+                      {evento.detalle && (
+                        <span>
+                          <span className="block font-bold uppercase tracking-[0.06em]">Detalle</span>
+                          <span className="mt-0.5 block">{evento.detalle}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="hidden max-h-[58vh] overflow-auto md:block">
+              <table className="w-full min-w-[820px] border-collapse text-sm">
+                <thead className="sticky top-0 z-10 border-b border-linea bg-superficie">
+                  <tr className="text-left text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">
+                    <th className="w-[150px] px-4 py-3">Fecha</th>
+                    <th className="px-4 py-3">Que se hizo</th>
+                    <th className="w-[220px] px-4 py-3">Quien lo hizo</th>
+                    <th className="w-[280px] px-4 py-3">Detalle</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-linea">
+                  {eventosPagina.map((evento) => (
+                    <tr key={evento.id} className="align-top">
+                      <td className="num px-4 py-3 text-xs font-semibold text-tinta-2">{fechaHora(evento.fecha)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold">{evento.accion}</span>
+                          <span className="rounded-full bg-hundido px-2 py-0.5 text-[11px] font-semibold text-tinta-2">{evento.entidad}</span>
+                        </div>
+                      </td>
+                      <td className="break-all px-4 py-3 text-xs font-semibold text-tinta-2">{evento.actor}</td>
+                      <td className="px-4 py-3 text-xs leading-5 text-apagado">{evento.detalle ?? "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-linea px-4 py-3 text-sm">
+              <span className="text-xs font-semibold text-apagado">
+                {desde + 1}-{Math.min(desde + porPagina, eventos.length)} de {eventos.length}
+              </span>
+              <span className="flex items-center gap-2">
+                <Boton type="button" variante="secundario" tam="sm" onClick={() => setAuditoriaPagina((actual) => Math.max(1, actual - 1))} disabled={paginaActual <= 1}>
+                  Anterior
+                </Boton>
+                <span className="text-xs font-semibold text-tinta-2">
+                  {paginaActual} / {totalPaginas}
+                </span>
+                <Boton type="button" variante="secundario" tam="sm" onClick={() => setAuditoriaPagina((actual) => Math.min(totalPaginas, actual + 1))} disabled={paginaActual >= totalPaginas}>
+                  Siguiente
+                </Boton>
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -602,6 +902,13 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
               <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{seleccionado.nombre}</h2>
               <p className="mt-1 text-sm text-apagado">{modulosVisibles.length} modulos habilitados · {fmtCent(total, seleccionado.moneda)} mensuales</p>
             </div>
+            {actuarComoEstudioAction && (
+              <form action={actuarComoEstudioAction}>
+                <Boton type="submit" variante="secundario" tam="md" className="w-full sm:w-auto">
+                  <ShieldCheck size={15} /> Funcionar como estudio
+                </Boton>
+              </form>
+            )}
           </div>
         </Panel>
 
@@ -840,88 +1147,87 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
               </h3>
               <div className="mt-2 flex flex-wrap items-end gap-x-3 gap-y-2">
                 <span className="text-xl font-extrabold text-tinta">{fmtCent(resumenVisible.totalCent, resumenVisible.moneda)}</span>
-                <span className="inline-flex rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">{nombreMesCobro(resumenVisible.mes)}</span>
                 <span className="inline-flex rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">
                   {resumenVisible.lineas.length} {resumenVisible.lineas.length === 1 ? "concepto" : "conceptos"}
                 </span>
               </div>
             </div>
-            <Chip tono={tonoFactura}>{estadoFactura}</Chip>
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <Chip tono={tonoFactura}>{estadoFactura}</Chip>
+              <select
+                aria-label="Mes a facturar"
+                className="h-8 rounded-full border border-linea bg-hundido px-3 text-xs font-semibold text-tinta-2 outline-none transition-colors hover:border-petroleo/35 focus:border-petroleo-3 focus:ring-2 focus:ring-petroleo-3/20"
+                value={mesCobro}
+                onChange={(e) => {
+                  const mes = e.target.value;
+                  setMesCobro(mes);
+                  setPagoACuentaDesdeMes(sumarMesCobro(mes, 1));
+                  quitarDescuento();
+                  setResultadoResumen(null);
+                  setResultadoPago(null);
+                }}
+              >
+                <option value={mesCobro} hidden>
+                  {nombreMesCobro(mesCobro)}
+                </option>
+                {mesesSelector.map((mes) => (
+                  <option key={mes} value={mes}>
+                    {nombreMesCobro(mes)}
+                    {resumenesPorMes[`${seleccionado.id}:${mes}`] ? " · factura emitida" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="grid min-w-0 items-start gap-4 px-5 py-3 2xl:grid-cols-[minmax(0,1fr)_344px]">
-            <div className="min-w-0">
-              <div className="grid min-w-0 items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(180px,220px)_minmax(180px,1fr)_minmax(150px,170px)_minmax(170px,190px)]">
-                <label className="block">
-                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Mes</span>
-                  <select
-                    className={inputCls}
-                    value={mesCobro}
-                    onChange={(e) => {
-                      const mes = e.target.value;
-                      setMesCobro(mes);
-                      setPagoACuentaDesdeMes(sumarMesCobro(mes, 1));
-                      quitarDescuento();
-                      setResultadoResumen(null);
-                      setResultadoPago(null);
-                    }}
-                  >
-                    {mesesSelector.map((mes) => (
-                      <option key={mes} value={mes}>
-                        {nombreMesCobro(mes)}
-                        {resumenesPorMes[`${seleccionado.id}:${mes}`] ? " · factura emitida" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Motivo del ajuste</span>
-                  <input
-                    className={inputCls}
-                    value={ajusteDescripcion}
-                    onChange={(e) => {
-                      const valor = e.target.value;
-                      setAjusteDescripcion(valor);
-                      if (!valor.trim()) {
-                        setAjusteConfirmado(null);
-                        setResultadoResumen(null);
-                      }
-                    }}
-                    placeholder="Ej. Cortesia"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Importe a descontar</span>
-                  <input
-                    className={inputCls}
-                    value={ajusteMonto}
-                    onChange={(e) => {
-                      const valor = e.target.value;
-                      const importe = Math.abs(Number(valor.replace(/\./g, "").replace(",", ".")));
-                      setAjusteMonto(valor);
-                      if (!Number.isFinite(importe) || importe <= 0) {
-                        setAjusteConfirmado(null);
-                        setResultadoResumen(null);
-                      }
-                    }}
-                    placeholder="1500"
-                    inputMode="decimal"
-                  />
-                </label>
-                <div className="w-full min-w-0">
-                  <Boton
-                    type="button"
-                    variante={ajusteConfirmado || puedeConfirmarDescuento ? "primario" : "secundario"}
-                    tam="md"
-                    className="w-full whitespace-nowrap"
-                    onClick={ajusteConfirmado ? quitarDescuento : confirmarDescuento}
-                    disabled={!ajusteConfirmado && !puedeConfirmarDescuento}
-                  >
-                    {ajusteConfirmado ? <X size={14} /> : <Save size={14} />}
-                    {ajusteConfirmado ? "Eliminar descuento" : "Confirmar descuento"}
+          <div className="grid min-w-0 items-start gap-4 px-5 py-3 2xl:grid-cols-[minmax(240px,1fr)_344px]">
+            <div className="grid gap-2">
+              <Boton type="button" variante="secundario" tam="md" className="w-full" onClick={() => setDescuentoAbierto(true)}>
+                <CircleDollarSign size={15} /> {ajusteConfirmado ? "Editar descuento" : "Descuento"}
+              </Boton>
+              <button
+                type="button"
+                onClick={() => setFacturasVencidasAbierto(true)}
+                disabled={facturasVencidasImpagas.length === 0}
+                className="w-full rounded-[14px] border border-linea bg-superficie px-4 py-3 text-left transition-colors hover:border-petroleo/45 hover:bg-hundido disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-linea disabled:hover:bg-superficie"
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold">Facturas impagas vencidas</span>
+                    <span className="mt-0.5 block text-xs text-apagado">Facturas anteriores pendientes.</span>
+                  </span>
+                  <span className="inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-[14px] border border-linea bg-superficie px-3.5 text-[13px] font-semibold text-tinta">
+                    <FileText size={14} /> Ver {facturasVencidasImpagas.length}
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoricoPagosAbierto(true)}
+                disabled={pagosDelEstudio.length === 0}
+                className="w-full rounded-[14px] border border-linea bg-superficie px-4 py-3 text-left transition-colors hover:border-petroleo/45 hover:bg-hundido disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-linea disabled:hover:bg-superficie"
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold">Histórico de pagos</span>
+                    <span className="mt-0.5 block text-xs text-apagado">Pagos registrados y meses cubiertos.</span>
+                  </span>
+                  <span className="inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-[14px] border border-linea bg-superficie px-3.5 text-[13px] font-semibold text-tinta">
+                    <CreditCard size={14} /> Ver {pagosDelEstudio.length}
+                  </span>
+                </span>
+              </button>
+              {facturaMesActualImpaga && estadoFacturaMesActual && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-linea bg-superficie px-3 py-2 text-sm">
+                  <span>
+                    <span className="block font-semibold">Factura actual: {nombreMesCobro(facturaMesActualImpaga.mes)}</span>
+                    <span className="mt-0.5 block text-xs text-apagado">Pendiente {fmtCent(estadoFacturaMesActual.saldoPendienteCent, facturaMesActualImpaga.moneda)}</span>
+                  </span>
+                  <Boton type="button" variante="primario" tam="sm" onClick={() => registrarPago(estadoFacturaMesActual.saldoPendienteCent, 1, facturaMesActualImpaga.mes)} disabled={pendientePago || estadoFacturaMesActual.saldoPendienteCent <= 0}>
+                    <CreditCard size={14} /> Acreditar pago
                   </Boton>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="rounded-xl border border-linea bg-hundido px-3 py-3">
@@ -963,21 +1269,17 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
                 </div>
               </div>
               {estadoPago.saldoAFavorCent > 0 && <p className="mt-2 text-xs font-semibold text-menta-t">A favor {fmtCent(estadoPago.saldoAFavorCent, resumenVisible.moneda)}</p>}
-              {facturaActualCancelable && (
-                <button
-                  type="button"
-                  onClick={() => cancelarFactura()}
-                  disabled={confirmandoFactura}
-                  className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-apagado transition-colors hover:bg-superficie hover:text-tinta disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <X size={13} /> Cancelar factura
-                </button>
-              )}
-              <div className="mt-1">
+              <div className="mt-2 grid gap-2">
+                {facturaActualCancelable && (
+                  <Boton type="button" variante="secundario" tam="sm" className="w-full justify-start" onClick={() => cancelarFactura()} disabled={confirmandoFactura}>
+                    <X size={14} /> Cancelar factura
+                  </Boton>
+                )}
                 <Boton
                   type="button"
-                  variante="fantasma"
+                  variante="secundario"
                   tam="sm"
+                  className="w-full justify-start"
                   onClick={() => {
                     setPagoACuentaEnRevision(false);
                     setPagoACuentaAbierto(true);
@@ -988,6 +1290,68 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
               </div>
             </div>
           </div>
+
+          <Modal abierto={descuentoAbierto} onCerrar={() => setDescuentoAbierto(false)} className="max-w-2xl" titulo="Descuento de factura">
+            <div className="space-y-4">
+              <div className="grid min-w-0 items-end gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Importe a descontar</span>
+                  <input
+                    className={inputCls}
+                    value={ajusteMonto}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      const importe = Math.abs(Number(valor.replace(/\./g, "").replace(",", ".")));
+                      setAjusteMonto(valor);
+                      if (!Number.isFinite(importe) || importe <= 0) {
+                        setAjusteConfirmado(null);
+                        setResultadoResumen(null);
+                      }
+                    }}
+                    placeholder="1500"
+                    inputMode="decimal"
+                  />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Motivo del ajuste</span>
+                  <input
+                    className={inputCls}
+                    value={ajusteDescripcion}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      setAjusteDescripcion(valor);
+                      if (!valor.trim()) {
+                        setAjusteConfirmado(null);
+                        setResultadoResumen(null);
+                      }
+                    }}
+                    placeholder="Ej. Cortesia"
+                  />
+                </label>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-linea pt-4">
+                <Boton type="button" variante="fantasma" onClick={() => setDescuentoAbierto(false)}>
+                  Cancelar
+                </Boton>
+                <Boton
+                  type="button"
+                  variante={ajusteConfirmado || puedeConfirmarDescuento ? "primario" : "secundario"}
+                  onClick={() => {
+                    if (ajusteConfirmado) {
+                      quitarDescuento();
+                    } else {
+                      confirmarDescuento();
+                    }
+                    setDescuentoAbierto(false);
+                  }}
+                  disabled={!ajusteConfirmado && !puedeConfirmarDescuento}
+                >
+                  {ajusteConfirmado ? <X size={14} /> : <Save size={14} />}
+                  {ajusteConfirmado ? "Eliminar descuento" : "Confirmar descuento"}
+                </Boton>
+              </div>
+            </div>
+          </Modal>
 
           <Modal
             abierto={pagoACuentaAbierto}
@@ -1097,61 +1461,25 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
             </div>
           </Modal>
 
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <div className="rounded-xl border border-linea bg-superficie px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold">Facturas impagas vencidas</p>
-                  <p className="mt-0.5 text-xs text-apagado">Facturas anteriores al mes actual pendientes de pago.</p>
-                </div>
-                <Boton type="button" variante="secundario" tam="sm" onClick={() => setFacturasVencidasAbierto(true)} disabled={facturasVencidasImpagas.length === 0}>
-                  <FileText size={14} /> Ver {facturasVencidasImpagas.length}
-                </Boton>
-              </div>
-              {facturaMesActualImpaga && estadoFacturaMesActual && (
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-linea bg-hundido px-3 py-2 text-sm">
-                  <span>
-                    <span className="block font-semibold">Factura actual: {nombreMesCobro(facturaMesActualImpaga.mes)}</span>
-                    <span className="mt-0.5 block text-xs text-apagado">Pendiente {fmtCent(estadoFacturaMesActual.saldoPendienteCent, facturaMesActualImpaga.moneda)}</span>
-                  </span>
-                  <Boton type="button" variante="primario" tam="sm" onClick={() => registrarPago(estadoFacturaMesActual.saldoPendienteCent, 1, facturaMesActualImpaga.mes)} disabled={pendientePago || estadoFacturaMesActual.saldoPendienteCent <= 0}>
-                    <CreditCard size={14} /> Acreditar pago
-                  </Boton>
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-linea bg-superficie px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold">Histórico de pagos</p>
-                  <p className="mt-0.5 text-xs text-apagado">Pagos registrados y meses cubiertos.</p>
-                </div>
-                <Boton type="button" variante="secundario" tam="sm" onClick={() => setHistoricoPagosAbierto(true)} disabled={pagosDelEstudio.length === 0}>
-                  <CreditCard size={14} /> Ver {pagosDelEstudio.length}
-                </Boton>
-              </div>
-            </div>
-          </div>
-
-          <Modal abierto={facturasVencidasAbierto} onCerrar={() => setFacturasVencidasAbierto(false)} className="max-w-3xl" titulo="Facturas impagas vencidas">
+          <Modal abierto={facturasVencidasAbierto} onCerrar={() => setFacturasVencidasAbierto(false)} className="[--modal-max:860px]" titulo="Facturas impagas vencidas">
             {facturasVencidasImpagas.length === 0 ? (
               <p className="text-sm text-apagado">No hay facturas vencidas pendientes.</p>
             ) : (
-              <div className="divide-y divide-linea rounded-xl border border-linea">
+              <div className="divide-y divide-linea overflow-hidden rounded-xl border border-linea">
                 {facturasVencidasImpagas.map((factura) => {
                   const estado = estadoPagoDemo(factura.totalCent, pagosDemo[`${seleccionado.id}:${factura.mes}`] ?? 0);
                   return (
-                    <div key={factura.mes} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
-                      <span>
+                    <div key={factura.mes} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3 text-sm">
+                      <span className="min-w-0">
                         <span className="block font-semibold">Factura de {nombreMesCobro(factura.mes)}</span>
                         <span className="mt-0.5 block text-xs text-apagado">Pendiente {fmtCent(estado.saldoPendienteCent, factura.moneda)} de {fmtCent(factura.totalCent, factura.moneda)}</span>
                       </span>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex shrink-0 gap-2">
                         <Boton
                           type="button"
                           variante="secundario"
                           tam="sm"
+                          className="whitespace-nowrap"
                           onClick={() => {
                             setMesCobro(factura.mes);
                             setPagoACuentaDesdeMes(sumarMesCobro(factura.mes, 1));
@@ -1161,10 +1489,10 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
                         >
                           <FileText size={14} /> Ver factura
                         </Boton>
-                        <Boton type="button" variante="primario" tam="sm" onClick={() => registrarPago(estado.saldoPendienteCent, 1, factura.mes)} disabled={pendientePago || estado.saldoPendienteCent <= 0}>
+                        <Boton type="button" variante="primario" tam="sm" className="whitespace-nowrap" onClick={() => registrarPago(estado.saldoPendienteCent, 1, factura.mes)} disabled={pendientePago || estado.saldoPendienteCent <= 0}>
                           <CreditCard size={14} /> Acreditar pago
                         </Boton>
-                        <Boton type="button" variante="fantasma" tam="sm" onClick={() => cancelarFactura(factura.mes)}>
+                        <Boton type="button" variante="secundario" tam="sm" className="whitespace-nowrap" onClick={() => cancelarFactura(factura.mes)}>
                           <X size={14} /> Cancelar
                         </Boton>
                       </div>
@@ -1175,37 +1503,45 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
             )}
           </Modal>
 
-          <Modal abierto={historicoPagosAbierto} onCerrar={() => setHistoricoPagosAbierto(false)} className="max-w-3xl" titulo="Histórico de pagos">
+          <Modal abierto={historicoPagosAbierto} onCerrar={() => setHistoricoPagosAbierto(false)} className="[--modal-max:56rem]" titulo="Histórico de pagos">
             {pagosDelEstudio.length === 0 ? (
               <p className="text-sm text-apagado">Todavía no hay pagos registrados para este estudio.</p>
             ) : (
-              <div className="divide-y divide-linea rounded-xl border border-linea">
-                {pagosDelEstudio.map((pago) => (
-                  <div key={pago.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 text-sm">
-                    <div>
-                      <span className="block font-semibold">{pago.descripcion}</span>
-                      <span className="mt-0.5 block text-xs text-apagado">{fmtCent(pago.importeCent, resumenVisible.moneda)} recibidos</span>
-                      <span className="mt-2 flex flex-wrap gap-1.5">
-                        {pago.aplicaciones.map((aplicacion) => {
-                          const etiqueta = aplicacion.mes === mesActualCobro() ? "actual" : aplicacion.mes > mesActualCobro() ? "futuro" : "anterior";
-                          return (
-                            <span key={aplicacion.mes} className="rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">
-                              {nombreMesCobro(aplicacion.mes)} · {etiqueta}
-                            </span>
-                          );
-                        })}
-                      </span>
+              <div className="divide-y divide-linea overflow-hidden rounded-xl border border-linea">
+                {pagosDelEstudio.map((pago) => {
+                  const esPagoDeUnMes = pago.aplicaciones.length === 1;
+                  const aplicacionUnMes = esPagoDeUnMes ? pago.aplicaciones[0] : null;
+                  const pagoDeMesActual = aplicacionUnMes?.mes === mesActualCobro();
+                  const totalMesPago = aplicacionUnMes ? resumenesPorMes[`${seleccionado.id}:${aplicacionUnMes.mes}`]?.totalCent : undefined;
+                  const esPagoParcial = aplicacionUnMes && totalMesPago !== undefined && aplicacionUnMes.importeCent < totalMesPago;
+                  return (
+                    <div key={pago.id} className={clsx("flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm", pagoDeMesActual && "bg-menta/55")}>
+                      <div className="min-w-0">
+                        <span className="block font-semibold">{tituloPagoVista(pago, totalMesPago)}</span>
+                        <span className="mt-0.5 block text-xs text-apagado">
+                          {esPagoParcial ? `${fmtCent(aplicacionUnMes.importeCent, resumenVisible.moneda)} recibidos de ${fmtCent(totalMesPago, resumenVisible.moneda)}` : `${fmtCent(pago.importeCent, resumenVisible.moneda)} recibidos`}
+                        </span>
+                        {!esPagoDeUnMes && (
+                          <span className="mt-1.5 flex flex-wrap gap-1.5">
+                            {pago.aplicaciones.map((aplicacion) => (
+                              <span key={aplicacion.mes} className="rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">
+                                {nombreMesCobro(aplicacion.mes)}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => cancelarPago(pago)}
+                        disabled={pendientePago}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-tinta-2 hover:bg-hundido hover:text-tinta"
+                      >
+                        <Undo2 size={13} /> {pendientePago ? "Cancelando..." : "Cancelar"}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => cancelarPago(pago)}
-                      disabled={pendientePago}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-tinta-2 hover:bg-hundido hover:text-tinta"
-                    >
-                      <Undo2 size={13} /> {pendientePago ? "Cancelando..." : "Cancelar"}
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Modal>
@@ -1330,16 +1666,178 @@ export function AdminCommercialConsole({ datosIniciales }: { datosIniciales: Dat
         </Panel>
 
         <Panel className="p-5">
-          <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-            <ClipboardList size={18} className="text-petroleo" /> Auditoria comercial
-          </h3>
-          <div className="mt-4 rounded-2xl bg-hundido px-4 py-3 text-sm">
-            <p className="font-semibold">Cambio pendiente de guardar</p>
-            <p className="mt-1 text-apagado">
-              {seleccionado.nombre}: {plan.nombre}, {addonsVisibles.length} modulos extra, total {fmtCent(total, seleccionado.moneda)}.
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+                <ClipboardList size={18} className="text-petroleo" /> Auditoria
+              </h3>
+              <p className="mt-1 text-sm text-apagado">Movimientos por rol, estudio o empresa, con filtros para investigar rapido.</p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => abrirVistaAuditoria("admin")}
+              className="rounded-xl border border-linea bg-superficie px-4 py-4 text-left transition-colors hover:border-petroleo/45 hover:bg-hundido"
+            >
+              <span className="flex items-center gap-2 text-sm font-bold">
+                <ShieldCheck size={16} className="text-petroleo" /> Auditoria admin
+              </span>
+              <span className="mt-2 block text-xs leading-5 text-apagado">Cambios comerciales, facturas, pagos y acciones realizadas desde el dashboard admin.</span>
+              <span className="mt-3 inline-flex rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">{eventosAuditoriaAdmin.length} movimientos</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => abrirVistaAuditoria("estudio")}
+              className="rounded-xl border border-linea bg-superficie px-4 py-4 text-left transition-colors hover:border-petroleo/45 hover:bg-hundido"
+            >
+              <span className="flex items-center gap-2 text-sm font-bold">
+                <UserCog size={16} className="text-petroleo" /> Auditoria estudio
+              </span>
+              <span className="mt-2 block text-xs leading-5 text-apagado">Primero elegis el estudio y despues ves todos los movimientos asociados a ese estudio.</span>
+              <span className="mt-3 inline-flex rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">{estudios.length} estudios</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => abrirVistaAuditoria("empresa")}
+              className="rounded-xl border border-linea bg-superficie px-4 py-4 text-left transition-colors hover:border-petroleo/45 hover:bg-hundido"
+            >
+              <span className="flex items-center gap-2 text-sm font-bold">
+                <Building2 size={16} className="text-petroleo" /> Auditoria empresa
+              </span>
+              <span className="mt-2 block text-xs leading-5 text-apagado">Elegis empresa por estudio o la buscas directo para revisar actividad operativa.</span>
+              <span className="mt-3 inline-flex rounded-full bg-hundido px-2.5 py-1 text-xs font-semibold text-tinta-2">{empresasOperativas.length} empresas operativas</span>
+            </button>
           </div>
         </Panel>
+
+        <Modal abierto={auditoriaVista !== "inicio"} onCerrar={volverAuditoriaInicio} className="[--modal-max:72rem]" titulo={tituloModalAuditoria}>
+          {auditoriaVista === "admin" && (
+            <div className="space-y-3">
+              {renderFiltrosAuditoria()}
+              {renderEventosAuditoria(eventosAdminFiltrados, "No hay movimientos admin con esos filtros.")}
+            </div>
+          )}
+
+          {auditoriaVista === "estudio" && (
+            <div className="space-y-3">
+              <label className="block max-w-md">
+                <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Estudio</span>
+                <select className={inputCls} value={auditoriaEstudioSeleccionadoId} onChange={(e) => cambiarFiltroAuditoria(() => setAuditoriaEstudioId(e.target.value))}>
+                  {estudios.map((estudio) => (
+                    <option key={estudio.id} value={estudio.id}>
+                      {estudio.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {renderFiltrosAuditoria()}
+              {renderEventosAuditoria(eventosEstudioFiltrados, "No hay movimientos para ese estudio con esos filtros.")}
+            </div>
+          )}
+
+          {auditoriaVista === "empresa" && (
+            <div className="space-y-3">
+              {!auditoriaEmpresaModo ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuditoriaEmpresaModo("por_estudio");
+                      setAuditoriaPagina(1);
+                    }}
+                    className="rounded-xl border border-linea bg-superficie px-4 py-4 text-left transition-colors hover:border-petroleo/45 hover:bg-hundido"
+                  >
+                    <span className="text-sm font-bold">Elegir por estudio</span>
+                    <span className="mt-1 block text-xs leading-5 text-apagado">Primero seleccionas el estudio y despues una empresa asociada.</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuditoriaEmpresaModo("directa");
+                      setAuditoriaPagina(1);
+                    }}
+                    className="rounded-xl border border-linea bg-superficie px-4 py-4 text-left transition-colors hover:border-petroleo/45 hover:bg-hundido"
+                  >
+                    <span className="text-sm font-bold">Buscar empresa directo</span>
+                    <span className="mt-1 block text-xs leading-5 text-apagado">Filtras por nombre y abris la auditoria de esa empresa.</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Boton
+                      type="button"
+                      variante="secundario"
+                      tam="sm"
+                      onClick={() => {
+                        setAuditoriaEmpresaModo(null);
+                        setAuditoriaEmpresaId("");
+                        setBusquedaEmpresaAudit("");
+                        setAuditoriaPagina(1);
+                      }}
+                    >
+                      <ArrowLeft size={14} /> Cambiar modo
+                    </Boton>
+                  </div>
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+                    {auditoriaEmpresaModo === "por_estudio" ? (
+                      <label className="block">
+                        <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Estudio</span>
+                        <select className={inputCls} value={auditoriaEstudioSeleccionadoId} onChange={(e) => cambiarFiltroAuditoria(() => setAuditoriaEstudioId(e.target.value))}>
+                          {estudios.map((estudio) => (
+                            <option key={estudio.id} value={estudio.id}>
+                              {estudio.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <label className="block">
+                        <span className="mb-1.5 block text-[13px] font-semibold text-tinta-2">Buscar empresa</span>
+                        <span className="relative block">
+                          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-apagado" />
+                          <input className={clsx(inputCls, "pl-9")} value={busquedaEmpresaAudit} onChange={(e) => cambiarFiltroAuditoria(() => setBusquedaEmpresaAudit(e.target.value))} placeholder="Nombre de empresa" />
+                        </span>
+                      </label>
+                    )}
+                    <div className="grid max-h-52 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
+                      {empresasAudit.map((empresa) => (
+                        <button
+                          key={empresa.id}
+                          type="button"
+                          onClick={() => cambiarFiltroAuditoria(() => setAuditoriaEmpresaId(empresa.id))}
+                          className={clsx("rounded-xl border px-3 py-2 text-left text-sm transition-colors", auditoriaEmpresaId === empresa.id ? "border-petroleo bg-cielo text-cielo-t" : "border-linea bg-superficie hover:bg-hundido")}
+                        >
+                          <span className="block font-bold">{empresa.nombre}</span>
+                          <span className="mt-0.5 block text-xs opacity-75">{empresa.rut}</span>
+                        </button>
+                      ))}
+                      {empresasAudit.length === 0 && (
+                        <p className="rounded-xl bg-hundido px-3 py-3 text-sm text-apagado sm:col-span-2 xl:col-span-3">
+                          No hay empresas operativas cargadas para ese estudio.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {empresaAuditSeleccionada ? (
+                    <>
+                      <div className="rounded-xl bg-hundido px-4 py-3 text-sm">
+                        <p className="font-bold">{empresaAuditSeleccionada.nombre}</p>
+                        <p className="mt-0.5 text-xs text-apagado">RUT {empresaAuditSeleccionada.rut} - {empresaAuditSeleccionada.actividad}</p>
+                      </div>
+                      {renderFiltrosAuditoria()}
+                      {renderEventosAuditoria(eventosEmpresaFiltrados, "No hay movimientos para esa empresa con esos filtros.")}
+                    </>
+                  ) : (
+                    <p className="rounded-xl bg-hundido px-4 py-3 text-sm text-apagado">Elegí una empresa para ver su auditoria.</p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </Modal>
       </div>
     </div>
   );

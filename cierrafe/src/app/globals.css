@@ -46,7 +46,7 @@
   --cierra-navy: #102247;
   --cierra-navy-2: #1b315f;
   --cierra-gold: #f5b633;
-  --cierra-bg: #f7faff;
+  --cierra-bg: #edf3fb;
   --cierra-surface: #ffffff;
   --cierra-surface-soft: #f1f5fc;
   --cierra-border: #d8e1f0;
@@ -151,14 +151,10 @@ body {
   background-size: contain;
 }
 
-.cierra-loader-symbol-base {
-  filter: grayscale(1) saturate(0);
-  opacity: 0.26;
-}
-
 .cierra-loader-symbol-fill {
   clip-path: inset(0 100% 0 0);
-  filter: drop-shadow(0 18px 34px rgb(47 107 255 / 0.28));
+  opacity: 0.98;
+  will-change: clip-path;
 }
 
 .document-shell {
@@ -269,6 +265,18 @@ body {
   }
   .break-after-page { break-after: page; }
   .no-print { display: none !important; }
+  body:has(.print-document-active) > * {
+    visibility: hidden;
+  }
+  body:has(.print-document-active) .print-document-active,
+  body:has(.print-document-active) .print-document-active * {
+    visibility: visible;
+  }
+  .print-document-active {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+  }
   .document-shell,
   .document-surface {
     background: var(--document-bg) !important;

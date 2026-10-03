@@ -148,6 +148,12 @@ export const FUNCIONES: GrupoFunciones[] = [
         nota: "Por persona y total, con alerta si varía más del 15%.",
         probar: { href: "/empresas/ferrari?tab=liquidacion", label: "Ver Estudio Ferrari" },
       },
+      {
+        nombre: "Dispersión de sueldos y control de transferencias",
+        estado: "no",
+        nueva: true,
+        nota: "Módulo agregado al catálogo comercial. Falta construir la pantalla operativa para preparar órdenes de pago, marcar transferencias enviadas y conciliar liquidación contra banco.",
+      },
     ],
   },
   {

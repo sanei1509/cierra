@@ -11,6 +11,7 @@ import { USUARIOS, ESTUDIO } from "@/lib/seed";
 import { MES_ACTUAL, nombreMes } from "@/lib/format";
 import { Avatar } from "./ui";
 import { TEMA_LABELS, type TemaPreferido } from "@/lib/theme";
+import { DelegatedStudyFloat } from "./delegated-study-float";
 
 const NAV = [
   { href: "/", label: "Inicio", icon: Home },
@@ -48,14 +49,18 @@ export function Logo({ claro = false, variant, className }: { claro?: boolean; v
   );
 }
 
-function Sidebar({ onNav }: { onNav?: () => void }) {
+function Sidebar({ onNav, vistaDelegada }: { onNav?: () => void; vistaDelegada?: boolean }) {
   const path = usePathname();
   const reiniciar = useStore((s) => s.reiniciar);
   return (
-    <nav className="flex h-full flex-col rounded-[var(--radius-panel)] border border-linea bg-superficie p-4 shadow-[var(--cierra-shadow-soft)]" aria-label="Principal">
-      <div className="px-2 pt-1 pb-7">
-        <Logo />
-      </div>
+    <nav className="flex h-full min-h-0 flex-col overflow-y-auto rounded-[var(--radius-panel)] border border-linea bg-superficie p-4 shadow-[var(--cierra-shadow-soft)]" aria-label="Principal">
+      {vistaDelegada ? (
+        <DelegatedStudyFloat />
+      ) : (
+        <div className="px-2 pt-1 pb-7">
+          <Logo />
+        </div>
+      )}
       <ul className="space-y-1">
         {NAV.map((n) => {
           const activo = n.href === "/" ? path === "/" : path.startsWith(n.href);
@@ -249,19 +254,19 @@ function DevAccessBar() {
   );
 }
 
-export function Shell({ children }: { children: ReactNode }) {
+export function Shell({ children, vistaDelegada = false }: { children: ReactNode; vistaDelegada?: boolean }) {
   const ok = useHidratado();
   const [menu, setMenu] = useState(false);
   return (
     <div className="mx-auto flex min-h-screen max-w-[1600px] gap-3 p-3">
       <aside className="sticky top-3 hidden h-[calc(100vh-24px)] w-[248px] shrink-0 lg:block">
-        <Sidebar />
+        <Sidebar vistaDelegada={vistaDelegada} />
       </aside>
       {menu && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button className="absolute inset-0 bg-[#0B1220]/50" onClick={() => setMenu(false)} aria-label="Cerrar menú" />
           <div className="entra-drawer absolute inset-y-3 left-3 w-[260px]">
-            <Sidebar onNav={() => setMenu(false)} />
+            <Sidebar onNav={() => setMenu(false)} vistaDelegada={vistaDelegada} />
           </div>
         </div>
       )}

@@ -30,6 +30,12 @@ import { CATALOGO_MODULOS } from "../modulos";
 import { resolverSeedDesarrollo } from "./seed-config";
 import { addonComercialPorModulo, ESTUDIOS_COMERCIALES_BASE, planComercialPorCodigo, PLANES_COMERCIALES_BASE } from "./seed-comercial";
 
+function nombreMesSeed(mes: string) {
+  const [anio, mesNumero] = mes.split("-").map(Number);
+  if (!anio || !mesNumero) return mes;
+  return new Intl.DateTimeFormat("es-UY", { month: "long", year: "numeric" }).format(new Date(anio, mesNumero - 1, 1));
+}
+
 async function seedDesarrollo() {
   const config = resolverSeedDesarrollo(process.env);
   const passwordHash = crearPasswordHash(config.password);
@@ -479,7 +485,7 @@ async function seedDesarrollo() {
           { mes: "2026-06", empresas: 10, empleados: 164, recibos: 164, pagadoCent: 1800000 },
           { mes: "2026-07", empresas: 11, empleados: 171, recibos: 171, pagadoCent: 1800000 },
           { mes: "2026-08", empresas: 11, empleados: 176, recibos: 176, pagadoCent: 1800000 },
-          { mes: "2026-09", empresas: 12, empleados: 181, recibos: 181, pagadoCent: 900000 },
+          { mes: "2026-09", empresas: 12, empleados: 181, recibos: 181, pagadoCent: 0 },
         ];
         const planResumen = {
           id: plan.id,
@@ -556,47 +562,49 @@ async function seedDesarrollo() {
               },
             });
 
-          const pagoId = `00000000-0000-4000-8000-00000000060${index + 1}`;
-          await tx
-            .insert(pagosEstudio)
-            .values({
-              id: pagoId,
-              estudioId: estudio.id,
-              moneda: estudio.moneda,
-              importeCent: historico.pagadoCent,
-              fecha: new Date(`${historico.mes}-29T00:00:00`),
-              medio: "transferencia",
-              referencia: `seed-pereira-${historico.mes}`,
-              nota: `Pago de ${historico.mes}`,
-            })
-            .onConflictDoUpdate({
-              target: pagosEstudio.id,
-              set: {
+          if (historico.pagadoCent > 0) {
+            const pagoId = `00000000-0000-4000-8000-00000000060${index + 1}`;
+            await tx
+              .insert(pagosEstudio)
+              .values({
+                id: pagoId,
+                estudioId: estudio.id,
+                moneda: estudio.moneda,
                 importeCent: historico.pagadoCent,
                 fecha: new Date(`${historico.mes}-29T00:00:00`),
                 medio: "transferencia",
                 referencia: `seed-pereira-${historico.mes}`,
-                nota: `Pago de ${historico.mes}`,
-              },
-            });
+                nota: `Pago de ${nombreMesSeed(historico.mes)}`,
+              })
+              .onConflictDoUpdate({
+                target: pagosEstudio.id,
+                set: {
+                  importeCent: historico.pagadoCent,
+                  fecha: new Date(`${historico.mes}-29T00:00:00`),
+                  medio: "transferencia",
+                  referencia: `seed-pereira-${historico.mes}`,
+                  nota: `Pago de ${nombreMesSeed(historico.mes)}`,
+                },
+              });
 
-          await tx
-            .insert(aplicacionesPago)
-            .values({
-              id: `00000000-0000-4000-8000-00000000070${index + 1}`,
-              pagoId,
-              estudioId: estudio.id,
-              mes: historico.mes,
-              importeCent: historico.pagadoCent,
-              nota: historico.pagadoCent >= resumen.totalCent ? "Pago completo seed" : "Pago parcial seed",
-            })
-            .onConflictDoUpdate({
-              target: aplicacionesPago.id,
-              set: {
-                importeCent: historico.pagadoCent,
-                nota: historico.pagadoCent >= resumen.totalCent ? "Pago completo seed" : "Pago parcial seed",
-              },
-            });
+            await tx
+              .insert(aplicacionesPago)
+              .values({
+                id: `00000000-0000-4000-8000-00000000070${index + 1}`,
+                pagoId,
+                estudioId: estudio.id,
+                mes: historico.mes,
+                importeCent: resumen.totalCent,
+                nota: "Pago completo seed",
+              })
+              .onConflictDoUpdate({
+                target: aplicacionesPago.id,
+                set: {
+                  importeCent: resumen.totalCent,
+                  nota: "Pago completo seed",
+                },
+              });
+          }
         }
       }
     }

@@ -135,11 +135,27 @@ export const PARAMETROS: Parametros[] = [
 ];
 
 export function parametrosVigentes(mes: string): Parametros {
-  const p = PARAMETROS.find(
+  return parametrosVigentesEn(PARAMETROS, mes);
+}
+
+export function parametrosVigentesEn(parametros: readonly Parametros[], mes: string): Parametros {
+  const p = parametros.find(
     (x) => x.vigenciaDesde <= mes && (x.vigenciaHasta === null || mes <= x.vigenciaHasta),
   );
   if (!p) throw new Error(`Sin parámetros vigentes para ${mes}`);
   return p;
+}
+
+export function clonarParametrosIniciales(): Parametros[] {
+  return PARAMETROS.map((p) => ({
+    ...p,
+    personal: { ...p.personal },
+    fonasa: { ...p.fonasa },
+    patronal: { ...p.patronal },
+    irpf: { ...p.irpf, franjasBpc: p.irpf.franjasBpc.map((f) => ({ ...f })) },
+    horas: { ...p.horas },
+    topesAfap: p.topesAfap?.map((t) => ({ ...t })),
+  }));
 }
 
 /** Laudos mínimos por grupo / subgrupo / categoría (referenciales) */

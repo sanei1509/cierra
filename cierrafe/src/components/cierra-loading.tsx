@@ -9,9 +9,8 @@ export function CierraLoadingOverlay({ className }: { className?: string }) {
       aria-label="Cargando"
     >
       <span className="sr-only">Cargando</span>
-      <div className="relative flex size-[22.5rem] items-center justify-center sm:size-[27rem]" aria-hidden>
-        <span className="cierra-loader-symbol cierra-loader-symbol-base absolute size-[22.5rem] sm:size-[27rem]" />
-        <span className="cierra-loader-symbol cierra-loader-symbol-fill absolute size-[22.5rem] sm:size-[27rem]" />
+      <div className="relative flex size-[11.25rem] items-center justify-center sm:size-[13.5rem]" aria-hidden>
+        <span className="cierra-loader-symbol cierra-loader-symbol-fill absolute size-[11.25rem] sm:size-[13.5rem]" />
       </div>
     </div>
   );

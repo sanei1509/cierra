@@ -1,10 +1,10 @@
 "use client";
 
-import { CUENTAS_ASIENTO_SUELDOS, FLUJO_RRHH, PARAMETROS, LAUDOS, MOTOR_VERSION, GRUPOS_FUERA_DE_ALCANCE, TRATAMIENTO_REMUNERACIONES } from "@/lib/params";
+import { CUENTAS_ASIENTO_SUELDOS, FLUJO_RRHH, LAUDOS, GRUPOS_FUERA_DE_ALCANCE, TRATAMIENTO_REMUNERACIONES } from "@/lib/params";
 import { USUARIOS, ESTUDIO } from "@/lib/seed";
-import { fmt, pct } from "@/lib/format";
-import { UMBRAL_VARIACION } from "@/lib/validations";
+import { fmt } from "@/lib/format";
 import { Avatar, Chip, Panel } from "@/components/ui";
+import { ParametrosNormativosPanel } from "./parametros-editor";
 
 const ROLES = {
   admin: { l: "Administradora", d: "Todo, incluido reabrir períodos y cambiar parámetros" },
@@ -13,7 +13,6 @@ const ROLES = {
 };
 
 export default function Configuracion() {
-  const vig = PARAMETROS.at(-1)!;
   return (
     <div className="space-y-3">
       <Panel className="px-7 py-6">
@@ -21,83 +20,11 @@ export default function Configuracion() {
         <p className="mt-1 text-[15px] text-apagado">{ESTUDIO.nombre} · reglas de cálculo, laudos y accesos.</p>
       </Panel>
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        <Panel className="p-6">
-          <div className="mb-5 flex items-start gap-4 rounded-2xl bg-hundido px-4 py-4">
-            <Avatar nombre={ESTUDIO.nombre} tono="tinta" size={52} />
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold tracking-tight">{ESTUDIO.nombre}</h2>
-              <p className="text-sm text-apagado">{ESTUDIO.ciudad} · identidad visible del estudio para pantallas y comunicaciones.</p>
-            </div>
-          </div>
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-bold tracking-tight">Parámetros normativos</h2>
-              <p className="text-sm text-apagado">Cada cambio crea una versión con vigencia. Las liquidaciones cerradas guardan la versión que usaron.</p>
-            </div>
-            <Chip tono="crema">Valores de ejemplo</Chip>
-          </div>
-          <ul className="mt-4 space-y-2">
-            {[...PARAMETROS].reverse().map((p) => (
-              <li key={p.id} className="flex items-center gap-3 rounded-2xl bg-hundido px-4 py-3 text-sm">
-                <span className="font-bold">{p.id}</span>
-                <span className="text-apagado">desde {p.vigenciaDesde}{p.vigenciaHasta ? ` hasta ${p.vigenciaHasta}` : ""}</span>
-                <span className="ml-auto">{p.vigenciaHasta ? <Chip tono="gris">Histórica</Chip> : <Chip tono="menta">Vigente</Chip>}</span>
-              </li>
-            ))}
-          </ul>
-          <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
-            {[
-              ["BFC", vig.bfc ? fmt(vig.bfc) : "—"],
-              ["BPC", fmt(vig.bpc)],
-              ["Salario mínimo nacional", vig.salarioMinimoNacional ? fmt(vig.salarioMinimoNacional) : "—"],
-              ["Cuota mutual", vig.cuotaMutual ? fmt(vig.cuotaMutual) : "—"],
-              ["Costo promedio equivalente", vig.costoPromedioEquivalente ? fmt(vig.costoPromedioEquivalente) : "—"],
-              ["Tope aporte jubilatorio", fmt(vig.topeJubilatorio)],
-              ["Jubilatorio personal / patronal", `${pct(vig.personal.jubilatorio)} / ${pct(vig.patronal.jubilatorio)}`],
-              ["FONASA personal", `${pct(vig.fonasa.tasaBaja)} · ${pct(vig.fonasa.tasaSinHijos)} · ${pct(vig.fonasa.tasaConHijos)} (+${pct(vig.fonasa.adicionalConyuge)} cónyuge)`],
-              ["FONASA patronal", pct(vig.patronal.fonasa)],
-              ["FRL personal / patronal", `${pct(vig.personal.frl, 2)} / ${pct(vig.patronal.frl, 2)}`],
-              ["FGCL", pct(vig.patronal.fgcl, 3)],
-              ["IRPF deducción", `${pct(vig.irpf.tasaDeduccionBaja)} hasta ${vig.irpf.umbralTasaDeduccionBpc} BPC, luego ${pct(vig.irpf.tasaDeduccionAlta)}`],
-              ["Deducción por hijo", `${vig.irpf.deduccionHijoBpcAnual} BPC anuales`],
-              ["Valor hora", `sueldo ÷ ${vig.horas.divisor}, recargo ${pct(vig.horas.recargoExtra)}`],
-              ["Umbral de variación", `${pct(UMBRAL_VARIACION, 0)} vs. mes anterior`],
-              ["Motor", MOTOR_VERSION],
-            ].map(([k, v]) => (
-              <div key={k} className="border-t border-linea pt-2.5">
-                <dt className="text-xs text-apagado">{k}</dt>
-                <dd className="num font-semibold">{v}</dd>
-              </div>
-            ))}
-          </dl>
-          <div className="mt-5">
-            {vig.topesAfap && (
-              <>
-                <p className="text-xs font-semibold text-apagado">Topes AFAP Ley 16.713</p>
-                <div className="mt-2 mb-4 flex flex-wrap gap-1.5">
-                  {vig.topesAfap.map((t) => (
-                    <span key={t.tramo} className="rounded-full bg-hundido px-2.5 py-1 text-xs">
-                      Tramo {t.tramo} <b>{fmt(t.monto)}</b>
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
-            <p className="text-xs font-semibold text-apagado">Franjas IRPF mensuales</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {vig.irpf.franjasBpc.map((f) => (
-                <span key={f.desde} className="rounded-full bg-hundido px-2.5 py-1 text-xs">
-                  {f.desde}–{f.hasta ?? "∞"} BPC <b>{pct(f.tasa, 0)}</b>
-                </span>
-              ))}
-            </div>
-          </div>
-          <p className="mt-5 rounded-2xl bg-crema px-4 py-3 text-xs text-crema-t">{vig.fuente}. Antes del piloto deben validarse con un contador asesor y cargarse con su resolución de origen.</p>
-        </Panel>
+      <div className="grid min-w-0 gap-3 xl:grid-cols-2">
+        <ParametrosNormativosPanel />
 
-        <div className="space-y-3">
-          <Panel className="p-6">
+        <div className="min-w-0 space-y-3">
+          <Panel className="min-w-0 p-6">
             <h2 className="text-lg font-bold tracking-tight">Usuarios del estudio</h2>
             <ul className="mt-4 space-y-2">
               {USUARIOS.map((u) => (
@@ -113,19 +40,19 @@ export default function Configuracion() {
             </ul>
             <p className="mt-3 text-xs text-apagado">Cambiá de usuario desde el menú superior para probar los permisos.</p>
           </Panel>
-          <Panel className="p-6">
+          <Panel className="min-w-0 p-6">
             <h2 className="text-lg font-bold tracking-tight">Alcance soportado</h2>
             <p className="mt-1 text-sm text-apagado">Trabajadores mensuales de Industria y Comercio y servicios. El sistema bloquea (no estima) estos casos:</p>
             <ul className="mt-3 flex flex-wrap gap-2">
-              {Object.entries(GRUPOS_FUERA_DE_ALCANCE).map(([g, d]) => <li key={g}><Chip tono="rosa">Grupo {g}: {d}</Chip></li>)}
-              <li><Chip tono="rosa">Jornaleros</Chip></li>
+              {Object.entries(GRUPOS_FUERA_DE_ALCANCE).map(([g, d]) => <li key={g} className="min-w-0"><Chip tono="rosa" className="!whitespace-normal">Grupo {g}: {d}</Chip></li>)}
+              <li><Chip tono="rosa" className="!whitespace-normal">Jornaleros</Chip></li>
             </ul>
           </Panel>
         </div>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-[420px_1fr]">
-        <Panel className="p-6">
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[420px_1fr]">
+        <Panel className="min-w-0 p-6">
           <h2 className="text-lg font-bold tracking-tight">Flujo RRHH de la planilla</h2>
           <ol className="mt-4 space-y-2">
             {FLUJO_RRHH.map((p) => (
@@ -140,11 +67,11 @@ export default function Configuracion() {
           </ol>
         </Panel>
 
-        <Panel className="p-6">
+        <Panel className="min-w-0 p-6">
           <h2 className="text-lg font-bold tracking-tight">Tratamiento CESS / IRPF</h2>
           <p className="text-sm text-apagado">Resumen operativo importado de la hoja CESS - BPS. Lo parcial queda visible para no liquidarlo como si fuera una regla simple.</p>
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[700px] text-sm">
+            <table className="w-full min-w-full text-sm md:min-w-[700px]">
               <thead>
                 <tr className="text-left text-xs text-apagado">
                   <th className="py-2 font-semibold">Concepto</th>
@@ -166,7 +93,7 @@ export default function Configuracion() {
         </Panel>
       </div>
 
-      <Panel className="p-6">
+      <Panel className="min-w-0 p-6">
         <h2 className="text-lg font-bold tracking-tight">Asiento de sueldos</h2>
         <p className="text-sm text-apagado">Cuentas base tomadas de la hoja “Asiento sueldos”. En el MVP se convierten en una exportación contable.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -184,11 +111,11 @@ export default function Configuracion() {
         </div>
       </Panel>
 
-      <Panel className="p-6">
+      <Panel className="min-w-0 p-6">
         <h2 className="text-lg font-bold tracking-tight">Laudos por categoría</h2>
         <p className="text-sm text-apagado">Mínimos por grupo, subgrupo y categoría con vigencia. Valores de ejemplo.</p>
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[600px] text-sm">
+          <table className="w-full min-w-full text-sm md:min-w-[600px]">
             <thead>
               <tr className="text-left text-xs text-apagado">
                 <th className="py-2 font-semibold">Grupo</th>
