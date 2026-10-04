@@ -7,6 +7,7 @@ import { Suspense, useEffect, useMemo, useState, type MouseEvent } from "react";
 import {
   aceptarAdvertenciaReal,
   agregarNotaPeriodoReal,
+  actualizarFechaObjetivoReal,
   actualizarEmpleadoReal,
   actualizarEmpresaReal,
   aprobarInternoReal,
@@ -24,7 +25,7 @@ import {
 } from "@/app/(estudio)/actions";
 import {
   AlertOctagon, AlertTriangle, Info, Check, ChevronRight, Plus, X, Send, Calculator, FileDown, Lock, RefreshCw,
-  ExternalLink, UserRound, Mail, Undo2, MessageSquare, Eye, Paperclip, ImagePlus, FileSpreadsheet, Files, Pencil,
+  ExternalLink, UserRound, Mail, Undo2, MessageSquare, Eye, Paperclip, ImagePlus, FileSpreadsheet, Files, Pencil, CalendarDays,
 } from "lucide-react";
 import { useStore, usePeriodoVista, useUsuario, type Vista } from "@/lib/store";
 import { PASOS, pasoActual } from "@/lib/status";
@@ -35,7 +36,8 @@ import { activoEn, calcularEmpresa, totales } from "@/lib/engine";
 import { DIAS_LABORALES, horarioDefault, normalizarHorario, resumenHorario } from "@/lib/horarios";
 import { categoriasDe, laudoDe } from "@/lib/params";
 import { archivoNomina, descargar } from "@/lib/bps";
-import type { Alerta, AuditEvent, CondicionPresentismo, Empleado, Empresa, Novedad, Periodo } from "@/lib/types";
+import { portalEmpresaConfig } from "@/lib/empresa";
+import type { Alerta, AuditEvent, CapacidadPortalEmpresa, CondicionPresentismo, Empleado, Empresa, Novedad, Periodo, PortalEmpresaConfig } from "@/lib/types";
 import { Avatar, Boton, Campo, Chip, Drawer, EstadoChip, MarcaEmpresa, Modal, Panel, Vacio, imagenADataUrl, inputCls } from "@/components/ui";
 import { CalcDetalle } from "@/components/calc-detalle";
 import { NovedadForm } from "@/components/novedad-form";
@@ -100,6 +102,12 @@ function sincronizarDatosOperativos(datos: {
       vistas: { ...datos.vistas, ...actual.vistas },
     };
   });
+}
+
+function ultimoDiaDelMes(mes: string) {
+  const [anio, mesNumero] = mes.split("-").map(Number);
+  const dia = new Date(anio, mesNumero, 0).getDate();
+  return `${mes}-${String(dia).padStart(2, "0")}`;
 }
 
 function Stepper({ v }: { v: Vista }) {
@@ -217,15 +225,18 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
   const s = useStore();
   const router = useRouter();
   const puede = s.puede("editar");
-  const [confirmar, setConfirmar] = useState<null | "cerrar" | "rectificar" | "cancelar-liquidacion">(null);
+  const { periodo: p, empresa } = v;
+  const [confirmar, setConfirmar] = useState<null | "cerrar" | "rectificar" | "cancelar-liquidacion" | "fecha-objetivo">(null);
   const [motivo, setMotivo] = useState("");
   const [motivoCancelacion, setMotivoCancelacion] = useState("");
+  const [fechaObjetivo, setFechaObjetivo] = useState(p.fechaObjetivo);
   const [procesando, setProcesando] = useState("");
   const [error, setError] = useState("");
-  const { periodo: p, empresa } = v;
+  const configPortal = portalEmpresaConfig(empresa);
   const ultima = p.versiones.at(-1);
   const empleados = s.empleados;
   const periodoInput = { periodoId: p.id, empresaId: empresa.id, actor: useUsuario().nombre };
+  useEffect(() => setFechaObjetivo(p.fechaObjetivo), [p.fechaObjetivo]);
   const ejecutar = async (clave: string, accionReal: () => Promise<{ ok: boolean; modo: "real" | "demo"; mensaje: string }>, accionLocal: () => void) => {
     setError("");
     setProcesando(clave);
@@ -245,6 +256,7 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
   };
 
   let titulo = "";
+  let etiqueta = "Próximo paso";
   let texto: React.ReactNode = "";
   let acciones: React.ReactNode = null;
 
@@ -271,18 +283,28 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
 
   switch (v.estado) {
     case "pendiente":
-      titulo = p.solicitud ? "Esperando las novedades del cliente" : "Pedí las novedades del mes";
+      etiqueta = p.solicitud ? "Solicitud enviada" : "Próximo paso";
+      titulo = p.solicitud ? `Esperando las novedades de ${empresa.contacto.nombre}` : "Pedí las novedades del mes";
       texto = p.solicitud
-        ? `${empresa.contacto.nombre} recibió el pedido el ${fecha(p.solicitud.enviada)}${p.solicitud.abierta ? ` y lo abrió el ${fecha(p.solicitud.abierta)}` : ", todavía no lo abrió"}. Si te las mandó por otro medio, cargalas vos.`
-        : `Le enviamos a ${empresa.contacto.nombre} un enlace seguro para cargar horas extra, faltas, bonos y licencias antes del ${fecha(p.fechaObjetivo)}.`;
+        ? `Solicitud enviada el ${fecha(p.solicitud.enviada)} a ${empresa.contacto.email}${p.solicitud.abierta ? `. Abierta el ${fecha(p.solicitud.abierta)}.` : "."}`
+        : `Enviá a ${empresa.contacto.nombre} un enlace seguro para cargar horas extra, faltas, bonos y licencias.`;
       acciones = (
-        <>
-          <Boton disabled={!puede || procesando === "solicitar"} onClick={() => void ejecutar("solicitar", () => solicitarNovedadesReal(periodoInput), () => s.solicitarNovedades(p.id))}><Send size={15} /> {p.solicitud ? "Reenviar pedido" : "Pedir novedades"}</Boton>
-          <Boton variante="secundario" onClick={() => irA("novedades")}><Plus size={15} /> Cargarlas yo</Boton>
-          <Boton variante="secundario" disabled={!puede || procesando === "recibidas"} onClick={() => void ejecutar("recibidas", () => marcarNovedadesRecibidasReal(periodoInput), () => s.marcarRecibidas(p.id))}>
-            <Check size={15} /> Marcar como completas
-          </Boton>
-        </>
+        <div className="mt-4 space-y-3">
+          <div className="grid gap-2 sm:inline-grid sm:grid-cols-2">
+            <Boton className="w-full min-w-44 whitespace-nowrap sm:w-auto" disabled={!puede || procesando === "solicitar"} onClick={() => void ejecutar("solicitar", () => solicitarNovedadesReal(periodoInput), () => s.solicitarNovedades(p.id))}>
+              <Send size={15} /> {p.solicitud ? "Reenviar solicitud" : "Pedir novedades"}
+            </Boton>
+            <Boton className="w-full min-w-44 whitespace-nowrap sm:w-auto" variante="secundario" onClick={() => irA("novedades")}><Plus size={15} /> Cargarlas yo</Boton>
+          </div>
+          <button
+            type="button"
+            disabled={!puede || procesando === "recibidas"}
+            onClick={() => void ejecutar("recibidas", () => marcarNovedadesRecibidasReal(periodoInput), () => s.marcarRecibidas(p.id))}
+            className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-linea bg-superficie/65 px-3 py-2 text-sm font-semibold text-tinta-2 transition-colors hover:bg-superficie hover:text-tinta focus:outline-none focus:ring-2 focus:ring-petroleo/25 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Check size={14} aria-hidden /> Marcar novedades como completas
+          </button>
+        </div>
       );
       break;
     case "alertas":
@@ -314,14 +336,16 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
       titulo = v.desactualizada ? "Hubo cambios después del último cálculo" : `Revisá el borrador v${ultima?.version}`;
       texto = v.desactualizada
         ? "Se modificaron novedades o fichas. Recalculá para generar una versión nueva antes de enviarla."
-        : empresa.requiereAprobacion
+        : empresa.requiereAprobacion && configPortal.solicitudAprobacionLiquidacion
           ? `Si está bien, envialo a ${empresa.contacto.nombre} para que lo apruebe. Solo verá totales y variaciones.`
-          : "Esta empresa no requiere aprobación del cliente: podés aprobarlo internamente.";
+          : empresa.requiereAprobacion
+            ? "El pedido de aprobación por portal está deshabilitado para esta empresa: podés aprobarlo internamente."
+            : "Esta empresa no requiere aprobación del cliente: podés aprobarlo internamente.";
       acciones = v.desactualizada ? (
         recalc
       ) : (
         <>
-          {empresa.requiereAprobacion ? (
+          {empresa.requiereAprobacion && configPortal.solicitudAprobacionLiquidacion ? (
             <Boton disabled={!puede || procesando === "enviar"} onClick={() => void ejecutar("enviar", () => enviarAprobacionReal(periodoInput), () => s.enviarAprobacion(p.id))}><Send size={15} /> Enviar a aprobación</Boton>
           ) : (
             <Boton disabled={!puede || procesando === "aprobar"} onClick={() => void ejecutar("aprobar", () => aprobarInternoReal(periodoInput), () => s.aprobarInterno(p.id))}><Check size={15} /> Aprobar internamente</Boton>
@@ -399,13 +423,33 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
   }
 
   const tono = v.estado === "alertas" || v.estado === "devuelta" ? "bg-rosa/60" : v.estado === "cerrada" ? "bg-menta/70" : "bg-sol-suave";
+  const esPendiente = v.estado === "pendiente";
+  const fechaLimite = esPendiente ? (
+    <div className="flex flex-wrap items-center gap-1.5 text-sm text-tinta-2">
+      <CalendarDays size={15} className="text-tinta-2" aria-hidden />
+      <span className="font-semibold text-tinta">Fecha límite:</span>
+      <span>{fecha(p.fechaObjetivo)}</span>
+      <span className="text-apagado" aria-hidden>·</span>
+      <button
+        type="button"
+        disabled={!puede || !!procesando}
+        onClick={() => { setFechaObjetivo(p.fechaObjetivo); setConfirmar("fecha-objetivo"); }}
+        className="rounded-md font-semibold text-petroleo underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-petroleo/25 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Cambiar
+      </button>
+    </div>
+  ) : null;
 
   return (
-    <Panel className={clsx("p-6", tono)}>
-      <p className="text-xs font-semibold text-tinta-2">Próximo paso</p>
-      <h2 className="mt-1 text-2xl font-extrabold tracking-tight">{titulo}</h2>
-      <div className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-tinta-2">{texto}</div>
-      {acciones && <div className="mt-5 flex flex-wrap gap-2">{acciones}</div>}
+    <Panel className={clsx(esPendiente ? "p-5" : "p-6", tono)}>
+      <div className={clsx("flex gap-3", esPendiente ? "flex-col sm:flex-row sm:items-start sm:justify-between" : "flex-col")}>
+        <p className="text-xs font-semibold uppercase tracking-[0.04em] text-tinta-2">{etiqueta}</p>
+        {fechaLimite}
+      </div>
+      <h2 className={clsx("font-extrabold tracking-tight", esPendiente ? "mt-2 text-[22px]" : "mt-1 text-2xl")}>{titulo}</h2>
+      <div className={clsx("max-w-2xl text-[15px] leading-relaxed text-tinta-2", esPendiente ? "mt-1" : "mt-1.5")}>{texto}</div>
+      {acciones && <div className={clsx(esPendiente ? "" : "mt-5 flex flex-wrap gap-2")}>{acciones}</div>}
 
       <Modal abierto={confirmar === "cerrar"} onCerrar={() => setConfirmar(null)} titulo={`Cerrar ${nombreMes(p.mes).toLowerCase()} de ${empresa.nombre}`}>
         <p className="text-sm text-tinta-2">
@@ -431,6 +475,37 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
             onClick={() => void ejecutar("rectificar", () => rectificarPeriodoReal({ ...periodoInput, motivo: motivo.trim() }), () => { s.rectificar(p.id, motivo.trim()); setConfirmar(null); setMotivo(""); })}
           >
             Rectificar
+          </Boton>
+        </div>
+      </Modal>
+      <Modal abierto={confirmar === "fecha-objetivo"} onCerrar={() => setConfirmar(null)} titulo="Cambiar fecha límite de novedades">
+        <p className="text-sm text-tinta-2">
+          Es el día hasta el que la empresa debe enviar las novedades del mes al estudio. Si ya habías mandado el pedido, al reenviarlo se muestra este nuevo plazo.
+        </p>
+        <Campo label="Fecha límite para que la empresa envíe novedades">
+          <input
+            type="date"
+            className={inputCls}
+            min={`${p.mes}-01`}
+            max={ultimoDiaDelMes(p.mes)}
+            value={fechaObjetivo}
+            onChange={(e) => setFechaObjetivo(e.target.value)}
+          />
+        </Campo>
+        <div className="mt-5 flex justify-end gap-2">
+          <Boton variante="fantasma" onClick={() => setConfirmar(null)}>Cancelar</Boton>
+          <Boton
+            disabled={!fechaObjetivo.startsWith(`${p.mes}-`) || procesando === "fecha-objetivo"}
+            onClick={() => void ejecutar(
+              "fecha-objetivo",
+              () => actualizarFechaObjetivoReal({ ...periodoInput, fechaObjetivo }),
+              () => {
+                s.actualizarFechaObjetivo(p.id, fechaObjetivo);
+                setConfirmar(null);
+              },
+            )}
+          >
+            <CalendarDays size={15} /> {procesando === "fecha-objetivo" ? "Guardando..." : "Guardar fecha límite"}
           </Boton>
         </div>
       </Modal>
@@ -687,6 +762,7 @@ function TabLiquidacion({ v, empleados, verCalc }: { v: Vista; empleados: Emplea
   const allEmpleados = s.empleados;
   const prev = useMemo(() => calcularEmpresa(v.empresa, allEmpleados, mesAnterior(v.periodo.mes), s.novedades), [v.empresa, allEmpleados, v.periodo.mes, s.novedades]);
   const puedeAvanzar = s.puede("editar");
+  const configPortal = portalEmpresaConfig(v.empresa);
   const periodoInput = { periodoId: v.periodo.id, empresaId: v.empresa.id, actor: usuario.nombre };
   const ejecutar = async (clave: string, accionReal: () => Promise<{ ok: boolean; modo: "real" | "demo"; mensaje: string }>, accionLocal: () => void) => {
     setError("");
@@ -739,10 +815,10 @@ function TabLiquidacion({ v, empleados, verCalc }: { v: Vista; empleados: Emplea
           <div className="mr-auto">
             <h3 className="text-base font-bold tracking-tight">Borrador listo para avanzar</h3>
             <p className="mt-1 text-sm text-apagado">
-              Ya revisaste la liquidación. El siguiente paso es {v.empresa.requiereAprobacion ? `enviarla a ${v.empresa.contacto.nombre}` : "aprobarla internamente"}.
+              Ya revisaste la liquidación. El siguiente paso es {v.empresa.requiereAprobacion && configPortal.solicitudAprobacionLiquidacion ? `enviarla a ${v.empresa.contacto.nombre}` : "aprobarla internamente"}.
             </p>
           </div>
-          {v.empresa.requiereAprobacion ? (
+          {v.empresa.requiereAprobacion && configPortal.solicitudAprobacionLiquidacion ? (
             <Boton disabled={!puedeAvanzar || procesando === "enviar"} onClick={() => void ejecutar("enviar", () => enviarAprobacionReal(periodoInput), () => s.enviarAprobacion(v.periodo.id))}>
               <Send size={15} /> Enviar a aprobación
             </Boton>
@@ -1267,6 +1343,14 @@ const PRESENTISMO_ACCIONES: Array<{ valor: CondicionPresentismo["accion"]; label
   { valor: "paga_porcentaje", label: "Paga %" },
 ];
 
+const CAPACIDADES_PORTAL_EMPRESA: Array<{ id: CapacidadPortalEmpresa; titulo: string; detalle: string }> = [
+  { id: "novedadesWeb", titulo: "Novedades por la web", detalle: "La empresa puede cargar y enviar novedades desde el portal cliente." },
+  { id: "altasEmpleados", titulo: "Alta de trabajadores", detalle: "La empresa puede crear fichas de trabajadores desde el portal." },
+  { id: "portalEmpleadoRecibos", titulo: "Portal empleado y recibos web", detalle: "Los empleados pueden tener acceso web para ver y descargar recibos publicados." },
+  { id: "solicitudAprobacionLiquidacion", titulo: "Pedir aprobación de liquidación", detalle: "El estudio puede mandar el borrador al portal del cliente para revisión." },
+  { id: "aprobacionSueldos", titulo: "Responder aprobación de sueldos", detalle: "La empresa puede aprobar o devolver una liquidación enviada desde su portal." },
+];
+
 type PresentismoRegla = NonNullable<NonNullable<Empresa["reglasLiquidacion"]>["presentismo"]>;
 
 function condicionesPresentismoIniciales(presentismo?: PresentismoRegla) {
@@ -1274,6 +1358,86 @@ function condicionesPresentismoIniciales(presentismo?: PresentismoRegla) {
   const legacy = presentismo?.descontarConNovedades;
   if (legacy?.length) return legacy.map((tipo) => ({ tipo, desdeCantidad: 1, accion: "no_paga" as const }));
   return NOVEDADES_PRESENTISMO_DEFAULT;
+}
+
+function PermisosPortalCliente({ v, onCerrar }: { v: Vista; onCerrar: () => void }) {
+  const s = useStore();
+  const router = useRouter();
+  const usuario = useUsuario();
+  const puede = s.puede("configurar");
+  const portalConfigActual = useMemo(() => portalEmpresaConfig(v.empresa), [v.empresa]);
+  const [portalConfig, setPortalConfig] = useState<PortalEmpresaConfig>(portalConfigActual);
+  const [mensajePortal, setMensajePortal] = useState<{ tipo: "info" | "error"; texto: string } | null>(null);
+  const [guardandoPortal, setGuardandoPortal] = useState(false);
+
+  useEffect(() => setPortalConfig(portalConfigActual), [portalConfigActual]);
+
+  const cambiarCapacidadPortal = (capacidad: CapacidadPortalEmpresa, valor: boolean) => {
+    setPortalConfig((actual) => ({ ...actual, [capacidad]: valor }));
+    setMensajePortal(null);
+  };
+
+  const guardarPortal = async () => {
+    setMensajePortal(null);
+    setGuardandoPortal(true);
+    try {
+      const cambios: Partial<Empresa> = { portalConfig };
+      const activas = CAPACIDADES_PORTAL_EMPRESA.filter((capacidad) => portalConfig[capacidad.id]).map((capacidad) => capacidad.titulo.toLowerCase());
+      const resumen = `Actualizó permisos del portal cliente: ${activas.length ? activas.join(", ") : "sin capacidades activas"}`;
+      const res = await actualizarEmpresaReal({ empresaId: v.empresa.id, cambios, resumen, actor: usuario.nombre });
+      if (!res.ok) {
+        setMensajePortal({ tipo: "error", texto: res.mensaje });
+        return;
+      }
+      s.actualizarEmpresa(v.empresa.id, cambios, resumen);
+      setMensajePortal({ tipo: "info", texto: res.modo === "real" ? "Permisos del portal actualizados." : "En producción se guardarán estos permisos y quedarán auditados." });
+      if (res.modo === "real") router.refresh();
+    } catch (err) {
+      setMensajePortal({ tipo: "error", texto: err instanceof Error ? err.message : "No pudimos guardar los permisos del portal." });
+    } finally {
+      setGuardandoPortal(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="mr-auto">
+          <p className="mt-1 text-sm text-apagado">Define qué puede hacer esta empresa y sus empleados en la web. No cambia el precio ni el plan contratado.</p>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        {CAPACIDADES_PORTAL_EMPRESA.map((capacidad) => {
+          const activo = portalConfig[capacidad.id];
+          return (
+            <label key={capacidad.id} className={clsx("flex min-h-28 cursor-pointer gap-3 rounded-2xl border p-4 transition-colors", activo ? "border-petroleo/30 bg-cielo" : "border-linea bg-hundido/45")}>
+              <input
+                type="checkbox"
+                checked={activo}
+                disabled={!puede}
+                onChange={(event) => cambiarCapacidadPortal(capacidad.id, event.target.checked)}
+                className="mt-1 size-4 accent-petroleo"
+              />
+              <span className="min-w-0">
+                <span className="block font-bold">{capacidad.titulo}</span>
+                <span className="mt-1 block text-sm leading-5 text-tinta-2">{capacidad.detalle}</span>
+                <span className={clsx("mt-3 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold", activo ? "bg-menta text-menta-t" : "bg-superficie text-apagado")}>
+                  {activo ? "Habilitado" : "Deshabilitado"}
+                </span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      {mensajePortal && <p className={clsx("mt-3 rounded-xl px-4 py-3 text-sm", mensajePortal.tipo === "error" ? "bg-rosa text-rosa-t" : "bg-menta text-menta-t")}>{mensajePortal.texto}</p>}
+      <div className="mt-5 flex flex-wrap justify-end gap-2">
+        <Boton variante="fantasma" onClick={onCerrar}>Cerrar</Boton>
+        <Boton disabled={!puede || guardandoPortal} onClick={() => void guardarPortal()}>
+          {guardandoPortal ? "Guardando..." : "Guardar permisos"}
+        </Boton>
+      </div>
+    </div>
+  );
 }
 
 function TabReglasLiquidacion({ v }: { v: Vista }) {
@@ -1614,9 +1778,11 @@ function Contenido({
   if (datosIniciales.modo === "real" && !useStore.getState().empresas.some((empresa) => empresa.id === id)) {
     sincronizarDatosOperativos(datosIniciales);
   }
-  const tab = (sp.get("tab") as Tab) ?? "resumen";
+  const tabParam = sp.get("tab");
+  const tab = (["resumen", "novedades", "liquidacion", "empleados", "reglas", "actividad"].includes(tabParam ?? "") ? tabParam : "resumen") as Tab;
   const empleadoSel = sp.get("emp");
   const calcSel = sp.get("calc");
+  const [permisosAbiertos, setPermisosAbiertos] = useState(false);
   const existe = useStore((s) => s.empresas.some((e) => e.id === id));
   const todos = useStore((s) => s.empleados);
   const v = usePeriodoVista(id);
@@ -1672,6 +1838,7 @@ function Contenido({
                 <span className="block font-semibold">{v.empresa.contacto.nombre}</span>
                 <span className="mt-1 flex items-center gap-1 text-xs text-apagado"><Mail size={12} /> {v.empresa.contacto.email}</span>
               </div>
+              <Boton tam="sm" variante="secundario" onClick={() => setPermisosAbiertos(true)}>Permisos</Boton>
               <Boton tam="sm" variante="secundario" href={`/cliente/${v.empresa.id}`}>Portal cliente</Boton>
             </div>
           </section>
@@ -1699,6 +1866,10 @@ function Contenido({
       {tab === "empleados" && <TabEmpleados v={v} empleados={empleados} ver={(e) => setQ({ emp: e })} />}
       {tab === "reglas" && <TabReglasLiquidacion v={v} />}
       {tab === "actividad" && <TabActividad v={v} />}
+
+      <Modal abierto={permisosAbiertos} onCerrar={() => setPermisosAbiertos(false)} titulo="Permisos del portal cliente" className="[--modal-max:46rem]">
+        <PermisosPortalCliente v={v} onCerrar={() => setPermisosAbiertos(false)} />
+      </Modal>
 
       <Drawer
         abierto={!!r && !!eCalc}

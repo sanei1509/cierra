@@ -6,6 +6,7 @@ import { marcarReciboVistoReal } from "@/app/(estudio)/actions";
 import { ReciboDoc } from "@/components/recibo-doc";
 import { Boton } from "@/components/ui";
 import { hashDe } from "@/lib/engine";
+import { portalEmpresaConfig } from "@/lib/empresa";
 import { useStore, vistaPeriodo } from "@/lib/store";
 import type { DatosOperativosIniciales } from "@/lib/backend-operativo";
 
@@ -29,17 +30,19 @@ export default function ReciboClient({
   const empresa = datos.empresas.find((x) => x.id === e?.empresaId);
   const v = empresa ? vistaPeriodo(empresa.id, mes, datos) : null;
   const r = v?.resultados?.find((x) => x.empleadoId === id);
+  const portalEmpleadoHabilitado = empresa ? portalEmpresaConfig(empresa).portalEmpleadoRecibos : false;
   const listo = !!(e && empresa && v && v.periodo.etapa === "cerrada" && r && !r.fueraDeAlcance);
 
   useEffect(() => {
-    if (listo && desdePortal && empresa) {
+    if (listo && desdePortal && empresa && portalEmpleadoHabilitado) {
       marcarVisto(id, mes);
       if (datosIniciales.modo === "real") void marcarReciboVistoReal({ empleadoId: id, empresaId: empresa.id, mes });
     }
     if (listo && imprimir) setTimeout(() => window.print(), 300);
-  }, [listo, desdePortal, imprimir, id, mes, marcarVisto, datosIniciales.modo, empresa]);
+  }, [listo, desdePortal, imprimir, id, mes, marcarVisto, datosIniciales.modo, empresa, portalEmpleadoHabilitado]);
 
   if (!listo || !e || !empresa || !v || !r) return <p className="p-10 text-center text-tinta">Este recibo todavía no fue emitido.</p>;
+  if (desdePortal && !portalEmpleadoHabilitado) return <p className="p-10 text-center text-tinta">La consulta web de recibos no está habilitada para esta empresa.</p>;
 
   return (
     <div className="document-shell min-h-screen py-3 print:min-h-0 print:py-0">

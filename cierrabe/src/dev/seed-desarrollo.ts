@@ -388,6 +388,40 @@ async function seedDesarrollo() {
         await tx.delete(moduloOverrides).where(inArray(moduloOverrides.suscripcionId, idsSuscripcionesObsoletas));
         await tx.delete(suscripcionesEstudio).where(inArray(suscripcionesEstudio.id, idsSuscripcionesObsoletas));
       }
+      const planDev = planComercialPorCodigo("profesional");
+      const suscripcionDevId = "00000000-0000-4000-8000-000000000404";
+      await tx
+        .insert(suscripcionesEstudio)
+        .values({
+          id: suscripcionDevId,
+          estudioId: config.estudioId,
+          planId: planDev.id,
+          estado: "activo",
+          moneda: "UYU",
+          precioMensualCent: planDev.precioMensualCent,
+          inicio: new Date("2026-10-01T00:00:00"),
+          notasInternas: "Suscripcion operativa para el estudio de desarrollo.",
+        })
+        .onConflictDoUpdate({
+          target: suscripcionesEstudio.id,
+          set: {
+            estudioId: config.estudioId,
+            planId: planDev.id,
+            estado: "activo",
+            moneda: "UYU",
+            precioMensualCent: planDev.precioMensualCent,
+            inicio: new Date("2026-10-01T00:00:00"),
+            fin: null,
+            notasInternas: "Suscripcion operativa para el estudio de desarrollo.",
+          },
+        });
+      await tx.delete(suscripcionAddons).where(eq(suscripcionAddons.suscripcionId, suscripcionDevId));
+      await tx.insert(suscripcionAddons).values({
+        suscripcionId: suscripcionDevId,
+        moduloCodigo: "automatic_receipt_email",
+        precioMensualCent: addonComercialPorModulo("automatic_receipt_email")?.precioMensualCent ?? 0,
+        inicio: new Date("2026-10-01T00:00:00"),
+      });
     }
     for (const id of idsAplicacionesHistoricasPereira) await tx.delete(aplicacionesPago).where(eq(aplicacionesPago.id, id));
     for (const id of idsPagosHistoricosPereira) await tx.delete(pagosEstudio).where(eq(pagosEstudio.id, id));

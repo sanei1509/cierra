@@ -14,6 +14,7 @@ import { contextoEstudioDesarrollo, uuidValido } from "@/lib/backend-dev-context
 import { contextoOperativoActual } from "@/lib/backend-operativo";
 import { obtenerSesionDev } from "@/lib/dev-auth";
 import { calcularEmpresa, hashDe } from "@/lib/engine";
+import { portalEmpresaConfig } from "@/lib/empresa";
 import { MES_ACTUAL } from "@/lib/format";
 import { MOTOR_VERSION, parametrosVigentes } from "@/lib/params";
 import { controlarFichaEmpleado } from "@/lib/validations";
@@ -24,6 +25,10 @@ export interface AltaRealResult {
   modo: "real" | "demo";
   mensaje: string;
   id?: string;
+}
+
+export interface ActualizarFechaObjetivoRealInput extends PeriodoRealInput {
+  fechaObjetivo: string;
 }
 
 export interface CrearEmpresaInicialInput {
@@ -637,38 +642,60 @@ export async function crearEmpleadoClienteReal(input: CrearEmpleadoInicialInput 
   const tenant = tenantContextDesdeAcceso(ctx);
   if (!tenant) return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
   const { db } = await import("cierrabe/datos/db");
+  const empresasRepo = crearEmpresasRepo(db);
+  const empresa = await empresasRepo.obtener(tenant, empresaId);
+  if (!empresa) return { ok: false, modo: "real", mensaje: "No encontramos la empresa." };
+  const portalConfig = portalEmpresaConfig(empresa);
+  if (!portalConfig.altasEmpleados) {
+    return { ok: false, modo: "real", mensaje: "Esta empresa no tiene habilitado crear trabajadores desde el portal." };
+  }
   const auditoriaRepo = crearAuditoriaRepo(db);
-  const res = await crearEmpleadoConAccesoInicial(
-    ctx,
-    {
-      empleados: crearEmpleadosRepo(db),
-      usuarios: crearUsuariosRepo(db),
-      auditoria: auditoriaRepo,
-    },
-    { estudioId: ctx.estudioId, empresaId },
-    {
-      empleado: {
-        empresaId,
-        nombre: input.nombre.trim(),
-        apellido: input.apellido.trim(),
-        ci: input.ci.trim(),
-        email: input.email.trim().toLowerCase(),
-        cargo: input.cargo.trim(),
-        categoria,
-        modalidad: input.modalidad,
-        ingreso: input.ingreso,
-        sueldos: input.modalidad === "mensual" ? [{ desde: input.ingreso, monto: input.sueldo }] : [],
-        hijos: input.hijos,
-        conyugeFonasa: false,
-        telefono: input.telefono?.trim() || undefined,
-        area: input.area?.trim() || undefined,
-        tipoContrato: input.tipoContrato?.trim() || undefined,
-        direccion: input.direccion?.trim() || undefined,
-        cuenta: input.cuenta?.trim() || undefined,
-        horario: input.horario,
-      },
-    },
-  );
+  const empleadosRepo = crearEmpleadosRepo(db);
+  const empleadoInput = {
+    empresaId,
+    nombre: input.nombre.trim(),
+    apellido: input.apellido.trim(),
+    ci: input.ci.trim(),
+    email: input.email.trim().toLowerCase(),
+    cargo: input.cargo.trim(),
+    categoria,
+    modalidad: input.modalidad,
+    ingreso: input.ingreso,
+    sueldos: input.modalidad === "mensual" ? [{ desde: input.ingreso, monto: input.sueldo }] : [],
+    hijos: input.hijos,
+    conyugeFonasa: false,
+    telefono: input.telefono?.trim() || undefined,
+    area: input.area?.trim() || undefined,
+    tipoContrato: input.tipoContrato?.trim() || undefined,
+    direccion: input.direccion?.trim() || undefined,
+    cuenta: input.cuenta?.trim() || undefined,
+    horario: input.horario,
+  };
+  const res = portalConfig.portalEmpleadoRecibos
+    ? await crearEmpleadoConAccesoInicial(
+        ctx,
+        {
+          empleados: empleadosRepo,
+          usuarios: crearUsuariosRepo(db),
+          auditoria: auditoriaRepo,
+        },
+        { estudioId: ctx.estudioId, empresaId },
+        { empleado: empleadoInput },
+      )
+    : {
+        empleado: await crearEmpleadoBackend(ctx, empleadosRepo, { estudioId: ctx.estudioId, empresaId }, empleadoInput),
+        usuario: null,
+      };
+  if (!portalConfig.portalEmpleadoRecibos) {
+    await auditoriaRepo.registrar(tenant, {
+      actor: `${input.actor} (cliente)`,
+      empresaId,
+      entidad: "Empleado",
+      entidadId: res.empleado.id as EmpleadoId,
+      accion: "Alta de empleado sin acceso web",
+      detalle: "El portal empleado y recibos web está deshabilitado para esta empresa.",
+    });
+  }
   await auditoriaRepo.registrar(tenant, {
     actor: `${input.actor} (cliente)`,
     empresaId,
@@ -686,7 +713,7 @@ export async function crearEmpleadoClienteReal(input: CrearEmpleadoInicialInput 
   return {
     ok: true,
     modo: "real",
-    mensaje: `Empleado guardado con acceso para ${res.usuario.email}.`,
+    mensaje: portalConfig.portalEmpleadoRecibos ? `Empleado guardado con acceso para ${res.usuario?.email}.` : "Empleado guardado sin acceso web para recibos.",
     id: res.empleado.id,
   };
 }
@@ -1106,6 +1133,11 @@ export async function enviarNovedadesClienteReal(input: EnviarNovedadesClienteRe
   const { db } = await import("cierrabe/datos/db");
   const periodosRepo = crearPeriodosRepo(db);
   const auditoriaRepo = crearAuditoriaRepo(db);
+  const empresa = await crearEmpresasRepo(db).obtener(tenant, empresaId);
+  if (!empresa) return { ok: false, modo: "real", mensaje: "No encontramos la empresa." };
+  if (!portalEmpresaConfig(empresa).novedadesWeb) {
+    return { ok: false, modo: "real", mensaje: "Esta empresa no tiene habilitado el envío web de novedades." };
+  }
   const periodos = await periodosRepo.listarPorEmpresa(tenant, empresaId);
   const periodo =
     periodos.find((p) => p.mes === input.mes) ??
@@ -1180,6 +1212,22 @@ export async function solicitarNovedadesReal(input: PeriodoRealInput): Promise<A
   }));
 }
 
+export async function actualizarFechaObjetivoReal(input: ActualizarFechaObjetivoRealInput): Promise<AltaRealResult> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fechaObjetivo)) {
+    return { ok: false, modo: "real", mensaje: "La fecha objetivo no tiene un formato válido." };
+  }
+  return guardarPeriodoReal(input, async (periodo) => {
+    if (!input.fechaObjetivo.startsWith(`${periodo.mes}-`)) {
+      throw new Error("La fecha objetivo debe quedar dentro del mes que se está cerrando.");
+    }
+    const anterior = periodo.fechaObjetivo;
+    return {
+      periodo: { ...periodo, fechaObjetivo: input.fechaObjetivo },
+      auditoria: { accion: "Cambio la fecha objetivo de novedades", detalle: `${anterior} -> ${input.fechaObjetivo}` },
+    };
+  });
+}
+
 export async function marcarNovedadesRecibidasReal(input: PeriodoRealInput): Promise<AltaRealResult> {
   return guardarPeriodoReal(input, async (periodo) => ({
     periodo: { ...periodo, etapa: "recibidas" },
@@ -1202,6 +1250,17 @@ export async function agregarNotaPeriodoReal(input: AgregarNotaPeriodoRealInput)
 }
 
 export async function enviarAprobacionReal(input: PeriodoRealInput): Promise<AltaRealResult> {
+  const ctx = await contextoOperativoActual();
+  if (ctx && process.env.DATABASE_URL && uuidValido(input.empresaId)) {
+    const tenant = tenantContextDesdeAcceso(ctx);
+    if (tenant) {
+      const { db } = await import("cierrabe/datos/db");
+      const empresa = await crearEmpresasRepo(db).obtener(tenant, input.empresaId as EmpresaId);
+      if (empresa && !portalEmpresaConfig(empresa).solicitudAprobacionLiquidacion) {
+        return { ok: false, modo: "real", mensaje: "Esta empresa no tiene habilitado pedir aprobación de liquidación por portal." };
+      }
+    }
+  }
   return guardarPeriodoReal(input, async (periodo) => {
     const version = periodo.versiones.at(-1)?.version;
     if (!version) throw new Error("Primero hay que calcular una version.");
@@ -1252,6 +1311,17 @@ export async function cerrarPeriodoReal(input: PeriodoRealInput): Promise<AltaRe
 }
 
 export async function responderAprobacionReal(input: ResponderAprobacionRealInput): Promise<AltaRealResult> {
+  const ctx = await contextoOperativoActual();
+  if (ctx && process.env.DATABASE_URL && uuidValido(input.empresaId)) {
+    const tenant = tenantContextDesdeAcceso(ctx);
+    if (tenant) {
+      const { db } = await import("cierrabe/datos/db");
+      const empresa = await crearEmpresasRepo(db).obtener(tenant, input.empresaId as EmpresaId);
+      if (empresa && !portalEmpresaConfig(empresa).aprobacionSueldos) {
+        return { ok: false, modo: "real", mensaje: "Esta empresa no tiene habilitada la aprobación web de sueldos." };
+      }
+    }
+  }
   return guardarPeriodoReal(input, async (periodo) => {
     if (!periodo.aprobacion) throw new Error("No hay una aprobacion pendiente para responder.");
     const estado = input.aprobada ? "aprobada" : "devuelta";
@@ -1320,6 +1390,10 @@ export async function marcarReciboVistoReal(input: MarcarReciboVistoRealInput): 
   if (!tenant) return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
 
   const { db } = await import("cierrabe/datos/db");
+  const empresa = await crearEmpresasRepo(db).obtener(tenant, input.empresaId as EmpresaId);
+  if (empresa && !portalEmpresaConfig(empresa).portalEmpleadoRecibos) {
+    return { ok: false, modo: "real", mensaje: "Esta empresa no tiene habilitada la consulta web de recibos." };
+  }
   const reciboVistasRepo = crearReciboVistasRepo(db);
   const auditoriaRepo = crearAuditoriaRepo(db);
   const vista = await reciboVistasRepo.registrar(tenant, {

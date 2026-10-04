@@ -26,6 +26,17 @@ export interface Empresa {
   /** Logo como data URL (en producción: archivo en storage) */
   logo?: string;
   reglasLiquidacion?: ReglasLiquidacionEmpresa;
+  portalConfig?: PortalEmpresaConfig;
+}
+
+export type CapacidadPortalEmpresa = "novedadesWeb" | "altasEmpleados" | "portalEmpleadoRecibos" | "solicitudAprobacionLiquidacion" | "aprobacionSueldos";
+
+export interface PortalEmpresaConfig {
+  novedadesWeb: boolean;
+  altasEmpleados: boolean;
+  portalEmpleadoRecibos: boolean;
+  solicitudAprobacionLiquidacion: boolean;
+  aprobacionSueldos: boolean;
 }
 
 export interface ReglasLiquidacionEmpresa {

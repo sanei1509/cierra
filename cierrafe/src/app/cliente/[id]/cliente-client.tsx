@@ -3,13 +3,14 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { AlertOctagon, AlertTriangle, ArrowLeft, Check, CheckCircle2, ImagePlus, Paperclip, Plus, Search, Undo2, UserPlus, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { AlertOctagon, AlertTriangle, ArrowLeft, Check, CheckCircle2, ChevronDown, ImagePlus, Lock, LogOut, Paperclip, Plus, Search, Undo2, UserPlus, X } from "lucide-react";
 import { actualizarLogoEmpresaClienteReal, borrarNovedadReal, crearEmpleadoClienteReal, enviarNovedadesClienteReal, responderAprobacionReal } from "@/app/(estudio)/actions";
 import { NovedadForm } from "@/components/novedad-form";
 import { Logo } from "@/components/shell";
 import { Avatar, Boton, Campo, Drawer, MarcaEmpresa, Panel, ResultadoAccion, imagenADataUrl, inputCls } from "@/components/ui";
 import { activoEn, calcularEmpresa, totales } from "@/lib/engine";
+import { portalEmpresaConfig } from "@/lib/empresa";
 import { fecha, fmt, mesAnterior, MES_ACTUAL, nombreMes, pct } from "@/lib/format";
 import { horarioDefault } from "@/lib/horarios";
 import { TIPOS, valorNovedad } from "@/lib/labels";
@@ -47,6 +48,84 @@ const ORDEN_ETAPA: Record<Periodo["etapa"], number> = {
 };
 
 type FiltroPersonasNovedades = "todos" | "con" | "sin";
+
+function MenuEmpresaPortal({
+  empresa,
+  onCambiarFoto,
+  logoutAction,
+}: {
+  empresa: Empresa;
+  onCambiarFoto: (file: File | undefined) => void;
+  logoutAction: () => Promise<void>;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const cerrarSiAfuera = (event: PointerEvent) => {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      setAbierto(false);
+    };
+    const cerrarConEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAbierto(false);
+    };
+    document.addEventListener("pointerdown", cerrarSiAfuera);
+    document.addEventListener("keydown", cerrarConEscape);
+    return () => {
+      document.removeEventListener("pointerdown", cerrarSiAfuera);
+      document.removeEventListener("keydown", cerrarConEscape);
+    };
+  }, [abierto]);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-linea bg-superficie px-3 text-sm font-semibold text-tinta shadow-[0_1px_2px_rgb(16_34_71/0.05)] transition-colors hover:bg-hundido"
+        onClick={() => setAbierto((actual) => !actual)}
+        aria-label="Abrir menú de empresa"
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+      >
+        Cuenta <ChevronDown size={15} className={abierto ? "rotate-180 transition-transform" : "transition-transform"} />
+      </button>
+      {abierto && (
+        <div className="absolute right-0 top-12 z-30 w-64 rounded-xl border border-linea bg-superficie p-1.5 shadow-[var(--cierra-shadow-soft)]" role="menu">
+          <div className="px-2 py-2">
+            <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-apagado">Empresa</p>
+            <div className="mt-2 flex items-center gap-3 rounded-xl border border-linea bg-hundido p-2">
+              <MarcaEmpresa empresa={empresa} size={38} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold">{empresa.nombre}</p>
+                <p className="text-xs text-apagado">Portal cliente</p>
+              </div>
+            </div>
+          </div>
+          <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-semibold text-tinta-2 hover:bg-hundido hover:text-tinta" role="menuitem">
+            <ImagePlus size={15} /> Cambiar foto de perfil
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              aria-label="Cambiar foto de perfil de la empresa"
+              onChange={(event) => {
+                setAbierto(false);
+                onCambiarFoto(event.target.files?.[0]);
+              }}
+            />
+          </label>
+          <div className="my-1 border-t border-linea" />
+          <form action={logoutAction}>
+            <button type="submit" className="flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-tinta-2 hover:bg-hundido hover:text-tinta" role="menuitem">
+              <LogOut size={15} /> Salir
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function normalizar(texto: string) {
   return texto
@@ -122,7 +201,17 @@ function datosEmpleadoDesdeForm(formData: FormData) {
   };
 }
 
-export default function ClienteClient({ id, datosIniciales }: { id: string; datosIniciales: DatosOperativosIniciales }) {
+export default function ClienteClient({
+  id,
+  datosIniciales,
+  mostrarVolverEstudio,
+  logoutAction,
+}: {
+  id: string;
+  datosIniciales: DatosOperativosIniciales;
+  mostrarVolverEstudio: boolean;
+  logoutAction: () => Promise<void>;
+}) {
   const router = useRouter();
   const store = useStore();
   const datos = datosIniciales.modo === "real" ? combinarDatosCliente(datosIniciales, store) : store;
@@ -152,6 +241,7 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
 
   const autor = v.empresa.contacto.nombre;
   const p = v.periodo;
+  const portalConfig = portalEmpresaConfig(v.empresa);
   const mesNombre = nombreMes(p.mes).split(" ")[0].toLowerCase();
   const prev = calcularEmpresa(v.empresa, datos.empleados, mesAnterior(p.mes), datos.novedades);
   const novedadesPorEmpleado = (() => {
@@ -391,7 +481,15 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
   };
 
   let cuerpo: React.ReactNode;
-  if (p.etapa === "novedades") {
+  if (p.etapa === "novedades" && !portalConfig.novedadesWeb) {
+    cuerpo = (
+      <Panel className="p-8 text-center">
+        <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-hundido text-apagado"><Lock size={26} /></span>
+        <h1 className="mt-4 text-2xl font-extrabold tracking-tight">El envío web de novedades no está habilitado</h1>
+        <p className="mx-auto mt-2 max-w-md text-[15px] text-tinta-2">{ESTUDIO.nombre} lleva este intercambio por otro canal para {v.empresa.nombre}. Contactá al estudio si necesitás informar cambios.</p>
+      </Panel>
+    );
+  } else if (p.etapa === "novedades") {
     cuerpo = (
       <>
         <Panel className="bg-sol-suave p-6">
@@ -416,16 +514,22 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
               <option value="con">Con novedades ({v.novedadesMes.length ? new Set(v.novedadesMes.map((n) => n.empleadoId)).size : 0})</option>
               <option value="sin">Sin novedades ({empleados.length - new Set(v.novedadesMes.map((n) => n.empleadoId)).size})</option>
             </select>
-            <Boton variante="secundario" className="whitespace-nowrap" onClick={() => { setErrorEmpleado(""); setControlEmpleado({ bloqueos: [], advertencias: [] }); setNuevoEmpleado(true); }}>
-              <UserPlus size={16} /> Agregar trabajador
-            </Boton>
+            {portalConfig.altasEmpleados && (
+              <Boton variante="secundario" className="whitespace-nowrap" onClick={() => { setErrorEmpleado(""); setControlEmpleado({ bloqueos: [], advertencias: [] }); setNuevoEmpleado(true); }}>
+                <UserPlus size={16} /> Agregar trabajador
+              </Boton>
+            )}
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-apagado">
             <span>{empleadosFiltrados.length} de {empleados.length} personas</span>
             <span>·</span>
             <span>{v.novedadesMes.length} novedades cargadas</span>
-            <span>·</span>
-            <span>El alta crea acceso al portal de recibos.</span>
+            {portalConfig.altasEmpleados && (
+              <>
+                <span>·</span>
+                <span>{portalConfig.portalEmpleadoRecibos ? "El alta crea acceso al portal de recibos." : "El alta crea solo la ficha; portal empleado deshabilitado."}</span>
+              </>
+            )}
           </div>
         </Panel>
         <ul className="divide-y divide-linea overflow-hidden rounded-[var(--radius-panel)] border border-linea bg-superficie">
@@ -433,42 +537,46 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
             const ns = novedadesPorEmpleado.get(e.id) ?? [];
             const tipoSeleccionado = tipoRapidoPorEmpleado[e.id] ?? "hora_extra";
             return (
-              <li key={e.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(18rem,auto)] md:items-center">
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-3">
+              <li key={e.id} className="px-4 py-3">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_22rem] md:items-start">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-3">
                     <Avatar nombre={`${e.nombre} ${e.apellido}`} tono={v.empresa.tono} size={34} />
                     <span className="min-w-0 flex-1">
-                      <span className="block font-semibold">{e.nombre} {e.apellido}</span>
+                      <span className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="truncate font-semibold">{e.nombre} {e.apellido}</span>
+                        {ns.length > 0 && <span className="rounded-full bg-menta px-2.5 py-1 text-xs font-semibold text-menta-t">{ns.length}</span>}
+                      </span>
                       <span className="block text-xs text-apagado">{e.cargo}</span>
                     </span>
-                    {ns.length > 0 && <span className="rounded-full bg-menta px-2.5 py-1 text-xs font-semibold text-menta-t">{ns.length}</span>}
+                    </div>
+                    {ns.length > 0 && (
+                      <ul className="mt-3 flex flex-wrap gap-1.5 pl-11">
+                        {ns.map((n) => (
+                          <li key={n.id} className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-hundido py-1 pl-3 pr-1 text-[13px]">
+                            <b>{TIPOS[n.tipo].corto}</b> {valorNovedad(n)}
+                            {n.adjunto && <Paperclip size={12} className="text-petroleo" aria-label="Con adjunto" />}
+                            <button disabled={eliminando === n.id} onClick={() => void quitar(n)} className="rounded-full p-1 text-apagado hover:bg-rosa hover:text-rosa-t disabled:opacity-50" aria-label="Quitar"><X size={12} /></button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                  {ns.length > 0 && (
-                    <ul className="mt-2 flex flex-wrap gap-1.5">
-                      {ns.map((n) => (
-                        <li key={n.id} className="inline-flex items-center gap-1.5 rounded-full bg-hundido py-1 pl-3 pr-1 text-[13px]">
-                          <b>{TIPOS[n.tipo].corto}</b> {valorNovedad(n)}
-                          {n.adjunto && <Paperclip size={12} className="text-petroleo" aria-label="Con adjunto" />}
-                          <button disabled={eliminando === n.id} onClick={() => void quitar(n)} className="rounded-full p-1 text-apagado hover:bg-rosa hover:text-rosa-t disabled:opacity-50" aria-label="Quitar"><X size={12} /></button>
-                        </li>
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] md:pt-1">
+                    <select
+                      className={clsx(inputCls, "h-10")}
+                      value={tipoSeleccionado}
+                      onChange={(event) => setTipoRapidoPorEmpleado((actual) => ({ ...actual, [e.id]: event.target.value as TipoNovedad }))}
+                      aria-label={`Tipo de novedad para ${e.nombre} ${e.apellido}`}
+                    >
+                      {RAPIDOS.map((t) => (
+                        <option key={t} value={t}>{TIPOS[t].corto}</option>
                       ))}
-                    </ul>
-                  )}
-                </div>
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <select
-                    className={clsx(inputCls, "h-10")}
-                    value={tipoSeleccionado}
-                    onChange={(event) => setTipoRapidoPorEmpleado((actual) => ({ ...actual, [e.id]: event.target.value as TipoNovedad }))}
-                    aria-label={`Tipo de novedad para ${e.nombre} ${e.apellido}`}
-                  >
-                    {RAPIDOS.map((t) => (
-                      <option key={t} value={t}>{TIPOS[t].corto}</option>
-                    ))}
-                  </select>
-                  <Boton tam="sm" variante="secundario" className="justify-center" onClick={() => setForm({ emp: e.id, tipo: tipoSeleccionado })}>
-                    <Plus size={14} /> Agregar
-                  </Boton>
+                    </select>
+                    <Boton tam="sm" variante="secundario" className="justify-center" onClick={() => setForm({ emp: e.id, tipo: tipoSeleccionado })}>
+                      <Plus size={14} /> Agregar
+                    </Boton>
+                  </div>
                 </div>
               </li>
             );
@@ -496,7 +604,7 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
         <Panel className="p-6">
           <p className="text-sm font-semibold text-lila-t">Para revisar</p>
           <h1 className="mt-1 text-[26px] font-extrabold leading-tight tracking-tight">Los sueldos de {mesNombre} están listos</h1>
-          <p className="mt-2 text-[15px] text-tinta-2">Revisá los montos. Si está todo bien, aprobalos y emitimos los recibos. Si algo no coincide, devolvelo con un comentario.</p>
+          <p className="mt-2 text-[15px] text-tinta-2">{portalConfig.aprobacionSueldos ? "Revisá los montos. Si está todo bien, aprobalos y emitimos los recibos. Si algo no coincide, devolvelo con un comentario." : "Revisá los montos. La aprobación por portal no está habilitada para esta empresa; coordiná cualquier corrección con el estudio."}</p>
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
             <div className="rounded-2xl bg-petroleo p-5 text-white">
               <p className="text-sm text-[#DCE9FF]">Total a pagar a tu equipo</p>
@@ -553,7 +661,9 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
             </table>
           </div>
         </Panel>
-        {devolviendo ? (
+        {!portalConfig.aprobacionSueldos ? (
+          <Panel className="p-5 text-center text-sm text-apagado">La aprobación web está deshabilitada para esta empresa.</Panel>
+        ) : devolviendo ? (
           <Panel className="p-5">
             <label className="block text-sm font-semibold" htmlFor="obs">¿Qué hay que corregir?</label>
             <textarea id="obs" autoFocus className={clsx(inputCls, "mt-2 h-28 py-3")} value={comentario} onChange={(e) => setComentario(e.target.value)} placeholder="Ej.: a Florencia le corresponden 4 horas extra más" />
@@ -592,34 +702,23 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
   return (
     <div className="mx-auto max-w-2xl space-y-3 px-3 pb-32 pt-6 sm:pt-8">
       <div className="flex items-center gap-3 px-2 py-3">
-        <label className="group relative cursor-pointer" title="Cambiar logo de la empresa">
-          <MarcaEmpresa empresa={v.empresa} size={40} />
-          <span className="absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-full bg-petroleo text-white ring-2 ring-superficie transition-transform group-hover:scale-110">
-            <ImagePlus size={11} />
-          </span>
-          <input
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            aria-label="Subir logo de la empresa"
-            onChange={(e) => void cambiarLogo(e.target.files?.[0])}
-          />
-        </label>
+        <MarcaEmpresa empresa={v.empresa} size={40} />
         <div className="flex-1 leading-tight">
           <p className="font-bold">{v.empresa.nombre}</p>
           <p className="text-xs text-apagado">Hola, {autor.split(" ").slice(-2, -1)[0] ?? autor} · {nombreMes(p.mes)}</p>
         </div>
         <Logo />
+        <MenuEmpresaPortal empresa={v.empresa} onCambiarFoto={(file) => void cambiarLogo(file)} logoutAction={logoutAction} />
       </div>
       {cuerpo}
-      <Drawer abierto={nuevoEmpleado} onCerrar={() => setNuevoEmpleado(false)} titulo="Agregar trabajador" subtitulo="Crea la ficha y el acceso a recibos">
+      <Drawer abierto={nuevoEmpleado && portalConfig.altasEmpleados} onCerrar={() => setNuevoEmpleado(false)} titulo="Agregar trabajador" subtitulo={portalConfig.portalEmpleadoRecibos ? "Crea la ficha y el acceso a recibos" : "Crea la ficha del trabajador"}>
         <form
           action={crearEmpleado}
           className="space-y-4"
           onChange={(event) => setControlEmpleado(controlarFichaEmpleado(datosEmpleadoDesdeForm(new FormData(event.currentTarget))))}
         >
           <p className="rounded-2xl bg-hundido px-4 py-3 text-sm text-tinta-2">
-            Usá esta alta cuando falta alguien en la lista. Carga la ficha base de la planilla madre y el email será su acceso al portal de recibos.
+            Usá esta alta cuando falta alguien en la lista. Carga la ficha base de la planilla madre{portalConfig.portalEmpleadoRecibos ? " y el email será su acceso al portal de recibos." : ". El portal empleado no está habilitado para esta empresa."}
           </p>
           {(controlEmpleado.bloqueos.length > 0 || controlEmpleado.advertencias.length > 0) ? (
             <div className="space-y-2 rounded-2xl border border-linea bg-hundido px-4 py-3 text-sm" role={controlEmpleado.bloqueos.length ? "alert" : "status"}>
@@ -704,7 +803,7 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
               Cancelar
             </Boton>
             <Boton type="submit" disabled={creandoEmpleado}>
-              <UserPlus size={16} /> {creandoEmpleado ? "Creando..." : "Crear trabajador y acceso"}
+              <UserPlus size={16} /> {creandoEmpleado ? "Creando..." : portalConfig.portalEmpleadoRecibos ? "Crear trabajador y acceso" : "Crear trabajador"}
             </Boton>
           </div>
         </form>
@@ -714,9 +813,11 @@ export default function ClienteClient({ id, datosIniciales }: { id: string; dato
           <NovedadForm key={form.emp + form.tipo} empresaId={id} mes={p.mes} empleados={empleados} origen="cliente" autor={autor} empleadoInicial={form.emp} tipoInicial={form.tipo} tipos={RAPIDOS} onListo={() => { setForm(null); if (esReal) router.refresh(); }} />
         )}
       </Drawer>
-      <p className="no-print pt-4 text-center text-xs text-apagado">
-        <Link href={`/empresas/${id}`} className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Volver a la vista del estudio</Link>
-      </p>
+      {mostrarVolverEstudio && (
+        <p className="no-print pt-4 text-center text-xs text-apagado">
+          <Link href={`/empresas/${id}`} className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={12} /> Volver a la vista del estudio</Link>
+        </p>
+      )}
     </div>
   );
 }

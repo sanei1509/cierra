@@ -6,6 +6,7 @@ import { ArrowLeft, Download, Eye } from "lucide-react";
 import { Logo } from "@/components/shell";
 import { Avatar, Boton, MarcaEmpresa, Panel } from "@/components/ui";
 import { activoEn } from "@/lib/engine";
+import { portalEmpresaConfig } from "@/lib/empresa";
 import { fmt, fmt2, MES_ACTUAL, nombreMes } from "@/lib/format";
 import { useStore, vistaPeriodo } from "@/lib/store";
 import type { DatosOperativosIniciales } from "@/lib/backend-operativo";
@@ -38,6 +39,20 @@ export default function PortalEmpleadoClient({ id, datosIniciales }: { id: strin
   }, [datos, e, empresa, id]);
 
   if (!e || !empresa) return <p className="p-10 text-center">No encontramos tu acceso.</p>;
+  if (!portalEmpresaConfig(empresa).portalEmpleadoRecibos) {
+    return (
+      <div className="mx-auto min-h-screen max-w-md space-y-3 p-3 pb-10">
+        <div className="flex items-center justify-between px-2 py-3">
+          <Logo />
+          <Avatar nombre={`${e.nombre} ${e.apellido}`} tono="menta" size={38} />
+        </div>
+        <Panel className="p-8 text-center">
+          <h1 className="text-2xl font-extrabold tracking-tight">Portal empleado deshabilitado</h1>
+          <p className="mt-2 text-sm text-apagado">Tu empresa no tiene habilitada la consulta web de recibos. Pedí tus recibos por el canal habitual.</p>
+        </Panel>
+      </div>
+    );
+  }
   const ultimo = recibos[0];
 
   return (

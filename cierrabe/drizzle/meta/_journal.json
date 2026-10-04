@@ -92,6 +92,13 @@
       "when": 1790951123735,
       "tag": "0012_steady_warbird",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791119654153,
+      "tag": "0013_company_portal_config",
+      "breakpoints": true
     }
   ]
 }

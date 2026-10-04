@@ -5,6 +5,7 @@ import { ExternalLink, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useStore, vistaPeriodo } from "@/lib/store";
 import type { DatosOperativosIniciales } from "@/lib/backend-operativo";
+import { portalEmpresaConfig } from "@/lib/empresa";
 import { MES_ACTUAL } from "@/lib/format";
 import { Avatar, EstadoChip, Panel, inputCls } from "@/components/ui";
 
@@ -21,7 +22,8 @@ export default function PortalesClient({ datosIniciales }: { datosIniciales: Dat
   const store = useStore();
   const datos = datosIniciales.modo === "real" ? datosIniciales : store;
   const vistas = datos.empresas.map((empresa) => vistaPeriodo(empresa.id, MES_ACTUAL, datos));
-  const empleadosMensuales = datos.empleados.filter((e) => e.modalidad === "mensual");
+  const empresasConPortalEmpleado = new Set(datos.empresas.filter((empresa) => portalEmpresaConfig(empresa).portalEmpleadoRecibos).map((empresa) => empresa.id));
+  const empleadosMensuales = datos.empleados.filter((e) => e.modalidad === "mensual" && empresasConPortalEmpleado.has(e.empresaId));
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [estadoCliente, setEstadoCliente] = useState<FiltroEstadoCliente>("todos");
   const [busquedaEmpleado, setBusquedaEmpleado] = useState("");
@@ -113,7 +115,7 @@ export default function PortalesClient({ datosIniciales }: { datosIniciales: Dat
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold tracking-tight">Portal del empleado</h2>
-              <p className="mt-1 text-sm text-apagado">Accesos individuales para consultar recibos por mes y descargar PDF.</p>
+              <p className="mt-1 text-sm text-apagado">Accesos habilitados para consultar recibos por mes y descargar PDF.</p>
             </div>
             <span className="rounded-full bg-hundido px-3 py-1 text-xs font-semibold text-tinta-2">{empleadosFiltrados.length} de {empleadosMensuales.length}</span>
           </div>
@@ -129,7 +131,7 @@ export default function PortalesClient({ datosIniciales }: { datosIniciales: Dat
             </label>
             <select className={`${inputCls} md:w-56`} value={empresaEmpleado} onChange={(e) => setEmpresaEmpleado(e.target.value)} aria-label="Filtrar empleados por empresa">
               <option value="todas">Todas las empresas</option>
-              {datos.empresas.map((empresa) => (
+              {datos.empresas.filter((empresa) => portalEmpresaConfig(empresa).portalEmpleadoRecibos).map((empresa) => (
                 <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>
               ))}
             </select>

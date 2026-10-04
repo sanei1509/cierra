@@ -41,6 +41,7 @@ interface Acciones {
   agregarNovedad: (n: Omit<Novedad, "id" | "fecha"> & { id?: string; fecha?: string }) => void;
   editarNovedad: (id: string, n: Omit<Novedad, "id" | "fecha">, actor?: string) => void;
   borrarNovedad: (id: string, actor?: string) => void;
+  actualizarFechaObjetivo: (periodoId: string, fechaObjetivo: string) => void;
   solicitarNovedades: (periodoId: string) => void;
   abrirSolicitud: (periodoId: string, actor: string) => void;
   enviarNovedadesCliente: (periodoId: string, actor: string, sinNovedades: boolean) => void;
@@ -198,6 +199,13 @@ export const useStore = create<Datos & Acciones>()(
           if (!n) return;
           set((s) => ({ novedades: s.novedades.filter((x) => x.id !== id) }));
           log({ actor: a, empresaId: n.empresaId, entidad: "Novedad", accion: `Eliminó ${n.tipo.replace("_", " ")}`, antes: n.cantidad ? String(n.cantidad) : `$ ${n.importe}` });
+        },
+        actualizarFechaObjetivo: (id, fechaObjetivo) => {
+          const p = asegurarPeriodo(id);
+          if (!p) return;
+          const anterior = p.fechaObjetivo;
+          upd(id, () => ({ fechaObjetivo }));
+          log({ empresaId: p.empresaId, entidad: "Periodo", accion: "Cambió la fecha objetivo de novedades", detalle: `${anterior} -> ${fechaObjetivo}` });
         },
         solicitarNovedades: (id) => {
           const p = asegurarPeriodo(id);

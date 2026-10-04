@@ -98,6 +98,7 @@ function mapEmpresa(row: EmpresaRow): Empresa {
     tono: "menta",
     logo: row.logoDataUrl ?? undefined,
     reglasLiquidacion: row.reglasLiquidacion ?? undefined,
+    portalConfig: row.portalConfig ?? undefined,
   };
 }
 
@@ -301,6 +302,7 @@ export function crearEmpresasRepo(db: Db): EmpresasRepo {
           contactoEmail: input.contacto.email,
           logoDataUrl: input.logo,
           reglasLiquidacion: input.reglasLiquidacion,
+          portalConfig: input.portalConfig,
         })
         .returning();
       return mapEmpresa(row);
@@ -322,6 +324,7 @@ export function crearEmpresasRepo(db: Db): EmpresasRepo {
           contactoEmail: input.contacto?.email,
           logoDataUrl: input.logo,
           reglasLiquidacion: input.reglasLiquidacion,
+          portalConfig: input.portalConfig,
         })
         .where(and(eq(empresas.estudioId, ctx.estudioId), eq(empresas.id, empresaId)))
         .returning();

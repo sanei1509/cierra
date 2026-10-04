@@ -1,4 +1,16 @@
-import type { Empresa } from "./types";
+import type { Empresa, PortalEmpresaConfig } from "./types";
+
+export const PORTAL_EMPRESA_DEFAULTS: PortalEmpresaConfig = {
+  novedadesWeb: true,
+  altasEmpleados: true,
+  portalEmpleadoRecibos: true,
+  solicitudAprobacionLiquidacion: true,
+  aprobacionSueldos: true,
+};
+
+export function portalEmpresaConfig(empresa: Pick<Empresa, "portalConfig">): PortalEmpresaConfig {
+  return { ...PORTAL_EMPRESA_DEFAULTS, ...empresa.portalConfig };
+}
 
 export function nombreEmpresaVisible(empresa: Pick<Empresa, "nombre" | "nombreVisible">) {
   return empresa.nombreVisible?.trim() || empresa.nombre;
