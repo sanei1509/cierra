@@ -8,7 +8,7 @@ import { Building2, FileText, Home, Search, Settings, ShieldCheck, Users, Eye, M
 import { useMemo, useState, type ReactNode } from "react";
 import { useHidratado, useStore } from "@/lib/store";
 import { ESTUDIO } from "@/lib/seed";
-import { MES_ACTUAL, nombreMes } from "@/lib/format";
+import { iniciales, MES_ACTUAL, nombreMes } from "@/lib/format";
 import { DelegatedStudyFloat } from "./delegated-study-float";
 import { AccountMenu } from "./account-menu";
 
@@ -46,6 +46,26 @@ export function Logo({ claro = false, variant, className }: { claro?: boolean; v
   );
 }
 
+function MarcaEstudio({ compacta = false }: { compacta?: boolean }) {
+  const estudioLogo = useStore((s) => s.estudioLogo);
+  return (
+    <span className="flex min-w-0 items-center gap-3">
+      {estudioLogo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={estudioLogo} alt={`Logo de ${ESTUDIO.nombre}`} className={clsx("shrink-0 rounded-xl bg-white object-contain ring-1 ring-linea", compacta ? "size-7" : "size-[50px]")} />
+      ) : (
+        <span className={clsx("flex shrink-0 items-center justify-center rounded-xl bg-petroleo font-extrabold text-white", compacta ? "size-7 text-[11px]" : "size-[50px] text-lg")}>
+          {iniciales(ESTUDIO.nombre)}
+        </span>
+      )}
+      <span className="min-w-0">
+        <span className={clsx("block font-extrabold tracking-tight text-tinta", compacta ? "truncate text-sm" : "line-clamp-2 text-[17px] leading-5")}>{ESTUDIO.nombre}</span>
+        {!compacta && <span className="mt-0.5 block truncate text-xs font-medium text-apagado">{ESTUDIO.ciudad}</span>}
+      </span>
+    </span>
+  );
+}
+
 function Sidebar({ onNav, vistaDelegada }: { onNav?: () => void; vistaDelegada?: boolean }) {
   const path = usePathname();
   return (
@@ -54,7 +74,7 @@ function Sidebar({ onNav, vistaDelegada }: { onNav?: () => void; vistaDelegada?:
         <DelegatedStudyFloat />
       ) : (
         <div className="px-2 pt-1 pb-7">
-          <Logo />
+          <MarcaEstudio />
         </div>
       )}
       <ul className="space-y-1">
@@ -83,6 +103,12 @@ function Sidebar({ onNav, vistaDelegada }: { onNav?: () => void; vistaDelegada?:
         <Eye size={19} strokeWidth={1.8} />
         Cliente y empleado
       </Link>
+      <div className="mt-auto border-t border-linea pt-4">
+        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-apagado">Sistema</p>
+        <div className="px-3">
+          <Logo className="w-[96px]" />
+        </div>
+      </div>
     </nav>
   );
 }
@@ -165,8 +191,10 @@ export function Shell({ children, vistaDelegada = false, logoutAction }: { child
             <span className="hidden items-center gap-2 rounded-xl border border-linea bg-superficie px-4 py-2.5 text-sm font-semibold md:flex">
               <CalendarDays size={16} className="text-petroleo" /> {nombreMes(MES_ACTUAL)}
             </span>
-            <span className="hidden rounded-xl border border-linea bg-superficie px-4 py-2.5 text-sm text-apagado xl:block">{ESTUDIO.nombre}</span>
-            {ok && <AccountMenu logoutAction={logoutAction} />}
+            <span className="hidden h-11 min-w-0 max-w-[280px] items-center rounded-xl border border-linea bg-superficie px-3 text-sm text-apagado xl:flex">
+              <MarcaEstudio compacta />
+            </span>
+            {ok && <AccountMenu logoutAction={logoutAction} mostrarImagenEstudio />}
           </div>
         </header>
         <main className="min-w-0 flex-1">{ok ? children : <div className="h-[70vh] animate-pulse rounded-[var(--radius-panel)] bg-superficie/60" />}</main>

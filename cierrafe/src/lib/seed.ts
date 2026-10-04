@@ -3,10 +3,14 @@ import type { AuditEvent, Empleado, Empresa, Etapa, Novedad, Periodo, Usuario } 
 export const ESTUDIO = { nombre: "Estudio Pereira & Asociados", ciudad: "Montevideo" };
 
 export const USUARIOS: Usuario[] = [
-  { id: "u1", nombre: "Lucía Pereira", rol: "admin", email: "lucia@estudiopereira.uy" },
-  { id: "u2", nombre: "Martín Suárez", rol: "liquidador", email: "martin@estudiopereira.uy" },
-  { id: "u3", nombre: "Sofía Méndez", rol: "lectura", email: "sofia@estudiopereira.uy" },
+  { id: "u1", backendId: "00000000-0000-4000-8000-000000000003", nombre: "Lucía Pereira", rol: "admin", email: "lucia@estudiopereira.uy" },
+  { id: "u2", backendId: "00000000-0000-4000-8000-000000000004", nombre: "Martín Suárez", rol: "liquidador", email: "martin@estudiopereira.uy" },
+  { id: "u3", backendId: "00000000-0000-4000-8000-000000000005", nombre: "Sofía Méndez", rol: "lectura", email: "sofia@estudiopereira.uy" },
 ];
+
+export function usuarioPorResponsableId(id: string) {
+  return USUARIOS.find((u) => u.id === id || u.backendId === id);
+}
 
 type EmpSeed = [nombre: string, cargo: string, categoria: string, sueldo: number, ingreso: string, hijos?: number, extra?: Partial<Empleado>];
 

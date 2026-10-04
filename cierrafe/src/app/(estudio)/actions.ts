@@ -16,6 +16,7 @@ import { obtenerSesionDev } from "@/lib/dev-auth";
 import { calcularEmpresa, hashDe } from "@/lib/engine";
 import { MES_ACTUAL } from "@/lib/format";
 import { MOTOR_VERSION, parametrosVigentes } from "@/lib/params";
+import { controlarFichaEmpleado } from "@/lib/validations";
 import type { Adjunto, Empleado, Empresa, HorarioLaboral, Modalidad, Novedad, Periodo, TipoNovedad, Tono, VersionLiquidacion } from "@/lib/types";
 
 export interface AltaRealResult {
@@ -32,6 +33,7 @@ export interface CrearEmpresaInicialInput {
   actividad: string;
   grupo: number;
   subgrupo: string;
+  responsableId: string;
   contactoNombre: string;
   contactoEmail: string;
   tono: Tono;
@@ -50,7 +52,22 @@ export interface CrearEmpleadoInicialInput {
   sueldo: number;
   hijos: number;
   telefono?: string;
+  area?: string;
+  tipoContrato?: string;
+  direccion?: string;
+  cuenta?: string;
   horario?: HorarioLaboral;
+}
+
+function responsableBackendId(id: string, ctx: AccessContext) {
+  if (uuidValido(id)) return id;
+  const mapaDemo: Record<string, string | undefined> = {
+    u1: process.env.CIERRA_DEV_USUARIO_ID ?? "00000000-0000-4000-8000-000000000003",
+    u2: process.env.CIERRA_DEV_LIQUIDADOR_ID ?? "00000000-0000-4000-8000-000000000004",
+    u3: process.env.CIERRA_DEV_SOLO_LECTURA_ID ?? "00000000-0000-4000-8000-000000000005",
+  };
+  const candidato = mapaDemo[id];
+  return candidato && uuidValido(candidato) ? candidato : ctx.usuarioId;
 }
 
 export interface ImportarEmpleadoRealItem {
@@ -119,6 +136,10 @@ export interface ResponderAprobacionRealInput extends PeriodoRealInput {
 }
 
 export interface RectificarPeriodoRealInput extends PeriodoRealInput {
+  motivo: string;
+}
+
+export interface CancelarLiquidacionRealInput extends PeriodoRealInput {
   motivo: string;
 }
 
@@ -508,7 +529,7 @@ export async function crearEmpresaInicial(input: CrearEmpresaInicialInput): Prom
         actividad: input.actividad,
         grupo: input.grupo,
         subgrupo: input.subgrupo,
-        responsableId: "",
+        responsableId: responsableBackendId(input.responsableId, ctx),
         requiereAprobacion: true,
         contacto: { nombre: input.contactoNombre, email: input.contactoEmail },
         tono: input.tono,
@@ -566,6 +587,10 @@ export async function crearEmpleadoInicial(input: CrearEmpleadoInicialInput): Pr
         hijos: input.hijos,
         conyugeFonasa: false,
         telefono: input.telefono,
+        area: input.area,
+        tipoContrato: input.tipoContrato,
+        direccion: input.direccion,
+        cuenta: input.cuenta,
         horario: input.horario,
       },
     },
@@ -577,6 +602,91 @@ export async function crearEmpleadoInicial(input: CrearEmpleadoInicialInput): Pr
     ok: true,
     modo: "real",
     mensaje: `Empleado guardado en backend con acceso inicial para ${res.usuario.email}.`,
+    id: res.empleado.id,
+  };
+}
+
+export async function crearEmpleadoClienteReal(input: CrearEmpleadoInicialInput & { actor: string }): Promise<AltaRealResult> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(input.empresaId)) {
+    return { ok: true, modo: "demo", mensaje: "Alta simulada: falta sesion de empresa o backend real." };
+  }
+  const bloqueoContrato = await validarEscrituraPorContrato(ctx, "Alta de empleado");
+  if (bloqueoContrato) return bloqueoContrato;
+  const categoria = input.categoria.trim();
+  const control = controlarFichaEmpleado({
+    nombre: input.nombre,
+    apellido: input.apellido,
+    ci: input.ci,
+    email: input.email,
+    cargo: input.cargo,
+    categoria,
+    area: input.area,
+    tipoContrato: input.tipoContrato,
+    ingreso: input.ingreso,
+    sueldo: input.sueldo,
+    telefono: input.telefono,
+    direccion: input.direccion,
+    cuenta: input.cuenta,
+  });
+  if (control.bloqueos.length) {
+    return { ok: false, modo: "real", mensaje: `Corregí la ficha antes de crear el trabajador: ${control.bloqueos.join(" ")}` };
+  }
+
+  const empresaId = input.empresaId as EmpresaId;
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
+  const { db } = await import("cierrabe/datos/db");
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  const res = await crearEmpleadoConAccesoInicial(
+    ctx,
+    {
+      empleados: crearEmpleadosRepo(db),
+      usuarios: crearUsuariosRepo(db),
+      auditoria: auditoriaRepo,
+    },
+    { estudioId: ctx.estudioId, empresaId },
+    {
+      empleado: {
+        empresaId,
+        nombre: input.nombre.trim(),
+        apellido: input.apellido.trim(),
+        ci: input.ci.trim(),
+        email: input.email.trim().toLowerCase(),
+        cargo: input.cargo.trim(),
+        categoria,
+        modalidad: input.modalidad,
+        ingreso: input.ingreso,
+        sueldos: input.modalidad === "mensual" ? [{ desde: input.ingreso, monto: input.sueldo }] : [],
+        hijos: input.hijos,
+        conyugeFonasa: false,
+        telefono: input.telefono?.trim() || undefined,
+        area: input.area?.trim() || undefined,
+        tipoContrato: input.tipoContrato?.trim() || undefined,
+        direccion: input.direccion?.trim() || undefined,
+        cuenta: input.cuenta?.trim() || undefined,
+        horario: input.horario,
+      },
+    },
+  );
+  await auditoriaRepo.registrar(tenant, {
+    actor: `${input.actor} (cliente)`,
+    empresaId,
+    entidad: "Empleado",
+    entidadId: res.empleado.id as EmpleadoId,
+    accion: `Empleado nuevo para revisar: ${res.empleado.nombre} ${res.empleado.apellido}`,
+    detalle: control.advertencias.length
+      ? `Alta cargada por la empresa. Advertencias: ${control.advertencias.join(" ")}`
+      : "Alta cargada por la empresa. Revisar ficha, contrato, categoria, sueldo, cuenta y acceso.",
+  });
+
+  revalidatePath(`/cliente/${input.empresaId}`);
+  revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath(`/portal/${res.empleado.id}`);
+  return {
+    ok: true,
+    modo: "real",
+    mensaje: `Empleado guardado con acceso para ${res.usuario.email}.`,
     id: res.empleado.id,
   };
 }
@@ -681,7 +791,11 @@ export async function actualizarEmpresaReal(input: ActualizarEmpresaRealInput): 
   const empresaId = input.empresaId as EmpresaId;
   const empresasRepo = crearEmpresasRepo(db);
   const auditoriaRepo = crearAuditoriaRepo(db);
-  const empresa = await actualizarEmpresaBackend(ctx, empresasRepo, { estudioId: ctx.estudioId, empresaId }, { ...input.cambios, resumen: input.resumen });
+  const cambios = {
+    ...input.cambios,
+    responsableId: input.cambios.responsableId ? responsableBackendId(input.cambios.responsableId, ctx) : input.cambios.responsableId,
+  };
+  const empresa = await actualizarEmpresaBackend(ctx, empresasRepo, { estudioId: ctx.estudioId, empresaId }, { ...cambios, resumen: input.resumen });
 
   await auditoriaRepo.registrar(tenantContextDesdeAcceso(ctx)!, {
     actor: input.actor,
@@ -695,6 +809,37 @@ export async function actualizarEmpresaReal(input: ActualizarEmpresaRealInput): 
   revalidatePath(`/cliente/${input.empresaId}`);
   revalidatePath("/empresas");
   return { ok: true, modo: "real", mensaje: "Empresa actualizada en backend.", id: empresa.id };
+}
+
+export async function actualizarLogoEmpresaClienteReal(input: { empresaId: string; logo: string; actor: string }): Promise<AltaRealResult> {
+  const ctx = await contextoOperativoActual();
+  if (!ctx || !process.env.DATABASE_URL || !uuidValido(input.empresaId)) {
+    return { ok: true, modo: "demo", mensaje: "Logo actualizado solo en demo: falta backend real o empresa UUID." };
+  }
+  if (!input.logo.startsWith("data:image/")) {
+    return { ok: false, modo: "real", mensaje: "El logo debe ser una imagen válida." };
+  }
+  const tenant = tenantContextDesdeAcceso(ctx);
+  if (!tenant) return { ok: false, modo: "real", mensaje: "No pudimos resolver el contexto del estudio." };
+
+  const { db } = await import("cierrabe/datos/db");
+  const empresaId = input.empresaId as EmpresaId;
+  const empresasRepo = crearEmpresasRepo(db);
+  const auditoriaRepo = crearAuditoriaRepo(db);
+  const empresa = await actualizarEmpresaBackend(ctx, empresasRepo, { estudioId: ctx.estudioId, empresaId }, { logo: input.logo, resumen: "Actualizo el logo desde el portal del cliente" });
+
+  await auditoriaRepo.registrar(tenant, {
+    actor: `${input.actor} (cliente)`,
+    empresaId,
+    entidad: "Empresa",
+    entidadId: empresa.id as EmpresaId,
+    accion: "Actualizo el logo de la empresa",
+  });
+
+  revalidatePath(`/cliente/${input.empresaId}`);
+  revalidatePath(`/empresas/${input.empresaId}`);
+  revalidatePath("/empresas");
+  return { ok: true, modo: "real", mensaje: "Logo actualizado.", id: empresa.id };
 }
 
 export async function actualizarEmpleadoReal(input: ActualizarEmpleadoRealInput): Promise<AltaRealResult> {
@@ -1076,6 +1221,22 @@ export async function aprobarInternoReal(input: PeriodoRealInput): Promise<AltaR
       auditoria: { accion: `Aprobo internamente la version ${version}`, detalle: "Empresa sin aprobacion del cliente" },
     };
   });
+}
+
+export async function cancelarLiquidacionReal(input: CancelarLiquidacionRealInput): Promise<AltaRealResult> {
+  return guardarPeriodoReal(input, async (periodo) => ({
+    periodo: {
+      ...periodo,
+      etapa: periodo.solicitud?.respondida || periodo.sinNovedades ? "recibidas" : "novedades",
+      versiones: [],
+      aprobacion: undefined,
+      cerrado: undefined,
+      bps: "pendiente",
+      rectificaciones: [],
+      advertenciasAceptadas: {},
+    },
+    auditoria: { accion: "Cancelo la liquidacion completa", detalle: input.motivo },
+  }));
 }
 
 export async function cerrarPeriodoReal(input: PeriodoRealInput): Promise<AltaRealResult> {

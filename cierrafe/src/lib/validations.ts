@@ -1,9 +1,60 @@
-import type { Alerta, Empleado, Empresa, Novedad, Periodo, ResultadoEmpleado } from "./types";
+import type { Alerta, AuditEvent, Empleado, Empresa, Novedad, Periodo, ResultadoEmpleado } from "./types";
 import { activoEn, calcularEmpresa } from "./engine";
 import { laudoDe } from "./params";
 import { fmt, mesAnterior, pct } from "./format";
 
 export const UMBRAL_VARIACION = 0.15;
+
+export interface ControlFichaEmpleado {
+  bloqueos: string[];
+  advertencias: string[];
+}
+
+export interface DatosControlFichaEmpleado {
+  nombre: string;
+  apellido: string;
+  ci: string;
+  email: string;
+  cargo: string;
+  categoria: string;
+  area?: string;
+  tipoContrato?: string;
+  ingreso: string;
+  sueldo: number;
+  telefono?: string;
+  direccion?: string;
+  cuenta?: string;
+}
+
+const EMAIL_SIMPLE = /^\S+@\S+\.\S+$/;
+
+function ciLimpia(ci: string) {
+  return ci.replace(/\D/g, "");
+}
+
+export function controlarFichaEmpleado(datos: DatosControlFichaEmpleado): ControlFichaEmpleado {
+  const bloqueos: string[] = [];
+  const advertencias: string[] = [];
+
+  if (!datos.nombre.trim() || !datos.apellido.trim()) bloqueos.push("Falta nombre o apellido.");
+  const ci = ciLimpia(datos.ci);
+  if (!ci) bloqueos.push("Falta la cédula.");
+  else if (ci.length < 7 || ci.length > 8) bloqueos.push("La cédula debe tener 7 u 8 dígitos.");
+  if (!datos.email.trim()) bloqueos.push("Falta el email de acceso al portal de recibos.");
+  else if (!EMAIL_SIMPLE.test(datos.email.trim())) bloqueos.push("El email de acceso no tiene un formato válido.");
+  if (!datos.cargo.trim()) bloqueos.push("Falta el cargo.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datos.ingreso)) bloqueos.push("Falta una fecha de ingreso válida.");
+  if (!Number.isFinite(datos.sueldo) || datos.sueldo <= 0) bloqueos.push("Falta un sueldo mensual nominal mayor a cero.");
+
+  if (!datos.categoria.trim()) advertencias.push("Falta categoría / grupo de Consejo de Salario.");
+  if (!datos.area?.trim()) advertencias.push("Falta área.");
+  if (!datos.tipoContrato?.trim()) advertencias.push("Falta tipo de contrato.");
+  if (!datos.telefono?.trim()) advertencias.push("Falta teléfono.");
+  if (!datos.direccion?.trim()) advertencias.push("Falta dirección.");
+  if (!datos.cuenta?.trim()) advertencias.push("Falta banco / cuenta bancaria.");
+
+  return { bloqueos, advertencias };
+}
 
 /**
  * Motor de validaciones (RF-050..054, sección 13).
@@ -15,13 +66,68 @@ export function validar(
   periodo: Periodo,
   novedades: Novedad[],
   resultados?: ResultadoEmpleado[],
+  audit: AuditEvent[] = [],
 ): Alerta[] {
   const out: Alerta[] = [];
   const mes = periodo.mes;
   const empleados = empleadosTodos.filter((e) => e.empresaId === empresa.id && activoEn(e, mes));
   const nom = (e: Empleado) => `${e.nombre} ${e.apellido}`;
+  const altasPorRevisar = new Set(
+    audit
+      .filter((evento) => evento.empresaId === empresa.id && evento.entidad === "Empleado" && evento.accion.startsWith("Empleado nuevo para revisar") && evento.entidadId)
+      .map((evento) => evento.entidadId!),
+  );
 
   for (const e of empleados) {
+    const sueldoVigente = [...e.sueldos].filter((s) => s.desde.slice(0, 7) <= mes).sort((a, b) => b.desde.localeCompare(a.desde))[0]?.monto ?? 0;
+    const controlFicha = controlarFichaEmpleado({
+      nombre: e.nombre,
+      apellido: e.apellido,
+      ci: e.ci,
+      email: e.email,
+      cargo: e.cargo,
+      categoria: e.categoria,
+      area: e.area,
+      tipoContrato: e.tipoContrato,
+      ingreso: e.ingreso,
+      sueldo: sueldoVigente,
+      telefono: e.telefono,
+      direccion: e.direccion,
+      cuenta: e.cuenta,
+    });
+
+    const requiereRevisionAlta = altasPorRevisar.has(e.id) || e.ingreso.slice(0, 7) === mes;
+
+    if (requiereRevisionAlta) {
+      out.push({
+        id: `alta-${e.id}-${mes}`,
+        nivel: "advertencia",
+        empleadoId: e.id,
+        titulo: `${nom(e)} es un alta nueva`,
+        detalle: "La empresa cargó una persona nueva este mes. Revisá ficha, contrato, categoría, sueldo, cuenta y acceso antes de cerrar.",
+      });
+    }
+
+    if (requiereRevisionAlta && controlFicha.advertencias.length) {
+      out.push({
+        id: `ficha-${e.id}`,
+        nivel: "advertencia",
+        empleadoId: e.id,
+        titulo: `${nom(e)} tiene datos de ficha incompletos`,
+        detalle: controlFicha.advertencias.join(" "),
+      });
+    }
+
+    if (controlFicha.bloqueos.length) {
+      out.push({
+        id: `ficha-bloq-${e.id}`,
+        nivel: "bloqueante",
+        empleadoId: e.id,
+        titulo: `${nom(e)} tiene datos obligatorios incompletos`,
+        detalle: controlFicha.bloqueos.join(" "),
+      });
+    }
+
     if (e.modalidad !== "mensual" || [9, 21, 22].includes(empresa.grupo)) {
       out.push({
         id: `alcance-${e.id}`,
@@ -35,17 +141,8 @@ export function validar(
       });
       continue;
     }
-    if (!e.ci)
-      out.push({
-        id: `ci-${e.id}`,
-        nivel: "bloqueante",
-        empleadoId: e.id,
-        titulo: `${nom(e)} no tiene cédula cargada`,
-        detalle: "La cédula es obligatoria para la nómina de BPS y el recibo.",
-      });
-    const sueldo = [...e.sueldos].filter((s) => s.desde.slice(0, 7) <= mes).sort((a, b) => b.desde.localeCompare(a.desde))[0]?.monto ?? 0;
     const cambio = novedades.find((n) => n.empleadoId === e.id && n.mes === mes && n.tipo === "cambio_salarial")?.importe;
-    const efectivo = cambio ?? sueldo;
+    const efectivo = cambio ?? sueldoVigente;
     const laudo = laudoDe(empresa.grupo, empresa.subgrupo, e.categoria);
     if (laudo && efectivo < laudo.minimo)
       out.push({
@@ -55,15 +152,6 @@ export function validar(
         titulo: `${nom(e)} cobra menos que el mínimo de su categoría`,
         detalle: `Sueldo ${fmt(efectivo)} y el laudo de ${laudo.categoria} (grupo ${laudo.grupo}.${laudo.subgrupo}) es ${fmt(laudo.minimo)} desde ${laudo.vigenciaDesde}.`,
       });
-    if (!e.email)
-      out.push({
-        id: `mail-${e.id}`,
-        nivel: "info",
-        empleadoId: e.id,
-        titulo: `${nom(e)} no tiene email`,
-        detalle: "No va a recibir el aviso del recibo. Puede entrar al portal con su cédula.",
-      });
-
     const comprobanteRequerido = new Set<Novedad["tipo"]>(["certificacion", "accidente_laboral", "maternidad"]);
     const certSinAdjunto = novedades.filter((n) => n.empleadoId === e.id && n.mes === mes && comprobanteRequerido.has(n.tipo) && !n.adjunto);
     if (certSinAdjunto.length)

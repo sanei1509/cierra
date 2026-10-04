@@ -184,6 +184,9 @@ const PRECIOS_MODULO_BASE: Record<string, number> = {
 type PagoRegistradoVista = PagoRegistradoComercial;
 type AuditoriaVista = "inicio" | "admin" | "estudio" | "empresa";
 type AuditoriaEmpresaModo = "por_estudio" | "directa" | null;
+type CancelacionComercialPendiente =
+  | { tipo: "factura"; mes: string }
+  | { tipo: "pago"; pago: PagoRegistradoVista };
 type EventoAuditoriaAdmin = {
   id: string;
   fecha: string;
@@ -264,6 +267,7 @@ export function AdminCommercialConsole({
     return pagos;
   });
   const [pagosRegistrados, setPagosRegistrados] = useState<PagoRegistradoVista[]>(datosIniciales.pagosRegistrados);
+  const [cancelacionPendiente, setCancelacionPendiente] = useState<CancelacionComercialPendiente | null>(null);
   const [confirmandoFactura, setConfirmandoFactura] = useState(false);
   const [pendiente, startTransition] = useTransition();
   const [pendienteNuevo, startNuevoTransition] = useTransition();
@@ -647,6 +651,16 @@ export function AdminCommercialConsole({
         });
       }
     });
+  };
+
+  const confirmarCancelacionPendiente = () => {
+    if (!cancelacionPendiente) return;
+    if (cancelacionPendiente.tipo === "factura") {
+      cancelarFactura(cancelacionPendiente.mes);
+    } else {
+      cancelarPago(cancelacionPendiente.pago);
+    }
+    setCancelacionPendiente(null);
   };
 
   const limpiarFiltrosAuditoria = () => {
@@ -1271,7 +1285,7 @@ export function AdminCommercialConsole({
               {estadoPago.saldoAFavorCent > 0 && <p className="mt-2 text-xs font-semibold text-menta-t">A favor {fmtCent(estadoPago.saldoAFavorCent, resumenVisible.moneda)}</p>}
               <div className="mt-2 grid gap-2">
                 {facturaActualCancelable && (
-                  <Boton type="button" variante="secundario" tam="sm" className="w-full justify-start" onClick={() => cancelarFactura()} disabled={confirmandoFactura}>
+                  <Boton type="button" variante="secundario" tam="sm" className="w-full justify-start" onClick={() => setCancelacionPendiente({ tipo: "factura", mes: mesCobro })} disabled={confirmandoFactura}>
                     <X size={14} /> Cancelar factura
                   </Boton>
                 )}
@@ -1492,7 +1506,7 @@ export function AdminCommercialConsole({
                         <Boton type="button" variante="primario" tam="sm" className="whitespace-nowrap" onClick={() => registrarPago(estado.saldoPendienteCent, 1, factura.mes)} disabled={pendientePago || estado.saldoPendienteCent <= 0}>
                           <CreditCard size={14} /> Acreditar pago
                         </Boton>
-                        <Boton type="button" variante="secundario" tam="sm" className="whitespace-nowrap" onClick={() => cancelarFactura(factura.mes)}>
+                        <Boton type="button" variante="secundario" tam="sm" className="whitespace-nowrap" onClick={() => setCancelacionPendiente({ tipo: "factura", mes: factura.mes })}>
                           <X size={14} /> Cancelar
                         </Boton>
                       </div>
@@ -1533,7 +1547,7 @@ export function AdminCommercialConsole({
                       </div>
                       <button
                         type="button"
-                        onClick={() => cancelarPago(pago)}
+                        onClick={() => setCancelacionPendiente({ tipo: "pago", pago })}
                         disabled={pendientePago}
                         className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-linea bg-superficie px-3 text-xs font-semibold text-tinta-2 hover:bg-hundido hover:text-tinta"
                       >
@@ -1544,6 +1558,54 @@ export function AdminCommercialConsole({
                 })}
               </div>
             )}
+          </Modal>
+
+          <Modal
+            abierto={!!cancelacionPendiente}
+            onCerrar={() => setCancelacionPendiente(null)}
+            className="max-w-lg"
+            titulo={cancelacionPendiente?.tipo === "pago" ? "Cancelar pago" : "Cancelar factura"}
+          >
+            {cancelacionPendiente?.tipo === "factura" ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-linea bg-hundido px-4 py-3 text-sm">
+                  <p className="font-bold">Factura de {nombreMesCobro(cancelacionPendiente.mes)}</p>
+                  <p className="mt-1 text-apagado">
+                    Se va a quitar la factura emitida para este mes. Si necesitás cobrarla después, tendrás que emitirla nuevamente.
+                  </p>
+                </div>
+                <p className="text-sm text-apagado">
+                  No se puede cancelar una factura que ya tenga pago aplicado; en ese caso primero hay que cancelar el pago asociado.
+                </p>
+              </div>
+            ) : cancelacionPendiente?.tipo === "pago" ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-linea bg-hundido px-4 py-3 text-sm">
+                  <p className="font-bold">{tituloPagoVista(cancelacionPendiente.pago)}</p>
+                  <p className="mt-1 text-apagado">
+                    Se va a quitar el pago registrado por {fmtCent(cancelacionPendiente.pago.importeCent, resumenVisible.moneda)} y se descontará de los meses aplicados.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {cancelacionPendiente.pago.aplicaciones.map((aplicacion) => (
+                      <span key={aplicacion.mes} className="rounded-full bg-superficie px-3 py-1 text-xs font-semibold text-tinta-2">
+                        {nombreMesCobro(aplicacion.mes)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-sm text-apagado">
+                  Las facturas quedarán con saldo pendiente si este pago las cubría total o parcialmente.
+                </p>
+              </div>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <Boton type="button" variante="fantasma" onClick={() => setCancelacionPendiente(null)}>
+                Volver
+              </Boton>
+              <Boton type="button" variante="secundario" onClick={confirmarCancelacionPendiente} disabled={pendientePago || confirmandoFactura}>
+                <Undo2 size={14} /> {pendientePago ? "Cancelando..." : "Sí, cancelar"}
+              </Boton>
+            </div>
           </Modal>
 
           {resultadoPago && (

@@ -37,5 +37,5 @@ export const iniciales = (s: string) =>
     .toUpperCase();
 
 /** Fecha "hoy" fija para que la demo sea reproducible */
-export const HOY = "2026-09-25T10:30:00";
-export const MES_ACTUAL = "2026-09";
+export const HOY = "2026-10-04T10:30:00";
+export const MES_ACTUAL = "2026-10";

@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { RotateCcw, Save } from "lucide-react";
+import { ExternalLink, RotateCcw, Save } from "lucide-react";
 import { Chip, Panel } from "@/components/ui";
 import { fmt, pct } from "@/lib/format";
 import { UMBRAL_VARIACION } from "@/lib/validations";
-import { clonarParametrosIniciales, MOTOR_VERSION, type Parametros } from "@/lib/params";
+import { clonarParametrosIniciales, FUENTES_PARAMETROS_NORMATIVOS, MOTOR_VERSION, type Parametros } from "@/lib/params";
 import { useStore } from "@/lib/store";
 
 const inputCls =
@@ -70,21 +70,54 @@ export function ParametrosNormativosPanel() {
     actualizar(draft, `Editó parámetros normativos ${draft.id}`);
     setMensaje("Cambios guardados. Las próximas liquidaciones usan esta versión.");
   };
+  const resumenGrupos = [
+    {
+      titulo: "Valores base",
+      items: [
+        ["BFC", vigente.bfc ? fmt(vigente.bfc) : "-"],
+        ["BPC", fmt(vigente.bpc)],
+        ["Salario mínimo nacional", vigente.salarioMinimoNacional ? fmt(vigente.salarioMinimoNacional) : "-"],
+        ["Cuota mutual", vigente.cuotaMutual ? fmt(vigente.cuotaMutual) : "-"],
+        ["Costo promedio equivalente", vigente.costoPromedioEquivalente ? fmt(vigente.costoPromedioEquivalente) : "-"],
+        ["Tope aporte jubilatorio", fmt(vigente.topeJubilatorio)],
+      ],
+    },
+    {
+      titulo: "Aportes",
+      items: [
+        ["Jubilatorio personal / patronal", `${pct(vigente.personal.jubilatorio)} / ${pct(vigente.patronal.jubilatorio)}`],
+        ["FONASA personal", `${pct(vigente.fonasa.tasaBaja)} · ${pct(vigente.fonasa.tasaSinHijos)} · ${pct(vigente.fonasa.tasaConHijos)} (+${pct(vigente.fonasa.adicionalConyuge)} cónyuge)`],
+        ["FONASA patronal", pct(vigente.patronal.fonasa)],
+        ["FRL personal / patronal", `${pct(vigente.personal.frl, 2)} / ${pct(vigente.patronal.frl, 2)}`],
+        ["FGCL", pct(vigente.patronal.fgcl, 3)],
+      ],
+    },
+    {
+      titulo: "IRPF y cálculo",
+      items: [
+        ["IRPF deducción", `${pct(vigente.irpf.tasaDeduccionBaja)} hasta ${vigente.irpf.umbralTasaDeduccionBpc} BPC, luego ${pct(vigente.irpf.tasaDeduccionAlta)}`],
+        ["Deducción por hijo", `${vigente.irpf.deduccionHijoBpcAnual} BPC anuales`],
+        ["Valor hora", `sueldo / ${vigente.horas.divisor}, recargo ${pct(vigente.horas.recargoExtra)}`],
+        ["Umbral de variación", `${pct(UMBRAL_VARIACION, 0)} vs. mes anterior`],
+        ["Motor", MOTOR_VERSION],
+      ],
+    },
+  ];
 
   return (
     <Panel className="min-w-0 p-6">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold tracking-tight">Parámetros normativos</h2>
-          <p className="text-sm text-apagado">Valores de BPC, BFC, topes, aportes, FONASA e IRPF con vigencia.</p>
+          <p className="text-sm text-apagado">Valores vigentes que usa el motor para aportes, FONASA, IRPF y controles de cálculo.</p>
         </div>
-        <Chip tono="crema">Valores editables</Chip>
+        <Chip tono="crema">Carga manual</Chip>
       </div>
 
       <div className="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="Parámetros normativos">
         {[
           ["resumen", "Resumen"],
-          ["editar", "Editar valores"],
+          ["editar", "Editar manualmente"],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -110,31 +143,21 @@ export function ParametrosNormativosPanel() {
               </li>
             ))}
           </ul>
-          <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
-            {[
-              ["BFC", vigente.bfc ? fmt(vigente.bfc) : "-"],
-              ["BPC", fmt(vigente.bpc)],
-              ["Salario mínimo nacional", vigente.salarioMinimoNacional ? fmt(vigente.salarioMinimoNacional) : "-"],
-              ["Cuota mutual", vigente.cuotaMutual ? fmt(vigente.cuotaMutual) : "-"],
-              ["Costo promedio equivalente", vigente.costoPromedioEquivalente ? fmt(vigente.costoPromedioEquivalente) : "-"],
-              ["Tope aporte jubilatorio", fmt(vigente.topeJubilatorio)],
-              ["Jubilatorio personal / patronal", `${pct(vigente.personal.jubilatorio)} / ${pct(vigente.patronal.jubilatorio)}`],
-              ["FONASA personal", `${pct(vigente.fonasa.tasaBaja)} · ${pct(vigente.fonasa.tasaSinHijos)} · ${pct(vigente.fonasa.tasaConHijos)} (+${pct(vigente.fonasa.adicionalConyuge)} cónyuge)`],
-              ["FONASA patronal", pct(vigente.patronal.fonasa)],
-              ["FRL personal / patronal", `${pct(vigente.personal.frl, 2)} / ${pct(vigente.patronal.frl, 2)}`],
-              ["FGCL", pct(vigente.patronal.fgcl, 3)],
-              ["IRPF deducción", `${pct(vigente.irpf.tasaDeduccionBaja)} hasta ${vigente.irpf.umbralTasaDeduccionBpc} BPC, luego ${pct(vigente.irpf.tasaDeduccionAlta)}`],
-              ["Deducción por hijo", `${vigente.irpf.deduccionHijoBpcAnual} BPC anuales`],
-              ["Valor hora", `sueldo / ${vigente.horas.divisor}, recargo ${pct(vigente.horas.recargoExtra)}`],
-              ["Umbral de variación", `${pct(UMBRAL_VARIACION, 0)} vs. mes anterior`],
-              ["Motor", MOTOR_VERSION],
-            ].map(([k, v]) => (
-              <div key={k} className="border-t border-linea pt-2.5">
-                <dt className="text-xs text-apagado">{k}</dt>
-                <dd className="num font-semibold">{v}</dd>
-              </div>
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
+            {resumenGrupos.map((grupo) => (
+              <section key={grupo.titulo} className="rounded-2xl border border-linea bg-superficie px-4 py-3">
+                <h3 className="text-sm font-bold">{grupo.titulo}</h3>
+                <dl className="mt-3 space-y-2.5 text-sm">
+                  {grupo.items.map(([k, v]) => (
+                    <div key={k} className="border-t border-linea pt-2.5 first:border-t-0 first:pt-0">
+                      <dt className="text-xs text-apagado">{k}</dt>
+                      <dd className="num font-semibold">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
             ))}
-          </dl>
+          </div>
           {vigente.topesAfap && (
             <div className="mt-5">
               <p className="text-xs font-semibold text-apagado">Topes AFAP Ley 16.713</p>
@@ -153,7 +176,33 @@ export function ParametrosNormativosPanel() {
               ))}
             </div>
           </div>
-          <p className="mt-5 rounded-2xl bg-crema px-4 py-3 text-xs text-crema-t">{vigente.fuente}. Antes del piloto deben validarse con un contador asesor y cargarse con su resolución de origen.</p>
+          <div className="mt-5 rounded-2xl border border-linea bg-hundido/55 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold">Fuentes oficiales</p>
+                <p className="mt-1 text-xs leading-5 text-apagado">Links traídos de la planilla Excel. Hoy sirven para validar la carga manual; más adelante pueden alimentar una actualización automática.</p>
+              </div>
+              <Chip tono="gris">No sincroniza solo</Chip>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {FUENTES_PARAMETROS_NORMATIVOS.map((fuente) => (
+                <a
+                  key={fuente.url}
+                  href={fuente.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group rounded-xl border border-linea bg-superficie px-3 py-2 text-sm transition-colors hover:border-petroleo/35 hover:bg-lila"
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="font-semibold">{fuente.nombre}</span>
+                    <ExternalLink size={14} className="shrink-0 text-apagado transition-colors group-hover:text-petroleo" />
+                  </span>
+                  <span className="mt-0.5 block text-xs text-apagado">{fuente.organismo} · {fuente.detalle}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+          <p className="mt-5 rounded-2xl bg-crema px-4 py-3 text-xs text-crema-t">{vigente.fuente}. Antes de usarlo con clientes reales, estos valores deben validarse con fuente oficial y revisión profesional.</p>
         </>
       ) : (
         <div className="space-y-5">

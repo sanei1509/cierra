@@ -12,6 +12,7 @@ import {
   aprobarInternoReal,
   borrarNovedadReal,
   calcularLiquidacionReal,
+  cancelarLiquidacionReal,
   cerrarPeriodoReal,
   enviarAprobacionReal,
   generarBpsReal,
@@ -28,6 +29,7 @@ import {
 import { useStore, usePeriodoVista, useUsuario, type Vista } from "@/lib/store";
 import { PASOS, pasoActual } from "@/lib/status";
 import { TIPOS, valorNovedad, estadoNovedades } from "@/lib/labels";
+import { USUARIOS, usuarioPorResponsableId } from "@/lib/seed";
 import { MES_ACTUAL, fecha, fechaHora, fmt, fmt2, mesAnterior, nombreMes, pct } from "@/lib/format";
 import { activoEn, calcularEmpresa, totales } from "@/lib/engine";
 import { DIAS_LABORALES, horarioDefault, normalizarHorario, resumenHorario } from "@/lib/horarios";
@@ -42,34 +44,97 @@ import { ImportarEmpleados } from "@/components/importar-empleados";
 type Tab = "resumen" | "novedades" | "liquidacion" | "empleados" | "reglas" | "actividad";
 const LIMITE_HISTORIAL_NOVEDADES = 10;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ORDEN_ETAPA: Record<Periodo["etapa"], number> = {
+  novedades: 0,
+  recibidas: 1,
+  borrador: 2,
+  enviada: 3,
+  devuelta: 4,
+  aprobada: 5,
+  cerrada: 6,
+};
+
+function periodoMasNuevo(real: Periodo, local?: Periodo) {
+  if (!local) return real;
+  if (local.versiones.length > real.versiones.length) return local;
+  if (local.versiones.length === real.versiones.length && ORDEN_ETAPA[local.etapa] > ORDEN_ETAPA[real.etapa]) return local;
+  return real;
+}
+
+function sincronizarDatosOperativos(datos: {
+  modo: "real" | "demo";
+  empresas: Empresa[];
+  empleados: Empleado[];
+  periodos: Periodo[];
+  novedades: Novedad[];
+  audit: AuditEvent[];
+  vistas: Record<string, string>;
+}) {
+  if (datos.modo !== "real") return;
+  useStore.setState((actual) => {
+    const empresasReales = new Set(datos.empresas.map((empresa) => empresa.id));
+    const empleadosReales = new Set(datos.empleados.map((empleado) => empleado.id));
+    const periodosReales = new Map(datos.periodos.map((periodo) => [periodo.id, periodo]));
+    const novedadesReales = new Set(datos.novedades.map((novedad) => novedad.id));
+    const auditReal = new Set(datos.audit.map((evento) => evento.id));
+
+    return {
+      ...actual,
+      empresas: datos.empresas,
+      empleados: [
+        ...datos.empleados,
+        ...actual.empleados.filter((empleado) => empresasReales.has(empleado.empresaId) && !empleadosReales.has(empleado.id)),
+      ],
+      periodos: [
+        ...datos.periodos.map((periodo) => periodoMasNuevo(periodo, actual.periodos.find((local) => local.id === periodo.id))),
+        ...actual.periodos.filter((periodo) => empresasReales.has(periodo.empresaId) && !periodosReales.has(periodo.id)),
+      ],
+      novedades: [
+        ...datos.novedades,
+        ...actual.novedades.filter((novedad) => empresasReales.has(novedad.empresaId) && !novedadesReales.has(novedad.id)),
+      ],
+      audit: [
+        ...datos.audit,
+        ...actual.audit.filter((evento) => !!evento.empresaId && empresasReales.has(evento.empresaId) && !auditReal.has(evento.id)),
+      ],
+      vistas: { ...datos.vistas, ...actual.vistas },
+    };
+  });
+}
 
 function Stepper({ v }: { v: Vista }) {
   const actual = pasoActual(v.periodo, v.pend.total);
   return (
-    <ol className="flex items-center gap-1 overflow-x-auto pb-1">
-      {PASOS.map((p, i) => {
-        const hecho = i < actual;
-        const activo = i === actual;
-        return (
-          <li key={p} className="flex min-w-fit flex-1 items-center gap-1">
-            <span
-              className={clsx(
-                "flex h-10 flex-1 items-center gap-2 rounded-full px-3.5 text-[13px] font-semibold",
-                hecho && "bg-petroleo text-white",
-                activo && "bg-sol text-[#102247]",
-                !hecho && !activo && "rayado bg-hundido text-apagado",
-              )}
-              aria-current={activo ? "step" : undefined}
-            >
-              <span className={clsx("flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]", hecho ? "bg-white/20" : activo ? "bg-[#102247] text-sol" : "bg-superficie text-tinta-2")}>
-                {hecho ? <Check size={12} strokeWidth={3} /> : i + 1}
+    <div className="rounded-2xl border border-linea bg-hundido px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-apagado">Progreso del cierre</p>
+        <p className="text-xs font-semibold text-tinta-2">Paso {Math.min(actual + 1, PASOS.length)} de {PASOS.length}</p>
+      </div>
+      <ol className="mt-3 grid gap-2 md:grid-cols-6">
+        {PASOS.map((p, i) => {
+          const hecho = i < actual;
+          const activo = i === actual;
+          return (
+            <li key={p}>
+              <span
+                className={clsx(
+                  "flex h-full min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-[13px] font-semibold",
+                  hecho && "border-petroleo/15 bg-menta text-menta-t",
+                  activo && "border-petroleo bg-superficie text-tinta shadow-sm",
+                  !hecho && !activo && "border-linea bg-superficie/70 text-apagado",
+                )}
+                aria-current={activo ? "step" : undefined}
+              >
+                <span className={clsx("flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]", hecho ? "bg-petroleo text-white" : activo ? "bg-petroleo text-white" : "bg-hundido text-tinta-2")}>
+                  {hecho ? <Check size={12} strokeWidth={3} /> : i + 1}
+                </span>
+                <span className="truncate">{p}</span>
               </span>
-              {p}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -152,8 +217,9 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
   const s = useStore();
   const router = useRouter();
   const puede = s.puede("editar");
-  const [confirmar, setConfirmar] = useState<null | "cerrar" | "rectificar">(null);
+  const [confirmar, setConfirmar] = useState<null | "cerrar" | "rectificar" | "cancelar-liquidacion">(null);
   const [motivo, setMotivo] = useState("");
+  const [motivoCancelacion, setMotivoCancelacion] = useState("");
   const [procesando, setProcesando] = useState("");
   const [error, setError] = useState("");
   const { periodo: p, empresa } = v;
@@ -169,8 +235,8 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
         setError(res.mensaje);
         return;
       }
-      accionLocal();
       if (res.modo === "real") router.refresh();
+      else accionLocal();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No pudimos actualizar el periodo.");
     } finally {
@@ -191,6 +257,17 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
       <RefreshCw size={15} /> Recalcular (crea v{(ultima?.version ?? 0) + 1})
     </Boton>
   );
+  const puedeCancelarLiquidacion = p.versiones.length > 0 || ["enviada", "aprobada", "cerrada", "devuelta"].includes(p.etapa);
+  const cancelarLiquidacionBtn = puedeCancelarLiquidacion ? (
+    <Boton
+      variante="fantasma"
+      disabled={!s.puede("reabrir") || !!procesando}
+      onClick={() => setConfirmar("cancelar-liquidacion")}
+      title={!s.puede("reabrir") ? "Solo administradores" : undefined}
+    >
+      <Undo2 size={15} /> Cancelar liquidación
+    </Boton>
+  ) : null;
 
   switch (v.estado) {
     case "pendiente":
@@ -202,7 +279,9 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
         <>
           <Boton disabled={!puede || procesando === "solicitar"} onClick={() => void ejecutar("solicitar", () => solicitarNovedadesReal(periodoInput), () => s.solicitarNovedades(p.id))}><Send size={15} /> {p.solicitud ? "Reenviar pedido" : "Pedir novedades"}</Boton>
           <Boton variante="secundario" onClick={() => irA("novedades")}><Plus size={15} /> Cargarlas yo</Boton>
-          <Boton variante="fantasma" disabled={!puede || procesando === "recibidas"} onClick={() => void ejecutar("recibidas", () => marcarNovedadesRecibidasReal(periodoInput), () => s.marcarRecibidas(p.id))}>Marcar como completas</Boton>
+          <Boton variante="secundario" disabled={!puede || procesando === "recibidas"} onClick={() => void ejecutar("recibidas", () => marcarNovedadesRecibidasReal(periodoInput), () => s.marcarRecibidas(p.id))}>
+            <Check size={15} /> Marcar como completas
+          </Boton>
         </>
       );
       break;
@@ -211,11 +290,16 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
       texto = v.pend.bloq.length
         ? "Hasta corregirlos no se puede calcular ni cerrar. Cada alerta te lleva al dato a corregir."
         : "Aceptalas con una nota si están bien, o corregí el dato y recalculá.";
-      acciones = ultima ? recalc : null;
+      acciones = (
+        <>
+          {ultima ? recalc : null}
+          {cancelarLiquidacionBtn}
+        </>
+      );
       break;
     case "lista":
       titulo = "Todo listo para calcular";
-      texto = `${v.novedadesMes.length} novedades cargadas y sin bloqueos. El cálculo crea la versión 1 con los parámetros vigentes de ${nombreMes(p.mes).toLowerCase()}.`;
+      texto = `Validación automática completada: ${v.novedadesMes.length} novedades cargadas y sin bloqueos. El cálculo crea la versión 1 con los parámetros vigentes de ${nombreMes(p.mes).toLowerCase()}.`;
       acciones = (
         <Boton
           disabled={!s.puede("calcular") || procesando === "calcular"}
@@ -243,6 +327,7 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
             <Boton disabled={!puede || procesando === "aprobar"} onClick={() => void ejecutar("aprobar", () => aprobarInternoReal(periodoInput), () => s.aprobarInterno(p.id))}><Check size={15} /> Aprobar internamente</Boton>
           )}
           <Boton variante="secundario" onClick={() => irA("liquidacion")}>Ver liquidación</Boton>
+          {cancelarLiquidacionBtn}
         </>
       );
       break;
@@ -253,6 +338,7 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
         <>
           <Boton variante="secundario" href={`/cliente/${empresa.id}`}><Eye size={15} /> Ver lo que ve el cliente</Boton>
           <Boton variante="fantasma" disabled={!puede || procesando === "solicitar"} onClick={() => void ejecutar("solicitar", () => solicitarNovedadesReal(periodoInput), () => s.solicitarNovedades(p.id))}><Mail size={15} /> Recordar por email</Boton>
+          {cancelarLiquidacionBtn}
         </>
       );
       break;
@@ -271,13 +357,19 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
         <>
           <Boton onClick={() => irA("novedades")}>Corregir novedades</Boton>
           {recalc}
+          {cancelarLiquidacionBtn}
         </>
       );
       break;
     case "aprobada":
       titulo = "Aprobada: podés cerrar el mes";
       texto = `Al cerrar se bloquea la versión ${p.aprobacion?.version}, se publican los recibos en el portal de cada empleado y queda lista la nómina para BPS.`;
-      acciones = <Boton disabled={!s.puede("cerrar")} onClick={() => setConfirmar("cerrar")}><Lock size={15} /> Cerrar y publicar recibos</Boton>;
+      acciones = (
+        <>
+          <Boton disabled={!s.puede("cerrar")} onClick={() => setConfirmar("cerrar")}><Lock size={15} /> Cerrar y publicar recibos</Boton>
+          {cancelarLiquidacionBtn}
+        </>
+      );
       break;
     case "cerrada": {
       const res = v.resultados ?? [];
@@ -299,6 +391,7 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
           <Boton variante="fantasma" disabled={!s.puede("reabrir")} onClick={() => setConfirmar("rectificar")} title={!s.puede("reabrir") ? "Solo administradores" : undefined}>
             <Undo2 size={15} /> Rectificar
           </Boton>
+          {cancelarLiquidacionBtn}
         </>
       );
       break;
@@ -338,6 +431,44 @@ function ProximaAccion({ v, irA }: { v: Vista; irA: (t: Tab) => void }) {
             onClick={() => void ejecutar("rectificar", () => rectificarPeriodoReal({ ...periodoInput, motivo: motivo.trim() }), () => { s.rectificar(p.id, motivo.trim()); setConfirmar(null); setMotivo(""); })}
           >
             Rectificar
+          </Boton>
+        </div>
+      </Modal>
+      <Modal abierto={confirmar === "cancelar-liquidacion"} onCerrar={() => setConfirmar(null)} titulo={`Cancelar liquidación de ${nombreMes(p.mes).toLowerCase()}`}>
+        <div className="space-y-3 text-sm text-tinta-2">
+          <p>
+            Vas a eliminar el borrador y todas las versiones calculadas de este período. También se borra la aprobación pendiente o aprobada, el cierre, la marca de BPS y los recibos publicados si ya se habían generado.
+          </p>
+          <p>
+            Se conservan la empresa, las personas y las novedades cargadas. Después vas a poder revisar datos y calcular un borrador nuevo desde cero.
+          </p>
+          <label className="block pt-1">
+            <span className="mb-1.5 block text-[13px] font-semibold text-tinta">Motivo de la cancelación</span>
+            <textarea
+              className={clsx(inputCls, "h-24 py-3")}
+              placeholder="Ej.: prueba de flujo, necesito volver a calcular desde cero"
+              value={motivoCancelacion}
+              onChange={(e) => setMotivoCancelacion(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <Boton variante="fantasma" onClick={() => setConfirmar(null)}>Volver</Boton>
+          <Boton
+            variante="secundario"
+            disabled={motivoCancelacion.trim().length < 5 || procesando === "cancelar-liquidacion"}
+            onClick={() => void ejecutar(
+              "cancelar-liquidacion",
+              () => cancelarLiquidacionReal({ ...periodoInput, motivo: motivoCancelacion.trim() }),
+              () => {
+                s.cancelarLiquidacion(p.id, motivoCancelacion.trim());
+                setMotivoCancelacion("");
+                setConfirmar(null);
+                irA("resumen");
+              },
+            )}
+          >
+            <Undo2 size={15} /> {procesando === "cancelar-liquidacion" ? "Cancelando..." : "Sí, cancelar liquidación"}
           </Boton>
         </div>
       </Modal>
@@ -546,11 +677,34 @@ function Delta({ actual, previo }: { actual: number; previo?: number }) {
 
 function TabLiquidacion({ v, empleados, verCalc }: { v: Vista; empleados: Empleado[]; verCalc: (id: string) => void }) {
   const s = useStore();
+  const router = useRouter();
+  const usuario = useUsuario();
   const [ver, setVer] = useState<number | null>(null);
+  const [procesando, setProcesando] = useState("");
+  const [error, setError] = useState("");
   const version = v.periodo.versiones.find((x) => x.version === ver) ?? v.vigente;
   const res = version?.resultados ?? v.resultados;
   const allEmpleados = s.empleados;
   const prev = useMemo(() => calcularEmpresa(v.empresa, allEmpleados, mesAnterior(v.periodo.mes), s.novedades), [v.empresa, allEmpleados, v.periodo.mes, s.novedades]);
+  const puedeAvanzar = s.puede("editar");
+  const periodoInput = { periodoId: v.periodo.id, empresaId: v.empresa.id, actor: usuario.nombre };
+  const ejecutar = async (clave: string, accionReal: () => Promise<{ ok: boolean; modo: "real" | "demo"; mensaje: string }>, accionLocal: () => void) => {
+    setError("");
+    setProcesando(clave);
+    try {
+      const res = await accionReal();
+      if (!res.ok) {
+        setError(res.mensaje);
+        return;
+      }
+      if (res.modo === "real") router.refresh();
+      else accionLocal();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos avanzar la liquidación.");
+    } finally {
+      setProcesando("");
+    }
+  };
 
   if (!res || (!version && v.periodo.etapa !== "cerrada"))
     return (
@@ -580,6 +734,26 @@ function TabLiquidacion({ v, empleados, verCalc }: { v: Vista; empleados: Emplea
           <Boton tam="sm" disabled={!s.puede("calcular") || v.pend.bloq.length > 0} onClick={() => s.calcular(v.periodo.id)}><RefreshCw size={13} /> Recalcular</Boton>
         </div>
       )}
+      {!v.desactualizada && v.pend.total === 0 && (v.estado === "borrador" || v.estado === "rectificacion") && (
+        <Panel className="flex flex-wrap items-center gap-3 p-5">
+          <div className="mr-auto">
+            <h3 className="text-base font-bold tracking-tight">Borrador listo para avanzar</h3>
+            <p className="mt-1 text-sm text-apagado">
+              Ya revisaste la liquidación. El siguiente paso es {v.empresa.requiereAprobacion ? `enviarla a ${v.empresa.contacto.nombre}` : "aprobarla internamente"}.
+            </p>
+          </div>
+          {v.empresa.requiereAprobacion ? (
+            <Boton disabled={!puedeAvanzar || procesando === "enviar"} onClick={() => void ejecutar("enviar", () => enviarAprobacionReal(periodoInput), () => s.enviarAprobacion(v.periodo.id))}>
+              <Send size={15} /> Enviar a aprobación
+            </Boton>
+          ) : (
+            <Boton disabled={!puedeAvanzar || procesando === "aprobar"} onClick={() => void ejecutar("aprobar", () => aprobarInternoReal(periodoInput), () => s.aprobarInterno(v.periodo.id))}>
+              <Check size={15} /> Aprobar internamente
+            </Boton>
+          )}
+          {error && <p className="basis-full rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}
+        </Panel>
+      )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {[
           { k: "Nominal", v: t.nominal, p: tp.nominal },
@@ -599,7 +773,9 @@ function TabLiquidacion({ v, empleados, verCalc }: { v: Vista; empleados: Emplea
       </div>
       <Panel className="p-3">
         <div className="flex flex-wrap items-center gap-3 px-3 pt-2 pb-3">
-          <h2 className="mr-auto text-lg font-bold tracking-tight">Por persona</h2>
+          <div className="mr-auto">
+            <h2 className="text-lg font-bold tracking-tight">Por persona</h2>
+          </div>
           {v.periodo.versiones.length > 1 && (
             <div className="flex gap-1 rounded-full bg-hundido p-1">
               {v.periodo.versiones.map((x) => (
@@ -609,19 +785,23 @@ function TabLiquidacion({ v, empleados, verCalc }: { v: Vista; empleados: Emplea
               ))}
             </div>
           )}
-          {version && <span className="text-xs text-apagado">v{version.version} · {version.por} · {fechaHora(version.creada)} · {version.parametros}</span>}
+          {version && (
+            <span className="text-xs text-apagado">
+              Borrador versión {version.version}, calculado por {version.por} el {fechaHora(version.creada)} con parámetros {version.parametros}
+            </span>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="text-left text-xs text-apagado">
                 <th className="px-3 pb-2 font-semibold">Persona</th>
-                <th className="px-3 pb-2 text-right font-semibold">Nominal</th>
-                <th className="px-3 pb-2 text-right font-semibold">Descuentos</th>
-                <th className="px-3 pb-2 text-right font-semibold">Líquido</th>
-                <th className="px-3 pb-2 font-semibold">vs. mes anterior</th>
-                {original && <th className="px-3 pb-2 font-semibold">vs. versión cerrada</th>}
-                <th className="px-3 pb-2 font-semibold">Alertas</th>
+                <th className="px-3 pb-2 text-center font-semibold" title="Total bruto liquidado antes de descuentos.">Nominal</th>
+                <th className="px-3 pb-2 text-center font-semibold" title="Aportes personales, retenciones y otros descuentos.">Descuentos</th>
+                <th className="px-3 pb-2 text-center font-semibold" title="Importe final a pagar a la persona.">Líquido</th>
+                <th className="px-3 pb-2 text-center font-semibold" title="Variación del nominal frente al mes anterior.">vs. mes anterior</th>
+                {original && <th className="px-3 pb-2 text-center font-semibold" title="Diferencia contra la versión cerrada que se está rectificando.">vs. versión cerrada</th>}
+                <th className="px-3 pb-2 text-center font-semibold" title="Bloqueos o advertencias pendientes de revisar.">Alertas</th>
                 <th />
               </tr>
             </thead>
@@ -641,18 +821,18 @@ function TabLiquidacion({ v, empleados, verCalc }: { v: Vista; empleados: Emplea
                       <td colSpan={3} className="px-3 py-3 text-right text-xs text-rosa-t">Fuera de alcance · no calculado</td>
                     ) : (
                       <>
-                        <td className="num px-3 py-3 text-right">{fmt2(r.totalHaberes)}</td>
-                        <td className="num px-3 py-3 text-right text-tinta-2">{fmt2(r.descuentos)}</td>
-                        <td className="num px-3 py-3 text-right font-bold">{fmt2(r.liquido)}</td>
+                        <td className="num px-3 py-3 text-center">{fmt2(r.totalHaberes)}</td>
+                        <td className="num px-3 py-3 text-center text-tinta-2">{fmt2(r.descuentos)}</td>
+                        <td className="num px-3 py-3 text-center font-bold">{fmt2(r.liquido)}</td>
                       </>
                     )}
-                    <td className="px-3 py-3"><Delta actual={r.totalHaberes} previo={pr?.totalHaberes} /></td>
+                    <td className="px-3 py-3 text-center"><Delta actual={r.totalHaberes} previo={pr?.totalHaberes} /></td>
                     {original && (
-                      <td className="px-3 py-3 text-xs">
+                      <td className="px-3 py-3 text-center text-xs">
                         {orig && Math.abs(orig.liquido - r.liquido) > 0.5 ? <Chip tono="crema">{fmt(orig.liquido)} → {fmt(r.liquido)}</Chip> : <span className="text-apagado">igual</span>}
                       </td>
                     )}
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 text-center">
                       {al.length ? <Chip tono={al.some((a) => a.nivel === "bloqueante") ? "rosa" : "crema"}>{al.length}</Chip> : <span className="text-xs text-apagado">—</span>}
                     </td>
                     <td className="px-3 py-3 text-right">
@@ -1103,6 +1283,11 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
   const puede = s.puede("configurar");
   const reglas = v.empresa.reglasLiquidacion;
   const presentismo = reglas?.presentismo;
+  const responsables = USUARIOS.filter((u) => u.rol !== "lectura");
+  const responsableActual = usuarioPorResponsableId(v.empresa.responsableId);
+  const [responsableId, setResponsableId] = useState(responsableActual?.id ?? responsables[0]?.id ?? "");
+  const [mensajeResponsable, setMensajeResponsable] = useState<{ tipo: "info" | "error"; texto: string } | null>(null);
+  const [guardandoResponsable, setGuardandoResponsable] = useState(false);
   const [horasExtraFactor, setHorasExtraFactor] = useState(String(reglas?.horasExtraFactor ?? 2));
   const [feriadoFactor, setFeriadoFactor] = useState(String(reglas?.feriadoFactor ?? 2));
   const [calculoMesParcial, setCalculoMesParcial] = useState<NonNullable<Empresa["reglasLiquidacion"]>["calculoMesParcial"]>(reglas?.calculoMesParcial ?? "treinta_dias");
@@ -1120,6 +1305,32 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
 
   const actualizarCondicion = (tipo: Novedad["tipo"], cambios: Partial<CondicionPresentismo>) => {
     setCondiciones((actual) => actual.map((c) => (c.tipo === tipo ? { ...c, ...cambios } : c)));
+  };
+
+  const guardarResponsable = async () => {
+    const elegido = responsables.find((u) => u.id === responsableId);
+    if (!elegido) {
+      setMensajeResponsable({ tipo: "error", texto: "Elegí un integrante del estudio." });
+      return;
+    }
+    setMensajeResponsable(null);
+    setGuardandoResponsable(true);
+    try {
+      const resumen = `Asignó ${elegido.nombre} como responsable de la empresa`;
+      const cambios: Partial<Empresa> = { responsableId };
+      const res = await actualizarEmpresaReal({ empresaId: v.empresa.id, cambios, resumen, actor: usuario.nombre });
+      if (!res.ok) {
+        setMensajeResponsable({ tipo: "error", texto: res.mensaje });
+        return;
+      }
+      s.actualizarEmpresa(v.empresa.id, cambios, resumen);
+      setMensajeResponsable({ tipo: "info", texto: res.modo === "real" ? "Responsable actualizado." : "En producción se guardará este responsable y quedará auditado." });
+      if (res.modo === "real") router.refresh();
+    } catch (err) {
+      setMensajeResponsable({ tipo: "error", texto: err instanceof Error ? err.message : "No pudimos actualizar el responsable." });
+    } finally {
+      setGuardandoResponsable(false);
+    }
   };
 
   const guardar = async () => {
@@ -1190,7 +1401,32 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
   };
 
   return (
-    <Panel className="p-6">
+    <div className="space-y-3">
+      <Panel className="p-6">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="mr-auto">
+            <h2 className="text-lg font-bold tracking-tight">Responsable del estudio</h2>
+            <p className="mt-1 text-sm text-apagado">Define quién lleva esta empresa en el tablero del mes y en los filtros por responsable.</p>
+          </div>
+          <Boton disabled={!puede || guardandoResponsable || responsableId === (responsableActual?.id ?? "")} onClick={() => void guardarResponsable()}>
+            {guardandoResponsable ? "Guardando..." : "Guardar responsable"}
+          </Boton>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <Campo label="Quién la lleva">
+            <select className={inputCls} value={responsableId} onChange={(e) => setResponsableId(e.target.value)} disabled={!puede}>
+              {responsables.map((u) => <option key={u.id} value={u.id}>{u.nombre} · {u.rol === "admin" ? "Administración" : "Liquidación"}</option>)}
+            </select>
+          </Campo>
+          <div className="rounded-2xl bg-hundido px-4 py-3 text-sm">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-apagado">Actual</span>
+            <span className="font-semibold">{responsableActual?.nombre ?? "Sin asignar"}</span>
+          </div>
+        </div>
+        {mensajeResponsable && <p className={clsx("mt-3 rounded-2xl px-4 py-3 text-sm font-semibold", mensajeResponsable.tipo === "error" ? "bg-rosa text-rosa-t" : "bg-menta text-menta-t")}>{mensajeResponsable.texto}</p>}
+      </Panel>
+
+      <Panel className="p-6">
       <div className="flex flex-wrap items-start gap-3">
         <div className="mr-auto">
           <h2 className="text-lg font-bold tracking-tight">Reglas de pago</h2>
@@ -1315,7 +1551,8 @@ function TabReglasLiquidacion({ v }: { v: Vista }) {
         </div>
       </section>
       {error && <p className="mt-4 rounded-2xl bg-rosa px-4 py-3 text-sm text-rosa-t">{error}</p>}
-    </Panel>
+      </Panel>
+    </div>
   );
 }
 
@@ -1375,15 +1612,7 @@ function Contenido({
   const sp = useSearchParams();
   const router = useRouter();
   if (datosIniciales.modo === "real" && !useStore.getState().empresas.some((empresa) => empresa.id === id)) {
-    useStore.setState((actual) => ({
-      ...actual,
-      empresas: datosIniciales.empresas,
-      empleados: datosIniciales.empleados,
-      periodos: datosIniciales.periodos,
-      novedades: datosIniciales.novedades,
-      audit: datosIniciales.audit,
-      vistas: datosIniciales.vistas,
-    }));
+    sincronizarDatosOperativos(datosIniciales);
   }
   const tab = (sp.get("tab") as Tab) ?? "resumen";
   const empleadoSel = sp.get("emp");
@@ -1394,16 +1623,7 @@ function Contenido({
   const empleados = useMemo(() => todos.filter((e) => e.empresaId === id && activoEn(e, MES_ACTUAL)), [todos, id]);
 
   useEffect(() => {
-    if (datosIniciales.modo !== "real") return;
-    useStore.setState((actual) => ({
-      ...actual,
-      empresas: datosIniciales.empresas,
-      empleados: datosIniciales.empleados,
-      periodos: datosIniciales.periodos,
-      novedades: datosIniciales.novedades,
-      audit: datosIniciales.audit,
-      vistas: datosIniciales.vistas,
-    }));
+    sincronizarDatosOperativos(datosIniciales);
   }, [datosIniciales]);
 
   const setQ = (q: Record<string, string | null>) => {
@@ -1430,39 +1650,44 @@ function Contenido({
   return (
     <div className="space-y-3">
       <Panel className="px-7 pt-5 pb-5">
-        <nav className="text-xs text-apagado"><Link href="/empresas" className="hover:underline">Empresas</Link> / {v.empresa.nombre}</nav>
-        <div className="mt-2 flex flex-wrap items-start gap-4">
-          <LogoEditable v={v} />
-          <div className="mr-auto">
-            <h1 className="text-[28px] font-extrabold leading-tight tracking-tight">{v.empresa.nombre}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-apagado">
-              <EstadoChip estado={v.estado} />
-              <span>{nombreMes(v.periodo.mes)}</span>
-              {v.periodo.versiones.length > 0 && <span>· versión {v.periodo.versiones.at(-1)!.version}</span>}
-              <span>· Grupo {v.empresa.grupo}.{v.empresa.subgrupo} · RUT {v.empresa.rut}</span>
+        <nav className="text-xs text-apagado"><Link href="/empresas" className="hover:underline">Empresas</Link><span className="mx-1">/</span>{v.empresa.nombre}</nav>
+        <div className="mt-3 grid gap-4 xl:grid-cols-[1fr_auto] xl:items-start">
+          <div className="flex min-w-0 items-start gap-4">
+            <LogoEditable v={v} />
+            <div className="min-w-0">
+              <h1 className="text-[28px] font-extrabold leading-tight tracking-tight">{v.empresa.nombre}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-apagado">
+                <EstadoChip estado={v.estado} />
+                <span>{nombreMes(v.periodo.mes)}</span>
+                {v.periodo.versiones.length > 0 && <span>Versión {v.periodo.versiones.at(-1)!.version}</span>}
+                <span>Grupo {v.empresa.grupo}.{v.empresa.subgrupo}</span>
+                <span>RUT {v.empresa.rut}</span>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-full bg-hundido py-1.5 pl-1.5 pr-2">
-            <Avatar nombre={v.empresa.contacto.nombre} tono="lila" size={34} />
-            <span className="text-sm leading-tight">
-              <span className="block font-semibold">{v.empresa.contacto.nombre}</span>
-              <span className="block text-xs text-apagado">Contacto del cliente</span>
-            </span>
-            <Boton tam="sm" variante="secundario" href={`/cliente/${v.empresa.id}`}>Portal cliente</Boton>
-          </div>
+          <section className="rounded-2xl border border-linea bg-hundido p-3">
+            <div className="flex items-center gap-3">
+              <Avatar nombre={v.empresa.contacto.nombre} tono="lila" size={36} />
+              <div className="min-w-0 text-sm leading-tight">
+                <span className="block font-semibold">{v.empresa.contacto.nombre}</span>
+                <span className="mt-1 flex items-center gap-1 text-xs text-apagado"><Mail size={12} /> {v.empresa.contacto.email}</span>
+              </div>
+              <Boton tam="sm" variante="secundario" href={`/cliente/${v.empresa.id}`}>Portal cliente</Boton>
+            </div>
+          </section>
         </div>
         <div className="mt-5"><Stepper v={v} /></div>
-        <div className="mt-4 flex gap-1 overflow-x-auto" role="tablist">
+        <div className="mt-4 flex gap-1 overflow-x-auto rounded-2xl bg-hundido p-1" role="tablist">
           {TABS.map((t) => (
             <button
               key={t.k}
               role="tab"
               aria-selected={tab === t.k}
               onClick={() => irA(t.k)}
-              className={clsx("flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold", tab === t.k ? "bg-petroleo text-white" : "text-apagado hover:bg-hundido hover:text-tinta")}
+              className={clsx("flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold", tab === t.k ? "bg-superficie text-tinta shadow-sm" : "text-apagado hover:text-tinta")}
             >
               {t.l}
-              {t.n !== undefined && <span className={clsx("num rounded-full px-1.5 text-xs", tab === t.k ? "bg-white/20" : "bg-hundido")}>{t.n}</span>}
+              {t.n !== undefined && <span className={clsx("num rounded-full px-1.5 text-xs", tab === t.k ? "bg-hundido" : "bg-superficie")}>{t.n}</span>}
             </button>
           ))}
         </div>

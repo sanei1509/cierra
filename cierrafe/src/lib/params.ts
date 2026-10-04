@@ -77,6 +77,39 @@ export const CUENTAS_ASIENTO_SUELDOS = {
   haber: ["Anticipos de sueldos", "Sueldos a pagar", "BPS", "Retenciones IRPF", "Retenciones", "Redondeos"],
 } as const;
 
+export const FUENTES_PARAMETROS_NORMATIVOS = [
+  {
+    nombre: "Valores BPS",
+    detalle: "BPC, cuota mutual, costo promedio equivalente y topes.",
+    url: "https://www.bps.gub.uy/bps/valores.jsp",
+    organismo: "BPS",
+  },
+  {
+    nombre: "Escalas IRPF",
+    detalle: "Histórico de franjas y valores vinculados a IRPF.",
+    url: "https://www.bps.gub.uy/10323/",
+    organismo: "BPS",
+  },
+  {
+    nombre: "Tasas FONASA",
+    detalle: "Tasas personales según hijos, cónyuge y situación familiar.",
+    url: "https://www.bps.gub.uy/10314/tasas-fonasa.html",
+    organismo: "BPS",
+  },
+  {
+    nombre: "Simulador BPS",
+    detalle: "Servicio en línea usado como referencia de contraste.",
+    url: "https://serviciosenlinea.bps.gub.uy/ServiciosEnLineaWeb/contenidosEmbebido?id=8786",
+    organismo: "BPS",
+  },
+  {
+    nombre: "IRPF dependientes",
+    detalle: "Guía DGI para trabajadores dependientes.",
+    url: "https://www.gub.uy/direccion-general-impositiva/comunicacion/publicaciones/irpf-para-trabajadores-dependientes",
+    organismo: "DGI",
+  },
+] as const;
+
 const franjas = [
   { desde: 0, hasta: 7, tasa: 0 },
   { desde: 7, hasta: 10, tasa: 0.1 },

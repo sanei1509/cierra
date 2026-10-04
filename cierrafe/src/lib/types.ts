@@ -2,6 +2,7 @@ export type Rol = "admin" | "liquidador" | "lectura";
 
 export interface Usuario {
   id: string;
+  backendId?: string;
   nombre: string;
   rol: Rol;
   email: string;
@@ -273,6 +274,7 @@ export interface AuditEvent {
   actor: string;
   empresaId?: string;
   entidad: string;
+  entidadId?: string;
   accion: string;
   detalle?: string;
   antes?: string;

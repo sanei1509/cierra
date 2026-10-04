@@ -2,15 +2,16 @@
 
 import clsx from "clsx";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { crearEmpresaInicial, type AltaRealResult } from "../actions";
 import { useStore, useVistas, vistaPeriodo } from "@/lib/store";
-import { USUARIOS } from "@/lib/seed";
+import { USUARIOS, usuarioPorResponsableId } from "@/lib/seed";
 import { activoEn, totales } from "@/lib/engine";
 import { MES_ACTUAL, fmt } from "@/lib/format";
 import { ESTADOS } from "@/lib/status";
-import { Avatar, Boton, Campo, Drawer, EstadoChip, MarcaEmpresa, Panel, ResultadoAccion, TONOS, inputCls } from "@/components/ui";
+import { Boton, Campo, Drawer, EstadoChip, MarcaEmpresa, Panel, ResultadoAccion, inputCls } from "@/components/ui";
 import type { Empleado, Empresa, Periodo, Tono } from "@/lib/types";
 
 const TONOS_EMPRESA: Tono[] = ["menta", "cielo", "crema", "lila", "rosa"];
@@ -39,6 +40,8 @@ function NuevaEmpresaDrawer({
   const agregarEmpresa = useStore((s) => s.agregarEmpresa);
   const usuarioId = useStore((s) => s.usuarioId);
   const existentes = useStore((s) => s.empresas);
+  const responsables = USUARIOS.filter((u) => u.rol !== "lectura");
+  const responsableDefault = responsables.some((u) => u.id === usuarioId) ? usuarioId : (responsables[0]?.id ?? usuarioId);
   const [error, setError] = useState("");
   const [resultado, setResultado] = useState<AltaRealResult | null>(null);
   const [pendiente, startTransition] = useTransition();
@@ -54,13 +57,19 @@ function NuevaEmpresaDrawer({
     const actividad = String(form.get("actividad") ?? "").trim() || "Servicios";
     const grupo = Number(form.get("grupo") ?? 10);
     const subgrupo = String(form.get("subgrupo") ?? "01").trim() || "01";
+    const responsableId = String(form.get("responsableId") ?? responsableDefault).trim();
     const tono = String(form.get("tono") ?? "menta") as Tono;
     if (!nombre || !rut || !contactoNombre || !/^\S+@\S+\.\S+$/.test(contactoEmail)) {
-      setError("Completá nombre, RUT, responsable y un email válido.");
+      setError("Completá nombre, RUT, contacto del cliente y un email válido.");
+      return;
+    }
+    if (!responsables.some((u) => u.id === responsableId)) {
+      setError("Elegí quién del estudio lleva esta empresa.");
       return;
     }
     const base = slugId(nombre) || "empresa";
-    const id = existentes.some((e) => e.id === base) ? `${base}-${Date.now().toString(36).slice(-4)}` : base;
+    const repetidos = existentes.filter((e) => e.id === base || e.id.startsWith(`${base}-`)).length;
+    const id = repetidos > 0 ? `${base}-${repetidos + 1}` : base;
     const empresa: Empresa = {
       id,
       nombre,
@@ -71,7 +80,7 @@ function NuevaEmpresaDrawer({
       actividad,
       grupo: Number.isFinite(grupo) ? grupo : 10,
       subgrupo,
-      responsableId: usuarioId,
+      responsableId,
       requiereAprobacion: true,
       contacto: { nombre: contactoNombre, email: contactoEmail },
       tono,
@@ -85,6 +94,7 @@ function NuevaEmpresaDrawer({
           actividad,
           grupo: empresa.grupo,
           subgrupo,
+          responsableId,
           contactoNombre,
           contactoEmail,
           tono,
@@ -108,7 +118,7 @@ function NuevaEmpresaDrawer({
   };
 
   return (
-    <Drawer abierto={abierto} onCerrar={onCerrar} titulo="Nueva empresa" subtitulo="Alta inicial con usuario responsable">
+    <Drawer abierto={abierto} onCerrar={onCerrar} titulo="Nueva empresa" subtitulo="Alta inicial con contacto del cliente y responsable interno">
       <form action={crear} className="space-y-4">
         <Campo label="Nombre de empresa"><input name="nombre" className={inputCls} required /></Campo>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -121,9 +131,14 @@ function NuevaEmpresaDrawer({
           <Campo label="Subgrupo"><input name="subgrupo" className={inputCls} defaultValue="01" /></Campo>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Campo label="Responsable"><input name="contactoNombre" className={inputCls} required /></Campo>
-          <Campo label="Email de acceso"><input name="contactoEmail" type="email" className={inputCls} required /></Campo>
+          <Campo label="Contacto del cliente"><input name="contactoNombre" className={inputCls} required /></Campo>
+          <Campo label="Email de acceso del cliente"><input name="contactoEmail" type="email" className={inputCls} required /></Campo>
         </div>
+        <Campo label="Responsable del estudio">
+          <select name="responsableId" className={inputCls} defaultValue={responsableDefault}>
+            {responsables.map((u) => <option key={u.id} value={u.id}>{u.nombre} · {u.rol === "admin" ? "Administración" : "Liquidación"}</option>)}
+          </select>
+        </Campo>
         <Campo label="Color">
           <select name="tono" className={inputCls} defaultValue="menta">
             {TONOS_EMPRESA.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -138,6 +153,7 @@ function NuevaEmpresaDrawer({
 }
 
 export default function EmpresasClient({ datosIniciales }: { datosIniciales: { modo: "real" | "demo"; empresas: Empresa[]; empleados: Empleado[]; periodos: Periodo[] } }) {
+  const router = useRouter();
   const vistasDemo = useVistas();
   const empleadosDemo = useStore((s) => s.empleados);
   const [empresasReales, setEmpresasReales] = useState(datosIniciales.empresas);
@@ -199,35 +215,54 @@ export default function EmpresasClient({ datosIniciales }: { datosIniciales: { m
           ]);
         }}
       />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {lista.map((v) => {
-          const n = empleados.filter((e) => e.empresaId === v.empresa.id && activoEn(e, MES_ACTUAL)).length;
-          const t = v.resultados ? totales(v.resultados) : null;
-          const r = USUARIOS.find((u) => u.id === v.empresa.responsableId) ?? { nombre: v.empresa.contacto.nombre };
-          return (
-            <Link key={v.empresa.id} href={`/empresas/${v.empresa.id}`} className="group">
-              <Panel className="flex h-full flex-col p-2 transition-transform group-hover:-translate-y-0.5">
-                <div className={clsx("rounded-[22px] p-4", TONOS[v.empresa.tono].bg)}>
-                  <div className="flex items-start justify-between">
-                    <MarcaEmpresa empresa={{ ...v.empresa, tono: "tinta" }} size={40} />
-                    <span className="rounded-full bg-superficie/80 px-2.5 py-1 text-xs font-semibold text-tinta">Grupo {v.empresa.grupo}.{v.empresa.subgrupo}</span>
-                  </div>
-                  <p className="mt-4 text-lg font-bold leading-tight tracking-tight">{v.empresa.nombre}</p>
-                  <p className="text-[13px] text-tinta-2">{v.empresa.actividad}</p>
-                </div>
-                <div className="flex flex-1 flex-col gap-3 px-3 pt-3 pb-2">
-                  <EstadoChip estado={v.estado} className="self-start" />
-                  <dl className="grid grid-cols-2 gap-2 text-sm">
-                    <div><dt className="text-xs text-apagado">Personas</dt><dd className="num font-semibold">{n}</dd></div>
-                    <div><dt className="text-xs text-apagado">Líquido del mes</dt><dd className="num font-semibold">{t && t.liquido ? fmt(t.liquido) : "—"}</dd></div>
-                  </dl>
-                  <p className="mt-auto flex items-center gap-2 text-xs text-apagado"><Avatar nombre={r.nombre} tono="crema" size={22} /> {r.nombre}</p>
-                </div>
-              </Panel>
-            </Link>
-          );
-        })}
-      </div>
+      <Panel className="min-w-0 p-3">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] text-sm">
+            <thead>
+              <tr className="text-left text-xs text-apagado">
+                <th className="px-3 pb-2 font-semibold">Empresa</th>
+                <th className="px-3 pb-2 text-center font-semibold">Estado del mes</th>
+                <th className="px-3 pb-2 text-center font-semibold">Personas</th>
+                <th className="px-3 pb-2 text-center font-semibold">Líquido del mes</th>
+                <th className="px-3 pb-2 text-center font-semibold">Grupo</th>
+                <th className="px-3 pb-2 text-center font-semibold">La lleva</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lista.map((v) => {
+                const n = empleados.filter((e) => e.empresaId === v.empresa.id && activoEn(e, MES_ACTUAL)).length;
+                const t = v.resultados ? totales(v.resultados) : null;
+                const r = usuarioPorResponsableId(v.empresa.responsableId);
+                return (
+                  <tr
+                    key={v.empresa.id}
+                    className="group cursor-pointer border-t border-linea transition-colors hover:bg-hundido/70 focus-within:bg-hundido/70"
+                    onClick={() => {
+                      router.push(`/empresas/${v.empresa.id}`);
+                    }}
+                  >
+                    <td className="px-3 py-3">
+                      <Link href={`/empresas/${v.empresa.id}`} className="flex items-center gap-3" aria-label={`Abrir ${v.empresa.nombre}`}>
+                        <MarcaEmpresa empresa={v.empresa} size={38} />
+                        <span>
+                          <span className="block whitespace-nowrap font-semibold group-hover:underline">{v.empresa.nombre}</span>
+                          <span className="block whitespace-nowrap text-xs text-apagado">{v.empresa.actividad}</span>
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3 text-center"><EstadoChip estado={v.estado} /></td>
+                    <td className="num px-3 py-3 text-center font-semibold">{n}</td>
+                    <td className="num px-3 py-3 text-center font-semibold">{t && t.liquido ? fmt(t.liquido) : "—"}</td>
+                    <td className="px-3 py-3 text-center text-[13px] font-semibold text-tinta-2">{v.empresa.grupo}.{v.empresa.subgrupo}</td>
+                    <td className="px-3 py-3 text-center text-[13px] font-semibold text-tinta-2">{r ? r.nombre.split(" ")[0] : "Sin asignar"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {lista.length === 0 && <p className="px-3 py-10 text-center text-sm text-apagado">No hay empresas con ese filtro.</p>}
+        </div>
+      </Panel>
     </div>
   );
 }

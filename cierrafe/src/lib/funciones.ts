@@ -29,7 +29,7 @@ export const FUNCIONES: GrupoFunciones[] = [
         estado: "si",
         pasos: [
           "Entrá a Inicio: la tabla “Cartera del mes” lista las 12 empresas con su estado.",
-          "Filtrá por “Esperan al cliente”, “Con alertas” o “Listas para avanzar”, o por responsable.",
+          "Filtrá por “Falta info del cliente”, “Con alertas” o “Para trabajar ahora”, o por responsable.",
           "En Empresas ves cada cliente como tarjeta, con personas y líquido del mes.",
         ],
         probar: { href: "/empresas", label: "Abrir Empresas" },
@@ -48,7 +48,7 @@ export const FUNCIONES: GrupoFunciones[] = [
         pasos: [
           "Tocá tu nombre arriba a la derecha y elegí “Martín Suárez · Liquidador”: puede calcular y cerrar, pero no rectificar.",
           "Elegí “Sofía Méndez · Solo lectura”: todos los botones de acción quedan deshabilitados.",
-          "En Inicio, filtrá la cartera por responsable.",
+          "En Inicio, filtrá las empresas del mes por responsable.",
         ],
         probar: { href: "/", label: "Ir a Inicio" },
       },

@@ -20,6 +20,7 @@ interface Datos {
   audit: AuditEvent[];
   usuarioId: string;
   temaPorUsuario: Record<string, TemaPreferido>;
+  estudioLogo?: string;
   parametrosNormativos: Parametros[];
   /** Recibos vistos por el empleado: `${empleadoId}|${mes}` -> fecha ISO */
   vistas: Record<string, string>;
@@ -35,6 +36,7 @@ export type Accion =
 interface Acciones {
   setUsuario: (id: string) => void;
   setTemaUsuario: (tema: TemaPreferido) => void;
+  setEstudioLogo: (logo?: string) => void;
   puede: (a: Accion) => boolean;
   agregarNovedad: (n: Omit<Novedad, "id" | "fecha"> & { id?: string; fecha?: string }) => void;
   editarNovedad: (id: string, n: Omit<Novedad, "id" | "fecha">, actor?: string) => void;
@@ -48,6 +50,7 @@ interface Acciones {
   enviarAprobacion: (periodoId: string) => void;
   responderAprobacion: (periodoId: string, aprobada: boolean, comentario: string, actor: string) => void;
   aprobarInterno: (periodoId: string) => void;
+  cancelarLiquidacion: (periodoId: string, motivo: string) => void;
   cerrar: (periodoId: string) => void;
   generarBps: (periodoId: string) => void;
   marcarBpsPresentado: (periodoId: string) => void;
@@ -124,6 +127,7 @@ function estadoInicial(): Datos {
     periodos,
     usuarioId: "u1",
     temaPorUsuario: {},
+    estudioLogo: undefined,
     parametrosNormativos,
     vistas: { "espiga-1|2026-09": "2026-09-19T20:14:00", "espiga-2|2026-09": "2026-09-20T08:02:00", "delprado-1|2026-09": "2026-09-21T12:40:00" },
   };
@@ -137,6 +141,28 @@ export const useStore = create<Datos & Acciones>()(
         set((s) => ({ audit: [{ id: uid("a"), fecha: ahora(), actor: e.actor ?? actor(), ...e }, ...s.audit] }));
       const upd = (periodoId: string, f: (p: Periodo) => Partial<Periodo>) =>
         set((s) => ({ periodos: s.periodos.map((p) => (p.id === periodoId ? { ...p, ...f(p) } : p)) }));
+      const asegurarPeriodo = (periodoId: string) => {
+        const existente = get().periodos.find((p) => p.id === periodoId);
+        if (existente) return existente;
+        const empresa = get().empresas.find((e) => periodoId.startsWith(`${e.id}-`));
+        const mes = empresa ? periodoId.slice(empresa.id.length + 1) : "";
+        if (!empresa || !/^\d{4}-\d{2}$/.test(mes)) return undefined;
+        const periodo: Periodo = {
+          id: periodoId,
+          empresaId: empresa.id,
+          mes,
+          etapa: "novedades",
+          fechaObjetivo: `${mes}-28`,
+          sinNovedades: false,
+          versiones: [],
+          advertenciasAceptadas: {},
+          bps: "pendiente",
+          rectificaciones: [],
+          notas: [],
+        };
+        set((s) => ({ periodos: [...s.periodos, periodo] }));
+        return periodo;
+      };
       const per = (id: string) => get().periodos.find((p) => p.id === id)!;
       const emp = (id: string) => get().empresas.find((e) => e.id === id)!;
 
@@ -144,6 +170,7 @@ export const useStore = create<Datos & Acciones>()(
         ...estadoInicial(),
         setUsuario: (id) => set({ usuarioId: id }),
         setTemaUsuario: (tema) => set((s) => ({ temaPorUsuario: { ...s.temaPorUsuario, [s.usuarioId]: tema } })),
+        setEstudioLogo: (logo) => set({ estudioLogo: logo }),
         puede: (a) => {
           const rol = USUARIOS.find((u) => u.id === get().usuarioId)!.rol;
           if (rol === "lectura") return false;
@@ -173,27 +200,35 @@ export const useStore = create<Datos & Acciones>()(
           log({ actor: a, empresaId: n.empresaId, entidad: "Novedad", accion: `Eliminó ${n.tipo.replace("_", " ")}`, antes: n.cantidad ? String(n.cantidad) : `$ ${n.importe}` });
         },
         solicitarNovedades: (id) => {
+          const p = asegurarPeriodo(id);
+          if (!p) return;
           upd(id, (p) => ({ solicitud: { enviada: ahora(), abierta: p.solicitud?.abierta } }));
-          log({ empresaId: per(id).empresaId, entidad: "Solicitud", accion: "Solicitó novedades por email", detalle: `a ${emp(per(id).empresaId).contacto.email}` });
+          const empresa = get().empresas.find((x) => x.id === p.empresaId);
+          log({ empresaId: p.empresaId, entidad: "Solicitud", accion: "Solicitó novedades por email", detalle: empresa ? `a ${empresa.contacto.email}` : undefined });
         },
         abrirSolicitud: (id, a) => {
-          const p = per(id);
+          const p = asegurarPeriodo(id);
+          if (!p) return;
           if (p.solicitud && !p.solicitud.abierta) {
             upd(id, (p) => ({ solicitud: { ...p.solicitud!, abierta: ahora() } }));
             log({ actor: a, empresaId: p.empresaId, entidad: "Solicitud", accion: "Abrió la solicitud de novedades" });
           }
         },
         enviarNovedadesCliente: (id, a, sin) => {
+          const p = asegurarPeriodo(id);
+          if (!p) return;
           upd(id, (p) => ({
             etapa: p.etapa === "novedades" ? "recibidas" : p.etapa,
             sinNovedades: sin,
             solicitud: { enviada: p.solicitud?.enviada ?? ahora(), abierta: p.solicitud?.abierta ?? ahora(), respondida: ahora() },
           }));
-          log({ actor: a, empresaId: per(id).empresaId, entidad: "Novedades", accion: sin ? "Confirmó que no hay novedades" : "Envió novedades del mes" });
+          log({ actor: a, empresaId: p.empresaId, entidad: "Novedades", accion: sin ? "Confirmó que no hay novedades" : "Envió novedades del mes" });
         },
         marcarRecibidas: (id) => {
+          const p = asegurarPeriodo(id);
+          if (!p) return;
           upd(id, () => ({ etapa: "recibidas" }));
-          log({ empresaId: per(id).empresaId, entidad: "Novedades", accion: "Marcó novedades como completas" });
+          log({ empresaId: p.empresaId, entidad: "Novedades", accion: "Marcó novedades como completas" });
         },
         calcular: (id) => {
           const p = per(id);
@@ -222,6 +257,19 @@ export const useStore = create<Datos & Acciones>()(
           const v = per(id).versiones.at(-1)!.version;
           upd(id, () => ({ etapa: "aprobada", aprobacion: { version: v, estado: "aprobada", enviada: ahora(), fecha: ahora(), por: actor() } }));
           log({ empresaId: per(id).empresaId, entidad: "Aprobación", accion: `Aprobó internamente la versión ${v}`, detalle: "Empresa sin aprobación del cliente" });
+        },
+        cancelarLiquidacion: (id, motivo) => {
+          const p = per(id);
+          upd(id, () => ({
+            etapa: p.solicitud?.respondida || p.sinNovedades ? "recibidas" : "novedades",
+            versiones: [],
+            aprobacion: undefined,
+            cerrado: undefined,
+            bps: "pendiente",
+            rectificaciones: [],
+            advertenciasAceptadas: {},
+          }));
+          log({ empresaId: p.empresaId, entidad: "Liquidación", accion: "Canceló la liquidación completa", detalle: motivo });
         },
         cerrar: (id) => {
           const p = per(id);
@@ -315,7 +363,7 @@ export const useStore = create<Datos & Acciones>()(
     },
     {
       name: "cierra-demo-v1",
-      version: 5,
+      version: 6,
       // Cambió el modelo de datos: se regeneran los datos de ejemplo
       migrate: () => estadoInicial() as never,
     },
@@ -347,34 +395,49 @@ export function usePeriodoVista(empresaId: string, mes = MES_ACTUAL) {
   const novedades = useStore((s) => s.novedades);
   const periodos = useStore((s) => s.periodos);
   const parametrosNormativos = useStore((s) => s.parametrosNormativos);
+  const audit = useStore((s) => s.audit);
   return useMemo(
-    () => vistaPeriodo(empresaId, mes, { empresas, empleados, novedades, periodos, parametrosNormativos }),
-    [empresaId, mes, empresas, empleados, novedades, periodos, parametrosNormativos],
+    () => vistaPeriodo(empresaId, mes, { empresas, empleados, novedades, periodos, parametrosNormativos, audit }),
+    [empresaId, mes, empresas, empleados, novedades, periodos, parametrosNormativos, audit],
   );
 }
 
 export function vistaPeriodo(
   empresaId: string,
   mes: string,
-  d: Pick<Datos, "empresas" | "empleados" | "novedades" | "periodos"> & Partial<Pick<Datos, "parametrosNormativos">>,
+  d: Pick<Datos, "empresas" | "empleados" | "novedades" | "periodos"> & Partial<Pick<Datos, "parametrosNormativos" | "audit">>,
 ) {
   const empresa = d.empresas.find((e) => e.id === empresaId)!;
   const periodo =
     d.periodos.find((p) => p.empresaId === empresaId && p.mes === mes) ??
-    // Meses anteriores al actual: cerrados, reproducibles desde el motor
-    ({
-      id: `${empresaId}-${mes}`,
-      empresaId,
-      mes,
-      etapa: "cerrada",
-      fechaObjetivo: `${mes}-28`,
-      sinNovedades: false,
-      versiones: [],
-      advertenciasAceptadas: {},
-      bps: "presentado",
-      rectificaciones: [],
-      notas: [],
-    } as Periodo);
+    (mes >= MES_ACTUAL
+      ? ({
+          id: `${empresaId}-${mes}`,
+          empresaId,
+          mes,
+          etapa: "novedades",
+          fechaObjetivo: `${mes}-28`,
+          sinNovedades: false,
+          versiones: [],
+          advertenciasAceptadas: {},
+          bps: "pendiente",
+          rectificaciones: [],
+          notas: [],
+        } as Periodo)
+      : ({
+          // Meses anteriores al actual: cerrados, reproducibles desde el motor.
+          id: `${empresaId}-${mes}`,
+          empresaId,
+          mes,
+          etapa: "cerrada",
+          fechaObjetivo: `${mes}-28`,
+          sinNovedades: false,
+          versiones: [],
+          advertenciasAceptadas: {},
+          bps: "presentado",
+          rectificaciones: [],
+          notas: [],
+        } as Periodo));
   const ultima = periodo.versiones.at(-1);
   const vigente =
     periodo.etapa === "cerrada" && periodo.cerrado
@@ -382,7 +445,7 @@ export function vistaPeriodo(
       : ultima;
   const parametros = parametrosDe(d, mes);
   const resultados = vigente?.resultados ?? (periodo.etapa === "cerrada" ? calcularEmpresa(empresa, d.empleados, mes, d.novedades, parametros) : undefined);
-  const alertas = periodo.etapa === "cerrada" ? [] : validar(empresa, d.empleados, periodo, d.novedades, resultados);
+  const alertas = periodo.etapa === "cerrada" ? [] : validar(empresa, d.empleados, periodo, d.novedades, resultados, d.audit ?? []);
   const pend = pendientes(alertas, periodo);
   const estado = estadoVisible(periodo, alertas);
   const novedadesMes = d.novedades.filter((n) => n.empresaId === empresaId && n.mes === mes);
@@ -400,9 +463,10 @@ export function useVistas(mes = MES_ACTUAL) {
   const novedades = useStore((s) => s.novedades);
   const periodos = useStore((s) => s.periodos);
   const parametrosNormativos = useStore((s) => s.parametrosNormativos);
+  const audit = useStore((s) => s.audit);
   return useMemo(
-    () => empresas.map((e) => vistaPeriodo(e.id, mes, { empresas, empleados, novedades, periodos, parametrosNormativos })),
-    [mes, empresas, empleados, novedades, periodos, parametrosNormativos],
+    () => empresas.map((e) => vistaPeriodo(e.id, mes, { empresas, empleados, novedades, periodos, parametrosNormativos, audit })),
+    [mes, empresas, empleados, novedades, periodos, parametrosNormativos, audit],
   );
 }
 
